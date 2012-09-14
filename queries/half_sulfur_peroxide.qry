@@ -1,0 +1,16 @@
+(0 Composite_Query
+  (A I Version 2)
+  (A C Comment "half_sulfur_peroxide")
+  (0 Query
+    (A I version 2)
+    (A C smarts "[SD2]-[OD2]")
+  )
+  (1 Query
+    (A I version 2)
+    (A C smarts "[SD1]-[OD2]")
+  )
+  (2 Query
+    (A I version 2)
+    (A C smarts "[SD2]-[OD1]")
+  )
+)

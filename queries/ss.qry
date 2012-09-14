@@ -1,0 +1,11 @@
+(0 Query
+  (A I Version 2)
+  (A C Comment "ss")
+  (0 Query_Atom
+    (A I atomic_number 16)
+  )
+  (1 Query_Atom
+    (A I atomic_number 16)
+    (A I bond 0)
+  )
+)

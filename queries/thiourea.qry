@@ -1,0 +1,8 @@
+# RuleClass 
+# SubClass
+
+(0 Query
+  (A C Comment "thiourea")
+  (A I Version 2)
+  (A C smarts "[NR0G0]-C(=S)-[NG0R0]")
+)

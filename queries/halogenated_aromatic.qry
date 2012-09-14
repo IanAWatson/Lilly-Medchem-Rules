@@ -1,0 +1,7 @@
+(0 Query
+  (A C Comment "halogenated_aromatic")
+  (A I Version 2)
+  (0 Ring_System_Specifier
+    (A C environment ">4a-[F,Cl,Br,I]")
+  )
+)

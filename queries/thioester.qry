@@ -1,0 +1,6 @@
+(0 Query
+  (A C Comment "thioester")
+  (A I version 2)
+# (A C smarts "C(=O)-S")
+  (A C smarts "[SD2]-C=O")
+)

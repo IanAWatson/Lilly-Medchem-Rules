@@ -1,0 +1,8 @@
+# RuleClass acylating
+# SubClass acyl-QQ
+
+(0 Query
+  (A C Comment "diacylhydrazide")
+  (A I Version 2)
+  (A C smarts "O=C-N-N-C(=O)")
+)

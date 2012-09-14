@@ -1,0 +1,6 @@
+(0 Query
+  (A C Comment "sulfonyl_hydrazone")
+  (A I version 2)
+# (A C smarts "C=N-N-S(=O)(=O)")
+  (A C smarts "S(=O)(=O)-N-N=C")
+)

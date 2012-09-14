@@ -1,0 +1,5 @@
+(0 Query
+  (A C Comment "isothiourea_sulfonamide")
+  (A I version 2)
+  (A C smarts "N-C(-S)=N-[C,S](=O)")
+)
