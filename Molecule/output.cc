@@ -642,7 +642,7 @@ Molecule_Output_Object::determine_output_types (const Command_Line & cl,
       continue;
     }
 
-    if ("pdbso" == c || "pdbfo" == c)
+/*  if ("pdbso" == c || "pdbfo" == c)
     {
       set_write_pdb_files_in_fragment_order(1);
       continue;
@@ -665,7 +665,7 @@ Molecule_Output_Object::determine_output_types (const Command_Line & cl,
       set_store_pdb_atom_information(1);
       set_use_stored_atom_information_when_writing_pdb_files(1);
       continue;
-    }
+    }*/
 
     if ("help" == c)
     {

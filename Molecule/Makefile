@@ -40,6 +40,7 @@ TSMILES_OBJECTS = tsmiles.o $(COMMON_OBJECTS)
 all: $(EXECUTABLES)
 
 install:  $(EXECUTABLES)
+	if [ ! -d ../bin ] ; then mkdir ../bin ; fi
 	$(CP) -p $(EXECUTABLES) ../bin
 
 mc_first_pass: $(MC_FIRST_PASS_OBJECTS)
