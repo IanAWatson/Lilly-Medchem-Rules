@@ -43,12 +43,6 @@ class Bindir
     @bindir.push(dir)
   end
 
-  def add_sprime
-    s = "/lrl/indy/data01/software/sprime/dev-RH5"
-    @bindir.unshift("#{s}/sprime-core/bin")
-    @bindir.unshift("#{s}/sprime-core/bin/#{@uname}")
-  end
-
   def report_not_found prog
     $stderr.print "Cannot find '#{prog}' in any of\n"
     @bindir.each do |dir|
