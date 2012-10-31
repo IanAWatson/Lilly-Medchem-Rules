@@ -63,13 +63,9 @@ bin/mc_summarise -T Reasons okmedchem.smi
 
 QUERY FILES
 
-Even through the supplementary information associated with the paper
-gave the query files in JSON format, internally we are using a much
-older format.  If this was being done today, we would use a format
-like JSON rather than what is in the queries directory.
-
-That said, the existing file format is usually straightforward to use
-and often is nothing more than a smarts in a file.
+The query files are on a modified Cerius-2 format. Today, there are
+many better choices for file formats, and if the software were
+being developed today, we would likely use JSON or similar.
 
 SOFTWARE
 
@@ -96,6 +92,9 @@ I have also learned a lot about OO design over the years, and many
 of the ideas implemented here would benefit from refactoring to more
 modern design sensibilities. There is however no motivation to do that.
 
+Parsing of smarts and smiles is not elegant - it too would benefit
+from a re-design.
+
 The code is generally not thread safe - there is extensive use of file
 scope static variables to indicate optional behaviours.  Parallel
 processing for molecules is usually best done by separately processing
@@ -116,7 +115,7 @@ Many class methods will start with
 assert (ok())
 
 where the ok() function is a function that checks the internal
-integrity of the object.  If you compile with -NDEBUG this will
+integrity of the object.  If you compile with -DNDEBUG this will
 compile out all these checks, and you will see a speed improvement of
 maybe five percent.
 
@@ -160,6 +159,11 @@ behaviour. Since most of the molecules that cause problems for this
 implementation are not of pharmaceutical interest, we ignore these
 difficulties. The tool tsmiles (cd Molecule && make tsmiles) is a tester 
 that will automatically test canonicalisation and identify failures.
+Suggest always using the -u option.
+
+time Molecule/tsmiles -p 5 -a -t 0 -w 3 -m 2 -u -q test/example_molecules.smi
+
+Takes around 1 minute to test these 36k molecules - no errors reported.
 
 Getting consistent regular expression behaviour across implementations
 proved impossible and I ultimately used the regexp source from grep. 
@@ -172,6 +176,9 @@ number of file types, but for this distribution, we have included just
 smiles and various mdl flavours.  The other file types are not used
 extensively, and their handling is not always robust.  There are other
 tools available for doing such coversions in a robust fashion.
+
+Parsing of SDF files is very messy, but over the years, we have encountered
+a vast number of variations in SDF files.
 
 If you find bugs, we would be very interested in learning about those. 
 Please contact i.watson@lilly.com.  Or if you have a fix, then please
