@@ -11,7 +11,14 @@ LD = g++
 CXXFLAGS = -O2 -I . -I ../include -ffast-math -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 
 # Some versions of gcc need the -std= directive, remove if it causes problems
-CXXFLAGS = -O2 -I . -I ../include -ffast-math -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -std=c++0x
+CXXFLAGS = -O2 -I . -I ../include -ffast-math -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 
+
+# Auto check gcc version from Raj Guha
+GCCVERSIONGTEQ4 := $(shell expr `gcc -dumpversion | cut -f1,2 -d.` \>= 4.3)
+ifeq "$(GCCVERSIONGTEQ4)" "1"
+    CXXFLAGS += -std=c++0x
+endif
+
 
 CP = cp
 
