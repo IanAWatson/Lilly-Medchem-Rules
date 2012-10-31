@@ -1207,7 +1207,7 @@ Substructure_Atom::complete_chiral_centre_via_ring_closure (Substructure_Chiral_
       return 1;
   }
 
-  for (auto i = 0; i < _children.number_elements(); i++)
+  for (int i = 0; i < _children.number_elements(); i++)
   {
     if (! _children[i]->complete_chiral_centre_via_ring_closure(c, ndx))
       continue;

@@ -106,7 +106,7 @@ queries_from_file_of_molecules (data_source_and_type<MDL_Molecule> & input,
 
   while (NULL != (m = input.next_molecule ()))
   {
-    unique_ptr<MDL_Molecule> free_m (m);
+    auto_ptr<MDL_Molecule> free_m (m);
 
     if (! queries_from_file_of_molecules (*m, mqs, queries, verbose))
     {
@@ -254,7 +254,7 @@ queries_from_ISIS_query_file (data_source_and_type<MDL_Molecule> & input,
 
   while (NULL != (m = input.next_molecule()))
   {
-    unique_ptr<MDL_Molecule> free_m(m);
+    auto_ptr<MDL_Molecule> free_m(m);
 
     if (! query_from_ISIS_query_file (*m, mqs, queries, verbose))
     {
