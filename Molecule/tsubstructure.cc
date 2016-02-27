@@ -1143,7 +1143,7 @@ tsubstructure (data_source_and_type<Molecule> & input,
   Molecule * m;
   while (NULL != (m = input.next_molecule()))
   {
-    auto_ptr<Molecule> free_m(m);
+    std::unique_ptr<Molecule> free_m(m);
 
     molecules_read++;
     if (verbose > 1)

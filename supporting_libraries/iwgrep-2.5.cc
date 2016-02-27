@@ -156,7 +156,8 @@ IW_grep_25_regex::set_pattern (const char * s,
   int rc = regcompn (&_compiled_regular_expression, s, len, _regcomp_flags);
   if (0 != rc)
   {
-    cerr << "IW_grep_25_regex::set_pattern: cannot compile '" << cerr.write (s, len) << "'\n";
+    cerr << "IW_grep_25_regex::set_pattern: cannot compile '";
+    cerr.write (s, len) << "'\n";
     return 0;
   }
 

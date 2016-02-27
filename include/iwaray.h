@@ -26,7 +26,7 @@
 #define IW_TWO_PHASE_TEMPLATES
 #endif
 
-#if (__GNUC__ == 4)
+#if (__GNUC__ >= 4)
 #define IW_TWO_PHASE_TEMPLATES
 #endif
 
@@ -333,7 +333,7 @@ resizable_array_p<T>::resizable_array_p (int n)
 {
   assert (n >= 0);
 
-  this->resize (n);
+  this->resize(n);
 
   return;
 }
@@ -341,7 +341,7 @@ resizable_array_p<T>::resizable_array_p (int n)
 template <typename T>
 resizable_array_p<T>::resizable_array_p (T * item)
 {
-  add (item);
+  this->add(item);
 
   return;
 }
@@ -351,7 +351,7 @@ resizable_array<T>::resizable_array (int n)
 {
   assert (n >= 0);
 
-  this->resize (n);
+  this->resize(n);
 
   return;
 }
@@ -361,7 +361,7 @@ resizable_array<T>::resizable_array (int n, const T initialiser)
 {
   assert (n >= 0);
     
-  this->resize (n);
+  this->resize(n);
 
   for (int i = 0; i < _elements_allocated; i++)
   {
@@ -390,7 +390,7 @@ resizable_array<T>::resizable_array (const resizable_array<T> & rhs)
 template <typename T>
 resizable_array_base<T>::~resizable_array_base ()
 {
-  assert (ok ());
+  assert (ok());
    
   _number_elements = _elements_allocated = -1;   //paranoia !!
   _magic = -1;
@@ -1068,9 +1068,9 @@ resizable_array_base<T>::insert_at_beginning (const T item_to_insert)
   assert (ok ());
 
   if (0 == _number_elements )
-    return add (item_to_insert);
+    return this->add (item_to_insert);
   else
-    return insert_before (0, item_to_insert);
+    return this->insert_before (0, item_to_insert);
 }
 
 template <typename T>
@@ -1081,7 +1081,7 @@ resizable_array_base<T>::insert_in_order (T item_to_insert,
   assert (ok ());
 
   if (0 == _number_elements)
-    return add (item_to_insert);
+    return this->add (item_to_insert);
 
   int i;
   for (i = 0; i < _number_elements; i++)
@@ -1091,9 +1091,9 @@ resizable_array_base<T>::insert_in_order (T item_to_insert,
   }
 
   if (i == _number_elements)
-    return add (item_to_insert);
+    return this->add (item_to_insert);
 
-  return insert_before (i, item_to_insert);
+  return this->insert_before (i, item_to_insert);
 }
 
 template <typename T>
@@ -1101,39 +1101,39 @@ int
 resizable_array<T>::insert_in_order (const T item_to_insert, int increasing_order)
 {
   if (0 == _number_elements)
-    return add (item_to_insert);
+    return this->add (item_to_insert);
 
   if (increasing_order)
   {
     if (item_to_insert < _things[0])
-      return insert_at_beginning (item_to_insert);
+      return this->insert_at_beginning(item_to_insert);
 
     if (item_to_insert >= _things[_number_elements - 1])
-      return add (item_to_insert);
+      return this->add (item_to_insert);
 
     for (int i = 0; i < _number_elements; i++)
     {
       if (item_to_insert < _things[i])
-        return insert_before (i, item_to_insert);
+        return this->insert_before (i, item_to_insert);
     }
 
-    return add (item_to_insert);
+    return this->add (item_to_insert);
   }
   else     // decreasing order, largest first.
   {
     if (item_to_insert > _things[0])
-      return insert_at_beginning (item_to_insert);
+      return this->insert_at_beginning (item_to_insert);
 
     if (item_to_insert <= _things[_number_elements - 1])
-      return add (item_to_insert);
+      return this->add (item_to_insert);
 
     for (int i = 0; i < _number_elements; i++)
     {
       if (item_to_insert > _things[i])
-        return insert_before (i, item_to_insert);
+        return this->insert_before (i, item_to_insert);
     }
 
-    return add (item_to_insert);
+    return this->add (item_to_insert);
   }
 }
 
@@ -1142,33 +1142,33 @@ int
 resizable_array<T>::insert_in_order_if_not_already_present (const T item_to_insert, int increasing_order)
 {
   if (0 == _number_elements)
-    return add (item_to_insert);
+    return this->add (item_to_insert);
 
   if (increasing_order)
   {
     for (int i = 0; i < _number_elements; i++)
     {
       if (item_to_insert < _things[i])
-        return insert_before (i, item_to_insert);
+        return this->insert_before (i, item_to_insert);
 
       if (item_to_insert == _things[i])
         return 0;
     }
 
-    return add (item_to_insert);
+    return this->add (item_to_insert);
   }
   else     // decreasing order, largest first.
   {
     for (int i = 0; i < _number_elements; i++)
     {
       if (item_to_insert > _things[i])
-        return insert_before (i, item_to_insert);
+        return this->insert_before (i, item_to_insert);
 
       if (item_to_insert == _things[i])
         return 0;
     }
 
-    return add (item_to_insert);
+    return this->add (item_to_insert);
   }
 
   return 0;     // no path to here
@@ -1205,7 +1205,7 @@ resizable_array_base<T>::operator += (const resizable_array_base<T> & oo)
 
   for (int i = 0; i < noo; i++)
   {
-    add (oo.item (i));
+    this->add (oo.item (i));
   }
 
   return;
@@ -1215,7 +1215,7 @@ template <typename T>
 void
 resizable_array_base<T>::operator += (T extra)
 {
-  (void) add (extra);
+  (void) this->add (extra);
 
   return;
 }
@@ -1260,7 +1260,7 @@ resizable_array_p<T>::transfer_in (resizable_array_p<T> & oo,
   assert (oo.ok_index (item_to_transfer));
 
   T * tmp = oo._things[item_to_transfer];
-  add (tmp);
+  this->add (tmp);
   oo.remove_no_delete (item_to_transfer);
 
   return 1;
@@ -1462,7 +1462,7 @@ resizable_array<T>::add_non_duplicated_elements (const resizable_array<T> & qq)
     }
     if (0 == foundqi)
     {
-      add (qi);
+      this->add (qi);
       rc++;
     }
   }
@@ -1482,7 +1482,7 @@ resizable_array<T>::add_if_not_already_present (const T qq)
 
 // No match found, add qq
 
-  return add (qq);
+  return this->add (qq);
 }
 
 /*template <typename T>

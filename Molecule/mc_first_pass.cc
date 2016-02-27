@@ -669,7 +669,7 @@ tp_first_pass (data_source_and_type<Molecule> & input,
     iwmalloc_check_all_malloced (stderr);
 #endif
 
-    auto_ptr<Molecule> free_m (m);
+    std::unique_ptr<Molecule> free_m (m);
 
 //  if (verbose > 1)
 //    cerr << "Molecule " << input.molecules_read () << " finishes at line " << input.lines_read () << endl;

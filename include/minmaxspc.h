@@ -406,7 +406,7 @@ Min_Max_Specifier<T>::adjust_to_accommodate (const T v)
   if (! check_archive)
     return 1;
 
-  if (! contains (v))
+  if (! this->contains (v))
     add (v);
 
   _match_any = 0;

@@ -386,7 +386,7 @@ iwdemerit (data_source_and_type<Molecule> & input,
 
     molecules_read++;
 
-    auto_ptr<Molecule> free_m (m);
+    std:;unique_ptr<Molecule> free_m (m);
 
     preprocess (*m);
 

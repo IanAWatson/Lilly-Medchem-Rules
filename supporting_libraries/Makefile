@@ -12,7 +12,7 @@ CXXFLAGS = -O2 -I . -I ../include -Wall -ffast-math -DLINUX -D_LARGEFILE_SOURCE 
 # Auto check gcc version from Raj Guha
 GCCVERSIONGTEQ4 := $(shell expr `gcc -dumpversion | cut -f1,2 -d.` \>= 4.3)
 ifeq "$(GCCVERSIONGTEQ4)" "1"
-    CXXFLAGS += -std=c++0x
+    CXXFLAGS += -std=gnu++0x
 endif
 
 

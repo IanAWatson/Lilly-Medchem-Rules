@@ -177,7 +177,7 @@ iwarchive<T>::operator = (const iwarchive<T> & other)
 {
   _match_any = other._match_any;
 
-  resize (other._elements_allocated);
+  this->resize (other._elements_allocated);
   for (int i = 0; i < other._number_elements; i++)
   {
     _things[i] = other._things[i];
