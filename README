@@ -180,6 +180,49 @@ tools available for doing such coversions in a robust fashion.
 Parsing of SDF files is very messy, but over the years, we have encountered
 a vast number of variations in SDF files.
 
+Toolkit usage:
+
+The Molecule object is designed to be a functional tool for dealing
+with commonly encountered, drug-like small molecules.  It is not
+designed to handle all possible chemistry forms. 
+
+There are a great many parameters that can be set which control how the
+toolkit handles cases where reasonable people might need different
+behaviour.  Among the most important is aromaticity.  The default
+aromaticity definitions, named Pearlman (after Bob), are quite
+restrictive in what is considered aromatic - only structures having
+Kekule forms are considered aromatic. 
+
+An alternate aromaticity definition, called Daylight (after the
+company) takes a more liberal view of aromaticity.  It is recommended
+that all new programmes begin with
+
+ set_global_aromaticity_type(Daylight)
+
+to set this as the default. By default, rings with 4 atoms (and 2 pi 
+electrons) are not aromatic.  If this is desired, call 
+
+ set_allow_two_electron_systems_to_be_aromatic(1)
+
+which will enable this. There are other aromaticity definitions 
+included that are variants on these. Aromaticity determination of
+a Molecule will be governed by the currently applicable global
+aromaticity definition.
+
+Included in the source directory is a file, skeleton.cc, which gives
+a starting place upon which Molecule applications can be built.
+By default, it provides command line interfaces to a great many
+optional settings. Linking will be similar to the other tools 
+included.
+
+Particular care is needed when a Molecule is altered. If you have
+extracted a Ring or Bond via a pointer, and you change the molecule,
+those pointers may no longer be valid. No warning, usually crashes.
+Perform changes to the Molecule, then ask for Rings, Bonds, Atoms,
+etc..
+
+
+
 If you find bugs, we would be very interested in learning about those. 
 Please contact i.watson@lilly.com.  Or if you have a fix, then please
 do send it along.
