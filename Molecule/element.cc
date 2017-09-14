@@ -182,7 +182,7 @@ element_symbol_hash_function (const char * s,
 }
 
 int
-print_element_hash_table (ostream & os)
+print_element_hash_table (std::ostream & os)
 {
   for (int i = 0; i < SIZE_OF_ELEMENT_HASH_TABLE; i++)
   {
@@ -629,6 +629,7 @@ Element::_default_values (atomic_number_t i)
 
     case 34:
       _symbol = "Se";
+      _aromatic_symbol = "se";
       _normal_isotope = 79;
       _atomic_mass = static_cast<atomic_mass_t>(78.96);
       _normal_valence = 2;
@@ -762,8 +763,11 @@ Element::_default_values (atomic_number_t i)
    
     case 52:
       _symbol = "Te";
+      _aromatic_symbol = "te";
       _normal_isotope = 128;
       _atomic_mass = static_cast<atomic_mass_t>(127.60);
+      _normal_valence = 2;
+      _outer_shell_electrons = 6;
       _exact_mass     = 129.906229;
       break;
    
@@ -1312,7 +1316,7 @@ Element::~Element()
 }
 
 int
-Element::debug_print (ostream & os) const
+Element::debug_print (std::ostream & os) const
 {
   assert (os.good());
 
@@ -1325,7 +1329,7 @@ Element::debug_print (ostream & os) const
 }
 
 void
-debug_print_all_elements (ostream & os)
+debug_print_all_elements (std::ostream & os)
 {
   assert (os.good());
 
@@ -2065,7 +2069,7 @@ read_ptable_file (const const_IWSubstring & fname)
 }
       
 int
-display_standard_element_options (ostream & os)
+display_standard_element_options (std::ostream & os)
 {
   os << "  -E autocreate  automatically create new elements when encountered\n";
   os << "  -E PTABLE=file use 'file' for element data\n";
