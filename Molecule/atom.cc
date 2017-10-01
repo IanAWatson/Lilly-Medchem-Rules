@@ -87,6 +87,25 @@ reasonable_formal_charge_value (formal_charge_t c)
   return 1;
 }
 
+static int alternate_valences_give_hcount = 0;
+
+void 
+set_alternate_valences_give_hcount(const int s)
+{
+  alternate_valences_give_hcount = s;
+
+  return;
+}
+
+
+static int file_scope_four_connected_neutral_nitrogen_has_h = 0;
+
+void
+set_four_connected_neutral_nitrogen_has_h(const int s)
+{
+  file_scope_four_connected_neutral_nitrogen_has_h = s;
+}
+
 void
 Atom::_default_values (const Element * zelement)
 {
@@ -878,6 +897,18 @@ set_display_abnormal_valence_messages (int d)
   display_abnormal_valence_messages = d;
 }
 
+static int
+possible_hypervalent_hcount(const int v)
+{
+  if (alternate_valences_give_hcount)
+  {
+    assert (v >= 0);
+    return v;
+  }
+
+  return 0;
+}
+
 //#define DEBUG_COMPUTE_IMPLICIT_HYDROGENS
 
 int
@@ -971,11 +1002,11 @@ Atom::compute_implicit_hydrogens (int & result)
     return 0;      // return 0 so it will be known as a valence error
   }
 
-// Block 4 connected neutral Nitrogen
+// 4 connected neutral Nitrogen is an optional behaviour
 
   if (7 == _element->atomic_number() && 4 == _number_elements && 0 == _formal_charge && 4 == nbonds())
   {
-    result = 0;
+    result = file_scope_four_connected_neutral_nitrogen_has_h;
     return 1;
   }
 
@@ -998,14 +1029,13 @@ Atom::compute_implicit_hydrogens (int & result)
         else if (16 == _element->atomic_number() && -1 == _formal_charge && 2 == _number_elements)
           result = 1;
         else
-          result = ivalence - _formal_charge - _nbonds;
-        assert (result >= 0);
+          result = possible_hypervalent_hcount(ivalence - _formal_charge - _nbonds);
         return 1;
       }
     }
     else if (ivalence - _formal_charge - _nbonds >= 0)
     {
-      result = ivalence - _formal_charge - _nbonds;
+      result = possible_hypervalent_hcount(ivalence - _formal_charge - _nbonds);
       return 1;
     }
   }

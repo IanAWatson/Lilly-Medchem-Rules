@@ -237,4 +237,7 @@ extern void set_copy_implicit_hydrogen_count_in_atom_copy_constructor (int s);
 extern int set_reasonable_formal_charge_range(formal_charge_t, formal_charge_t);
 extern int reasonable_formal_charge_value (formal_charge_t c);
 
+extern void set_alternate_valences_give_hcount(const int s);
+extern void set_four_connected_neutral_nitrogen_has_h(const int s);
+
 #endif
