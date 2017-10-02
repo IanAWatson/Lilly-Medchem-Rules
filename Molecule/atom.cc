@@ -87,7 +87,7 @@ reasonable_formal_charge_value (formal_charge_t c)
   return 1;
 }
 
-static int alternate_valences_give_hcount = 0;
+static int alternate_valences_give_hcount = 1;
 
 void 
 set_alternate_valences_give_hcount(const int s)
