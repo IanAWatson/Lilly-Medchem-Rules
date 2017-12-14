@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
 #include <assert.h>
 
@@ -36,6 +18,7 @@
 
 Ring::Ring ()
 {
+  _is_fused = 0;
   _fused_system_identifier = -1;
   _aromaticity = AROMATICITY_NOT_DETERMINED;
   _ring_number = -9;
@@ -46,6 +29,7 @@ Ring::Ring ()
 
 Ring::Ring (const Ring & rhs)
 {
+  _is_fused = rhs._is_fused;
   _fused_system_identifier = rhs._fused_system_identifier;
   _aromaticity = rhs._aromaticity;
   _ring_number = rhs._ring_number;
@@ -104,6 +88,7 @@ int
 Ring::propagate_fused_system_identifier (int fsid)
 {
   _fused_system_identifier = fsid;
+  _is_fused = 1;
 
   int rc = 1;
 
@@ -189,25 +174,27 @@ Ring::spiro_fused (const int * ring_membership) const
 int
 Ring::fused_ring_check_for_spiro_fusion (const int * ring_membership) const
 {
-  for (int i = 0; i < _number_elements; i++)
+  return any_members_set_in_array(ring_membership);
+
+/*for (int i = 0; i < _number_elements; i++)
   {
     atom_number_t j = _things[i];
 
     if (ring_membership[j] > 0)
       return 1;
-  }
+  }*/
 
   return 0;
 }
 
-ostream &
-operator << (ostream & os, const Ring & r)
+std::ostream &
+operator << (std::ostream & os, const Ring & r)
 {
   os << "Ring " << r._ring_number;
-  if (r.fused_system_identifier () >= 0 || r.fused_ring_neighbours ())
+  if (r.is_fused() || r.fused_system_identifier () >= 0 || r.fused_ring_neighbours ())
   {
     os << " (";
-    if (r.fused_system_identifier () >= 0)
+    if (r.is_fused())
       os << "FSysId " << r.fused_system_identifier ();
     if (r.fused_ring_neighbours ())
       os << " fused " << r.fused_ring_neighbours ();

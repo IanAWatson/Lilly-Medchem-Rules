@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 /*
   First phase for 3rd party processing.
 
@@ -34,15 +16,14 @@
     a threshold, the molecule is rejected.
 */
 
-#include <stdlib.h>
-#include <ctype.h>
+#include <iostream>
 #include <iostream>
 #include <memory>
 #include <limits>
-using namespace std;
+using std::cerr;
+using std::endl;
 #include <assert.h>
 
-#include "iwconfig.h"
 #include "cmdline.h"
 #include "iwstring.h"
 #include "accumulator.h"
@@ -58,11 +39,6 @@ using namespace std;
 #include "istream_and_type.h"
 #include "output.h"
 
-//#define USE_IWMALLOC
-#ifdef USE_IWMALLOC
-#include "iwmalloc.h"
-#endif
-
 /*
   The programme can operate in the mode of just scanning its input
   and not writing anything
@@ -73,7 +49,7 @@ static int molecules_written = 0;
 
 static Chemical_Standardisation chemical_standardisation;
 
-static int skip_molecules_with_abnormal_valences;
+static int skip_molecules_with_abnormal_valences = 0;
 static int molecules_with_abnormal_valences = 0;
 
 static int exclude_isotopes = 0;
@@ -88,6 +64,8 @@ static int molecules_containing_non_allowed_atom_types = 0;
 static int exclude_molecules_containing_non_periodic_table_elements = 1;
 static int molecules_containing_non_periodic_table_elements = 0;
 
+static int run_all_checks = 0;
+
 /*
   One could imagine a poorly defined counterion entered as [X]. We can
   optionally allow non-periodic table elements if they aren't connected
@@ -96,10 +74,10 @@ static int molecules_containing_non_periodic_table_elements = 0;
 
 static int allow_non_periodic_table_elements_if_not_connected = 0;
 
-static float ring_bond_ratio = 2.0;
+static double ring_bond_ratio = 2.0;
 static int molecules_with_bad_ring_bond_ratios = 0;
 
-static Accumulator<int> natoms_accumulator;
+static Accumulator_Int<int> natoms_accumulator;
 
 // Note that these are applied differently from fileconv
 
@@ -112,7 +90,10 @@ int molecules_above_atom_count_cutoff = 0;
 static int exclude_molecules_with_no_interesting_atoms = 1;
 static int molecules_with_no_interesting_atoms = 0;
 
-static int reject_if_fragements_with_this_many_atoms = numeric_limits<int>::max();
+static double min_fraction_interesting_atoms = 0.0;
+static int molecules_with_not_enough_interesting_atoms = 0;
+
+static int reject_if_fragements_with_this_many_atoms = std::numeric_limits<int>::max();
 static int mixtures_rejected = 0;
 
 static int append_rejection_reason_to_name = 0;
@@ -157,6 +138,14 @@ static int molecules_with_too_many_rings = 0;
 static int upper_ring_size_cutoff = 0;
 static int molecules_with_ring_sizes_out_of_range = 0;
 
+/*
+  We can optionally assign each molecule written a number R(number).
+*/
+
+#include "numass.h"
+
+static Number_Assigner number_assigner;
+
 #include "rmele.h"
 
 static Elements_to_Remove elements_to_remove;
@@ -193,9 +182,12 @@ usage (int rc = 1)
   cerr << "  -s good        ignore erroneous chiral input\n";
   cerr << "  -s 1           include chiral info in output (default)\n";
   cerr << "  -s 0           exclude chiral info from output\n";
+//cerr << "  -n <number>    assign sequential numbers R(%d) starting with <number>\n";
   cerr << "  -b <ratio>     skip molecules with ring bond ratio's >= than <ratio>\n";
+  cerr << "  -w             run all checks - normally discards molecules once problem found\n";
   cerr << "  -V             skip any molecule with abnormal valences\n";
   cerr << "  -k             allow molecules having no \"interesting\" atoms to pass\n";
+  cerr << "  -f <fraction>  minimum fraction of interesting atoms required\n";
   cerr << "  -y             allow non periodic table elements if they are not connected\n";
   cerr << "  -L <fname>     write rejected molecules to <fname>\n";
   cerr << "  -a             append rejection reason to name in reject log\n";
@@ -212,9 +204,6 @@ usage (int rc = 1)
   (void) display_standard_chemical_standardisation_options (cerr, 'g');
   (void) display_standard_etrans_options (cerr, 't');
   (void) display_standard_aromaticity_options (cerr);
-#ifdef USE_IWMALLOC
-  (void) display_standard_debug_options (cerr, 'd');
-#endif
   cerr << "  -v             verbose output\n";
 
   exit (rc);
@@ -272,11 +261,46 @@ interesting_atoms (Molecule & m)
   return 0;
 }
 
+static int
+count_interesting_atoms (Molecule & m,
+                         const int * include_atom,
+                         const int flag)
+{
+  int carbon = 0;
+  int nitrogen = 0;
+  int oxygen = 0;
+
+  const auto matoms = m.natoms();
+
+  for (int i = 0; i < matoms; ++i)
+  {
+    if (NULL != include_atom && flag != include_atom[i])
+      continue;
+
+    atomic_number_t z = m.atomic_number (i);
+    if (6 == z)
+      carbon++;
+    else if (7 == z)
+      nitrogen++;
+    
+    else if (8 == z)
+      oxygen++;
+  }
+
+  if (0 == oxygen && 0 == nitrogen)
+    return 0;
+
+  if (0 == carbon)
+    return 0;
+  
+  return nitrogen + oxygen;
+}
+
 /*
   We can optionally append the reason for rejection to the molecule name
 */
 
-static const char * rejection_reason = NULL;
+static IWString rejection_reason;
 
 static int
 exclude_for_no_interesting_atoms (Molecule & m)
@@ -321,6 +345,51 @@ exclude_for_no_interesting_atoms (Molecule & m)
     rejection_reason = "no_interesting_atoms";
     return 1;     // yes, exclude this molecule
   }
+}
+
+static int
+exclude_for_too_few_interesting_atoms (Molecule & m)
+{
+  const int nf = m.number_fragments();
+
+  if (1 == nf)
+  {
+    const int interesting_atoms = count_interesting_atoms(m, NULL, 0);
+    if (static_cast<double>(interesting_atoms) / static_cast<double>(m.natoms()) >= min_fraction_interesting_atoms)
+      return 0;                // not rejected
+    rejection_reason = "too few interesting atoms";
+    return 1;          // yes, exclude this molecule
+  }
+
+  const int matoms = m.natoms();
+
+  int * f = new int[matoms]; std::unique_ptr<int[]> free_f(f);
+
+  m.fragment_membership(f);
+
+  int atoms_in_largest_fragment = 0;
+  int interesting_atoms_in_largest_fragment = 0;
+
+  for (int i = 0; i < nf; ++i)
+  {
+    const auto interesting_atoms = count_interesting_atoms(m, f, i+1);
+    const auto aif = m.atoms_in_fragment(i);
+
+    if (aif > atoms_in_largest_fragment)
+    {
+      atoms_in_largest_fragment = aif;
+      interesting_atoms_in_largest_fragment = interesting_atoms;
+    }
+    else if (aif == atoms_in_largest_fragment && interesting_atoms > interesting_atoms_in_largest_fragment)
+      interesting_atoms_in_largest_fragment = interesting_atoms;
+  }
+
+  if (static_cast<double>(interesting_atoms_in_largest_fragment) / static_cast<double>(atoms_in_largest_fragment) >= min_fraction_interesting_atoms)
+    return 0;            // do not reject this molecule
+
+  rejection_reason = "Too_few_interesting_atoms";
+
+  return 1;        // yes, reject this molecule
 }
 
 static int ok_elements[HIGHEST_ATOMIC_NUMBER + 1];
@@ -472,7 +541,7 @@ reject_for_ring_bond_ratio (Molecule & m)
       ring_bonds++;
   }
 
-  float ratio = static_cast<float> (ring_bonds) / static_cast<float> (nb);
+  double ratio = static_cast<double>(ring_bonds) / static_cast<double>(nb);
 
 //cerr << "My ratio " << ratio << " target " << ring_bond_ratio << endl;
 
@@ -487,7 +556,7 @@ _apply_all_filters (Molecule & m)
 {
   assert (m.ok ());
 
-  rejection_reason = NULL;
+  rejection_reason.resize_keep_storage(0);
 
 // Must do chemical standaridsation first because it may have
 // explicit hydrogens, which messes up the atom count things
@@ -500,9 +569,13 @@ _apply_all_filters (Molecule & m)
     return 0;
 
   if (lower_atom_count_cutoff > 0 || upper_atom_count_cutoff > 0 ||
-      numeric_limits<int>::max() != reject_if_fragements_with_this_many_atoms)
+      std::numeric_limits<int>::max() != reject_if_fragements_with_this_many_atoms)
   {
-    if (! process_fragments (m))
+    if (process_fragments (m))   // great, everything OK
+      ;
+    else if (run_all_checks)
+      ;
+    else
       return 0;
   }
 
@@ -524,13 +597,19 @@ _apply_all_filters (Molecule & m)
 
     molecules_with_no_interesting_atoms++;
   }
+  else if (min_fraction_interesting_atoms > 0.0 && exclude_for_too_few_interesting_atoms(m))
+  {
+    if (verbose > 1)
+      cerr << "Too few interesting atoms\n";
+    molecules_with_not_enough_interesting_atoms++;
+  }
   else if (lower_ring_count_cutoff && 
            m.nrings () < lower_ring_count_cutoff)
   {
     molecules_with_too_few_rings++;
     if (verbose > 1)
       cerr << "Molecule contains " << m.nrings () << " rings, which is below cutoff\n";
-    rejection_reason = "not_enough_rings";
+    rejection_reason << "not_enough_rings";
   }
   else if (upper_ring_count_cutoff &&
            m.nrings () > upper_ring_count_cutoff)
@@ -538,29 +617,28 @@ _apply_all_filters (Molecule & m)
     molecules_with_too_many_rings++;
     if (verbose > 1)
       cerr << "Molecule contains " << m.nrings () << " rings, which is above cutoff\n";
-    rejection_reason = "too_many_rings";
+    rejection_reason << "too_many_rings";
   }
   else if (exclude_isotopes && m.number_isotopic_atoms ())
   {
     molecules_containing_isotopes++;
     if (verbose > 1)
       cerr << "Molecule contains isotopes\n";
-    rejection_reason = "isotopes";
+    rejection_reason << "isotopes";
   }
-  else if (skip_molecules_with_abnormal_valences &&
-             ! m.valence_ok ())
+  else if (skip_molecules_with_abnormal_valences && ! m.valence_ok ())
   {
     molecules_with_abnormal_valences++;
     if (verbose > 1)
       cerr << "Molecule contains abnormal valence(s)\n";
-    rejection_reason = "abnormal_valence";
+    rejection_reason << "abnormal_valence";
   }
   else if (reject_for_ring_bond_ratio (m))
   {
     molecules_with_bad_ring_bond_ratios++;
     if (verbose > 1)
       cerr << "Ring bond ratio out of range\n";
-    rejection_reason = "ring_bond_ratio";
+    rejection_reason << "ring_bond_ratio";
   }
   else if (upper_ring_size_cutoff > 0 && reject_for_ring_size_condition (m, upper_ring_size_cutoff))
   {
@@ -568,7 +646,7 @@ _apply_all_filters (Molecule & m)
     if (verbose > 1)
       cerr << "Ring size out of range\n";
 
-    rejection_reason = "ring size";
+    rejection_reason << "ring size";
   }
   else
     keep = 1;     // molecule is good!
@@ -584,7 +662,7 @@ _apply_all_filters (Molecule & m)
 
 static int
 do_append_rejection_reason (Molecule & m,
-                            const char * rejection_reason)
+                            const IWString & rejection_reason)
 {
   IWString tmp = m.molecule_name ();
   tmp += ' ';
@@ -610,10 +688,12 @@ apply_all_filters (Molecule & m, int molecule_number)
 {
   int rc = _apply_all_filters (m);
 
-  if (rc)      // molecule is OK.
+  if (run_all_checks && rejection_reason.length() > 0)
+    ;
+  else if (rc)      // molecule is OK.
     return rc;
 
-  if (append_rejection_reason_to_name && NULL != rejection_reason)
+  if (append_rejection_reason_to_name && rejection_reason.length() > 0)
     do_append_rejection_reason (m, rejection_reason);
   if (rejections_output_object.good ())
     rejections_output_object.write (m);
@@ -665,9 +745,6 @@ tp_first_pass (data_source_and_type<Molecule> & input,
   Molecule * m;
   while (NULL != (m = input.next_molecule ()))
   {
-#ifdef USE_IWMALLOC
-    iwmalloc_check_all_malloced (stderr);
-#endif
 
     std::unique_ptr<Molecule> free_m (m);
 
@@ -681,6 +758,9 @@ tp_first_pass (data_source_and_type<Molecule> & input,
 
     if (! apply_all_filters (*m, input.molecules_read ()))
       continue;
+
+//  if (number_assigner.active ())
+//    number_assigner.process (*m);
 
     if (text_to_append.length ())
       m->append_to_name (text_to_append);
@@ -766,10 +846,6 @@ tp_first_pass (const char *fname,
     return 2;
   }
 
-#ifdef USE_IWMALLOC
-  iwmalloc_check_all_malloced (stderr);
-#endif
-
   rc = tp_first_pass (input, output);
 
   molecules_read += input.molecules_read ();
@@ -780,7 +856,7 @@ tp_first_pass (const char *fname,
 static int
 tp_first_pass (int argc, char ** argv)
 {
-  Command_Line cl (argc, argv, "aI:g:t:L:S:d:A:K:X:c:C:E:vVi:o:r:R:B:P:p:b:kyue:x:Z:");
+  Command_Line cl (argc, argv, "aI:g:t:n:L:S:d:A:K:X:c:C:E:vVi:o:r:R:B:P:p:b:kyue:x:Z:wf:");
 
   verbose = cl.option_count ('v');
 
@@ -789,13 +865,6 @@ tp_first_pass (int argc, char ** argv)
     cerr << "Unrecognised options encountered\n";
     usage (1);
   }
-
-#ifdef USE_IWMALLOC
-  if (! parse_standard_debug_options (cl, verbose, 'd'))
-  {
-    usage (7);
-  }
-#endif
 
   if (! process_elements (cl))
     usage (2);
@@ -825,6 +894,24 @@ tp_first_pass (int argc, char ** argv)
 
     if (verbose)
       cerr << "Will allow molecules with no interesting atoms to pass\n";
+  }
+
+  if (cl.option_present('f'))
+  {
+    if (! exclude_molecules_with_no_interesting_atoms)
+    {
+      cerr << "The -f and -k options cannot be used together\n";
+      usage(1);
+    }
+
+    if (! cl.value('f', min_fraction_interesting_atoms) || min_fraction_interesting_atoms < 0.0 || min_fraction_interesting_atoms > 1.0)
+    {
+      cerr << "The minimum fraction of interesting atoms needed (-f) must be a valid fraction\n";
+      usage(1);
+    }
+
+    if (verbose)
+      cerr << "Molecules must have a minimum fraction " << min_fraction_interesting_atoms << " of interesting atoms\n";
   }
 
   if (cl.option_present ('y'))
@@ -972,6 +1059,12 @@ tp_first_pass (int argc, char ** argv)
     usage (50);
   }
 
+//if (! number_assigner.initialise (cl, 'n', verbose))
+//{
+//  cerr << "Cannot process -n option\n";
+//  usage (51);
+//}
+
   if (cl.option_present ('r'))
   {
     if (! cl.value ('r', lower_ring_count_cutoff) ||
@@ -998,6 +1091,14 @@ tp_first_pass (int argc, char ** argv)
     if (verbose)
       cerr << "Molecules containing more than " << upper_ring_count_cutoff <<
               " rings will be ignored\n";
+  }
+
+  if (cl.option_present('w'))
+  {
+    run_all_checks = 1;
+
+    if (verbose)
+      cerr << "Will run all checks\n";
   }
 
   if (cl.option_present('Z'))
@@ -1159,6 +1260,12 @@ tp_first_pass (int argc, char ** argv)
 
       if (verbose)
         cerr << "Element " << e << " atomic number " << z << " allowed\n";
+
+      if (5 == z || 14 == z)
+      {
+        Element * x = const_cast<Element *>(o);
+        x->set_organic(1);
+      }
     }
   }
 
@@ -1267,13 +1374,6 @@ main (int argc, char **argv)
   prog_name = argv[0];
 
   int rc = tp_first_pass (argc, argv);
-
-#ifdef USE_IWMALLOC
-  if (verbose)
-    iwmalloc_malloc_status (stderr);
-  else
-    iwmalloc_terse_malloc_status (stderr);
-#endif
 
   return rc;
 }

@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef IWMINMAXSPECIFIER_H
 #define IWMINMAXSPECIFIER_H
 
@@ -56,7 +38,7 @@ class Min_Max_Specifier : public iwarchive<T>
     ~Min_Max_Specifier ();
 
     int ok () const;
-    int debug_print (ostream &) const;
+    int debug_print (std::ostream &) const;
 
     int is_set () const { return _is_set;}
 
@@ -76,21 +58,22 @@ class Min_Max_Specifier : public iwarchive<T>
 
     int matches (T) const;
 
-    int write_msi (ostream &, const char *, int = 0) const;
+    int write_msi (std::ostream &, const char *, int = 0) const;
 
-    int write_compact_representation (ostream &) const;  // something like '3,4', '>1', '<6'
+    int write_compact_representation (std::ostream &) const;  // something like '3,4', '>1', '<6'
 
     Min_Max_Specifier<T> & operator= (const Min_Max_Specifier<T> &);
 };
 
-template <typename T>  ostream &
-      operator << (ostream &, const Min_Max_Specifier<T> &);
+template <typename T>  std::ostream &
+      operator << (std::ostream &, const Min_Max_Specifier<T> &);
 
 #if (IW_IMPLEMENTATIONS_EXPOSED) || defined(MINMAXSPC_IMPLEMENTATION)
 
 #include <assert.h>
 #include <iomanip>
-using namespace std;
+using std::cerr;
+using std::endl;
 
 #include "minmaxspc.h"
 
@@ -169,7 +152,7 @@ Min_Max_Specifier<T>::ok () const
 
 template <typename T>
 int 
-Min_Max_Specifier<T>::debug_print (ostream & os) const
+Min_Max_Specifier<T>::debug_print (std::ostream & os) const
 {
   os << "Details on Min_Max_Specifier<T>::";
   if (_is_set)
@@ -325,7 +308,7 @@ Min_Max_Specifier<T>::matches (const T v) const
 
 template <typename T>
 int
-Min_Max_Specifier<T>::write_msi (ostream & os, const char * name,
+Min_Max_Specifier<T>::write_msi (std::ostream & os, const char * name,
                                 int indentation) const
 {
   assert (ok ());
@@ -528,15 +511,40 @@ Min_Max_Specifier<T>::initialise (const const_IWSubstring & buffer)
     if (token.starts_with ('='))
       token.remove_leading_chars (1);
 
-    T m;
-
-    if (! token.numeric_value (m))
+    int j = token.index('-');
+    if (j > 0)    // looks like range specification
     {
-      cerr << "Min_Max_Specifier::initialise: invalid numeric '" << buffer << "'\n";
-      return 0;
-    }
+      const_IWSubstring r1, r2;
+      if (! token.split(r1, '-', r2) || 0 == r1.length() || 0 == r2.length())
+      {
+        cerr << "Min_Max_Specifier::initialise:invalid range specification '" << token << "'\n";
+        return 0;
+      }
 
-    iwarchive<T>::add (m);
+      T vr1, vr2;
+      if (! r1.numeric_value(vr1) || ! r2.numeric_value(vr2) || vr1 > vr2)
+      {
+        cerr << "Min_Max_Specifier::initialise:invalid range specification '" << token << "'\n";
+        return 0;
+      }
+      while (vr1 <= vr2)    // theoretically T could be float or double type...
+      {
+        iwarchive<T>::add(vr1);
+        vr1 += static_cast<T>(1);
+      }
+    }
+    else
+    {
+      T m;
+
+      if (! token.numeric_value (m))
+      {
+        cerr << "Min_Max_Specifier::initialise: invalid numeric '" << buffer << "'\n";
+        return 0;
+      }
+
+      iwarchive<T>::add (m);
+    }
   }
 
   _is_set = _number_elements;
@@ -546,7 +554,7 @@ Min_Max_Specifier<T>::initialise (const const_IWSubstring & buffer)
 
 template <typename T>
 int
-Min_Max_Specifier<T>::write_compact_representation (ostream & os) const
+Min_Max_Specifier<T>::write_compact_representation (std::ostream & os) const
 {
   T tmp;
 
@@ -580,8 +588,8 @@ Min_Max_Specifier<T>::write_compact_representation (ostream & os) const
 // This is a separate include file because I cannot get the templates to instantiate
 
 template <class T>
-ostream &
-operator << (ostream & os, const Min_Max_Specifier<T> & qq) 
+std::ostream &
+operator << (std::ostream & os, const Min_Max_Specifier<T> & qq) 
 {
   os << "minmax: ";
 

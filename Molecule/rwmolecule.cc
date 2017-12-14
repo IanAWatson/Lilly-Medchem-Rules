@@ -1,39 +1,22 @@
-/**************************************************************************
-
-    Copyright (C) 2012  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 /*
   Various functions associated with reading and writing structure files
 */
 
-#include <stdlib.h>
-//#include <iostream>
+#include <iostream>
 //#include <iomanip>
 #include <limits>
-using namespace std;
-#include <assert.h>
+using std::cerr;
+using std::endl;
 
 #include "cmdline.h"
 #include "iwrandom.h"
 
 #include "misc2.h"
 #include "molecule.h"
+#include "mdl.h"
 #include "smiles.h"
 #include "iwstring_data_source.h"
+#include "string_data_source.h"
 
 /*
   Fileconv can be run so as to ignore all chiral information on input
@@ -235,7 +218,7 @@ seek_to_from_command_line ()
   return _seek_to_from_command_line;
 }
 
-static off_t _max_offset_from_command_line = numeric_limits<off_t>::max();
+static off_t _max_offset_from_command_line = std::numeric_limits<off_t>::max();
 
 off_t
 max_offset_from_command_line ()
@@ -422,8 +405,8 @@ suffix_for_file_type (int file_type)
       return "chm";
       break;
 
-    case IWMTYPE_GTF:
-      return "gtf";
+    case IWMTYPE_CIF:
+      return "cif";
       break;
 
     case IWMTYPE_SMT:
@@ -613,6 +596,8 @@ discern_file_type_from_name (const IWString & file_name)
     return IWMTYPE_MRV;
   if (file_name.ends_with(".inchi"))
     return IWMTYPE_INCHI;
+  if (file_name.ends_with(".cif"))
+    return IWMTYPE_CIF;
 
   return 0;
 }
@@ -642,6 +627,8 @@ _string_to_file_type (const const_IWSubstring & file_type)
     return MSI;
   if ("tdt" == file_type)
     return TDT;
+  if ("gfp" == file_type)
+    return TDT;
   if ("utdt" == file_type)
     return UTDT;
   if ("tdtnausmi" == file_type)
@@ -668,8 +655,8 @@ _string_to_file_type (const const_IWSubstring & file_type)
     return IWMTYPE_WCHM;
   if ("nausmi" == file_type)
     return IWMTYPE_NAUSMI;
-  if ("gtf" == file_type)
-    return IWMTYPE_GTF;
+  if ("cif" == file_type)
+    return IWMTYPE_CIF;
   if ("smt" == file_type)
     return IWMTYPE_SMT;
   if ("mrv" == file_type)
@@ -816,7 +803,7 @@ valid_file_type (int ftype)
       return 1;
       break;
 
-    case IWMTYPE_GTF:
+    case IWMTYPE_CIF:
       return 1;
       break;
 
@@ -926,8 +913,8 @@ set_type_to_write_with_operator(int s)
   type_to_write_with_operator = s;
 }
 
-ostream &
-operator << (ostream & os, Molecule & m)
+std::ostream &
+operator << (std::ostream & os, Molecule & m)
 {
   m.write_molecule(os, type_to_write_with_operator);
 
@@ -935,7 +922,7 @@ operator << (ostream & os, Molecule & m)
 }
 
 int
-Molecule::write_molecule (ostream & os, int output_type, 
+Molecule::write_molecule (std::ostream & os, int output_type, 
                           const IWString & comments)
 {
   assert (ok());
@@ -958,43 +945,15 @@ Molecule::write_molecule (ostream & os, int output_type,
     rc = write_molecule_rsmi(os, name());
   else if (IWMTYPE_NAUSMI == output_type)
     rc = write_molecule_nausmi(os, name());
-  else if (IWMTYPE_SMT == output_type)
-    rc = write_molecule_smarts(os);
   else
     cerr << "Molecule::write_molecule: unrecognised type " << output_type << "\n";
     
   return rc;
 }
 
-static int
-process_mdl_bond_translation (const const_IWSubstring & mdlbt)
-{
-  const_IWSubstring f, t;
-  if (! mdlbt.split(f, '=', t))
-  {
-    cerr << "An mdl bond translation must be of the form 'number=number'\n";
-    return 0;
-  }
-
-  int zfrom;
-  if (! f.numeric_value(zfrom) || zfrom < 0)
-  {
-    cerr << "process_mdl_bond_translation:invalid from bond type specification '" << f << "'\n";
-    return 0;
-  }
-
-  int zto;
-  if (! t.numeric_value(zto) || zto < 0)
-  {
-    cerr << "process_mdl_bond_translation:invalid to bond type specification '" << t << "'\n";
-    return 0;
-  }
-
-  return set_mdl_input_bond_type_translation(zfrom, zto);
-}
-
+template <typename T>
 int
-rwmolecule_error (const char * message, iwstring_data_source & input)
+rwmolecule_error (const char * message, T & input)
 {
   assert (NULL != message);
 
@@ -1009,8 +968,11 @@ rwmolecule_error (const char * message, iwstring_data_source & input)
   return 0;
 }
 
+template int rwmolecule_error<String_Data_Source>(char const*, String_Data_Source&);
+template int rwmolecule_error<iwstring_data_source>(char const*, iwstring_data_source&);
+
 static void
-display_input_help (ostream & os)
+display_input_help (std::ostream & os)
 {
   os << " -i sdf                  SDF input\n";
   os << " -i smi                  smiles input\n";
@@ -1036,6 +998,7 @@ display_input_help (ostream & os)
   os << " -i Galias               replace elements by their alias symbols, G records in MDL files\n";
   os << " -i ICTE=<nn>            ignore as many as <nn> connection table errors\n";
   os << " -i allsdfid             concatenate all sdf identifiers\n";
+  os << " -i gsubsdf=<c>          gsub all spaced values in sdf data records with <c>\n";
   os << " -i dctb                 Discern Cis-Trans Bonds\n";
   os << " -i d@3d                 Discern chirality from 3d coordinates\n";
   os << " -i d@3d=nn              Discern chirality from 3d coordinates, only if < nn atoms\n";
@@ -1053,8 +1016,8 @@ display_input_help (ostream & os)
   os << " -i discard_chiral       discard all chiral information input\n";
   os << " -i addmih               add implicit hydrogens to H deficient chiral centres\n";
   os << " -i mol2fc               try to assign formal changes when reading MOL2 files\n";
+  os << " -i mol2rfc              interpret mol2 charges as formal charges\n";
   os << " -i fixnd3v4             put formal charge on 3 connected, 4 bonded neutral Nitrogen\n";
-  os << " -i mxrngd=<nn>          max number of digits in % ring specifications (default 2)\n";
   os << " -i TDTSMI:XX            smiles is in tag XX rather than $SMI<>\n";
   os << " -i TDTID:XX             identifier is XX rather than PCN\n";
   os << " -i TDTAPPEND:XX         append dataitem XX to name\n";
@@ -1073,8 +1036,9 @@ display_input_help (ostream & os)
   os << " -i maxq=<charge>        set maximum plausible atomic partial charge\n";
   os << " -i minq=<charge>        set minimum plausible atomic partial charge\n";
   os << " -i mq=<charge>          set min (-charge) and max (+charge) plausible atomic partial charge\n";
-  os << " -o mfc=<charge>         set min and max plausible formal charges\n";
+  os << " -i mfc=<charge>         set min and max plausible formal charges\n";
   os << " -i mdlsep=<..>          separator between tags when reading mdl files \n";
+  os << " -i sasge                MDL V30: convert single atom SGROUP labels to elements\n";
 
   exit(0);
 }
@@ -1082,6 +1046,8 @@ display_input_help (ostream & os)
 int
 process_input_type (const Command_Line & cl, int & input_type)
 {
+  MDL_File_Supporting_Material * mdlfos = global_default_MDL_File_Supporting_Material();
+
   input_type = 0;
 
   int i = 0;
@@ -1096,19 +1062,24 @@ process_input_type (const Command_Line & cl, int & input_type)
     }
     else if ("ignore_bad_m" == optval)
     {
-      set_ignore_unrecognised_mdl_m_records(1);
+      mdlfos->set_ignore_unrecognised_mdl_m_records(1);
     }
     else if ("ignore_fatal_m" == optval)
     {
-       set_die_on_erroneous_m_input(0);
+       mdlfos->set_die_on_erroneous_m_input(0);
     }
     else if ("mdlquiet" == optval)
     {
-      set_mdl_report_unrecognised_records(0);
+      mdlfos->set_report_unrecognised_records(0);
     }
+//  else if (optval.starts_with("mdlquiet="))     seems like a good idea, implement it sometime
+//  {
+//    optval.remove_leading_chars(9);
+//    mdlfor->set_ignore_unrecognised_mdl_tag(optval);
+//  }
     else if ("ignore_self_bonds" == optval)
     {
-      set_mdl_ignore_self_bonds(1);
+      mdlfos->set_ignore_self_bonds(1);
       set_add_same_bond_twice_fatal(0);
     }
     else if ("uccvno" == optval)
@@ -1122,7 +1093,7 @@ process_input_type (const Command_Line & cl, int & input_type)
     else if (optval.starts_with("MDLIBT:"))
     {
       optval.remove_leading_chars(7);
-      if (! process_mdl_bond_translation(optval))
+      if (! mdlfos->process_mdl_bond_translation(optval))
       {
         cerr << "Invalid MDL input bond type translation '" << optval << "'\n";
         return 0;
@@ -1138,12 +1109,12 @@ process_input_type (const Command_Line & cl, int & input_type)
         return 0;
       }
 
-      if (! set_sdf_identifier(sdfid))    // bad pattern
+      if (! mdlfos->set_sdf_identifier(sdfid))    // bad pattern
         return 0;
     }
     else if ("ICTE" == optval)
     {
-      set_number_connection_table_errors_to_skip(numeric_limits<int>::max());
+      set_number_connection_table_errors_to_skip(std::numeric_limits<int>::max());
     }
     else if (optval.starts_with("ICTE="))
     {
@@ -1158,43 +1129,48 @@ process_input_type (const Command_Line & cl, int & input_type)
     }
     else if ("allsdfid" == optval || "ALLSDFID" == optval)
     {
-      set_fetch_all_sdf_identifiers(1);
+      mdlfos->set_fetch_all_sdf_identifiers(1);
+    }
+    else if (optval.starts_with("gsubsdf="))
+    {
+      optval.remove_leading_chars(8);
+      mdlfos->set_gsub_mdl_file_data(optval[0]);
     }
     else if ("SDFNONAME" == optval)
     {
-      set_discard_sdf_molecule_name(1);
+      mdlfos->set_discard_sdf_molecule_name(1);
     }
     else if ("SDFNOPREPEND" == optval)
     {
-      set_prepend_sdf_identifier(0);
+      mdlfos->set_prepend_sdfid(0);
     }
     else if ("firstsdftag" == optval)
     {
-      set_take_first_tag_as_name(1);
+      mdlfos->set_take_first_tag_as_name(1);
     }
     else if (optval.starts_with("RPSDFTAG="))
     {
       optval.remove_leading_chars(9);
-      set_replace_first_sdf_tag(optval);
+      mdlfos->set_replace_first_sdf_tag(optval);
     }
     else if (optval.starts_with("RDFID:"))
     {
       optval.remove_leading_chars(6);
-      add_rdfile_identifier(optval);
+      mdlfos->add_rdfile_identifier(optval);
     }
     else if (optval.starts_with("RDFSTART:"))
     {
       optval.remove_leading_chars(9);
-      set_rdfile_start_of_record(optval);
+      mdlfos->set_rdfile_start_of_record(optval);
     }
     else if ("mdlatomalias" == optval)
     {
-      set_set_elements_based_on_atom_aliases(1);
+      mdlfos->set_set_elements_based_on_atom_aliases(1);
       set_auto_create_new_elements(1);
     }
     else if ("Galias" == optval)
     {
-      set_mdl_g_records_hold_atom_symbols(1);
+      mdlfos->set_mdl_g_records_hold_atom_symbols(1);
       set_auto_create_new_elements(1);
     }
     else if ("ignoretdtnosmi" == optval || "IGNORETDTNOSMI" == optval)
@@ -1211,41 +1187,41 @@ process_input_type (const Command_Line & cl, int & input_type)
     }
     else if ("ISISEXTREG" == optval)
     {
-      set_extract_isis_extregno(1);
+      mdlfos->set_extract_isis_extregno(1);
     }
     else if (optval.starts_with("IDM:"))
     {
       optval.remove_leading_chars(4);
-      set_mdl_name_in_m_tag(optval);
+      mdlfos->set_mdl_name_in_m_tag(optval);
     }
     else if ("mdl3chop" == optval)
     {
-      set_mdl_truncate_long_elements(1);
+      mdlfos->set_truncate_long_symbols(1);
     }
     else if (optval.starts_with("mdl3="))
     {
       optval.remove_leading_chars(5);
-      set_mdl_change_long_symbols_to(optval);
+      mdlfos->set_mdl_change_long_symbols_to(optval);
     }
     else if ("mdlD" == optval)
     {
-      set_mdl_allow_deuterium(1);
+      mdlfos->set_allow_deuterium(1);
     }
     else if ("mdlT" == optval)
     {
-      set_mdl_allow_tritium(1);
+      mdlfos->set_allow_tritium(1);
     }
     else if ("mdlRisonum" == optval)
     {
-      set_mdl_read_isotopes_as_numbers_rather_than_differences_from_normal(1);
+      mdlfos->set_read_isotopes_as_numbers_rather_than_differences_from_normal(1);
     }
     else if ("mdlRisoMnum" == optval)
     {
-      set_mdl_read_M_isotopes_as_numbers_rather_than_differences_from_normal(1);
+      mdlfos->set_read_M_isotopes_as_numbers_rather_than_differences_from_normal(1);
     }
     else if ("mdlRincch" == optval)
     {
-      set_mdl_read_h_correct_chiral_centres(0);
+      mdlfos->set_mdl_read_h_correct_chiral_centres(0);
     }
     else if ("ignore_bad_chiral" == optval)
     {
@@ -1283,7 +1259,7 @@ process_input_type (const Command_Line & cl, int & input_type)
     }
     else if ("mdlustere" == optval)
     {
-      set_mdl_accumulate_mdl_chirality_features(1);
+      mdlfos->set_accumulate_mdl_chirality_features(1);
     }
     else if ("dctb" == optval)
     {
@@ -1307,7 +1283,7 @@ process_input_type (const Command_Line & cl, int & input_type)
     }
     else if ("dwedge" == optval)
     {
-      set_mdl_discern_chirality_from_wedge_bonds(1);
+      mdlfos->set_discern_chirality_from_wedge_bonds(1);
     }
     else if ("ibctb" == optval)
     {
@@ -1426,30 +1402,18 @@ process_input_type (const Command_Line & cl, int & input_type)
 
       set_reasonable_formal_charge_range(-q, q);
     }
-    else if ("mol2fc" == optval)
-    {
-//    set_mol2_assign_default_formal_charges(1);
-    }
     else if ("fixnd3v4" == optval)
     {
        set_put_formal_charges_on_neutral_ND3v4(1);
     }
-    else if (optval.starts_with("mxrngd="))
-    {
-      optval.remove_leading_chars(7);
-      int m;
-      if (! optval.numeric_value(m) || m < 2)
-      {
-        cerr << "The maximum number of digits in a ring specification must be a number > 1\n";
-        return 0;
-      }
-
-      set_max_ring_digits_following_percent(m);
-    }
     else if (optval.starts_with("mdlsep="))
     {
       optval.remove_leading_chars(7);
-      set_mdl_insert_between_sdf_name_tokens(optval);
+      mdlfos->set_mdl_insert_between_sdf_name_tokens(optval);
+    }
+    else if ("sasge" == optval)
+    {
+      mdlfos->set_convert_single_atom_sgroup_to_element(1);
     }
     else if ("help" == optval)
     {
@@ -1497,7 +1461,7 @@ reset_rwmolecule_file_scope_variables ()
     _skip_first_molecules = 0;
     _do_only_n_molecules = 0;
     _seek_to_from_command_line = 0;
-    _max_offset_from_command_line = numeric_limits<off_t>::max();
+    _max_offset_from_command_line = std::numeric_limits<off_t>::max();
     _number_connection_table_errors_to_skip = 0;
     _unconnect_covalently_bonded_non_organics_on_read = 0;
     _put_formal_charges_on_neutral_ND3v4 = 0;

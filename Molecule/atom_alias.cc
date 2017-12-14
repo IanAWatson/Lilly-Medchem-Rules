@@ -1,25 +1,8 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
 
 #define RESIZABLE_ARRAY_IMPLEMENTATION
 #include "iwaray.h"
+#include "string_data_source.h"
 
 #include "atom_alias.h"
 
@@ -54,9 +37,10 @@ Atom_Alias::_copy (const Atom_Alias & rhs)
   return;
 }
 
+template <typename T>
 int
 Atom_Alias::build (const const_IWSubstring & buffer,
-                   iwstring_data_source & input)
+                   T & input)
 {
   assert (buffer.starts_with ("A  "));
 
@@ -86,3 +70,5 @@ Atom_Alias::build (const const_IWSubstring & buffer,
 template class resizable_array_p<Atom_Alias>;
 template class resizable_array_base<Atom_Alias *>;
 
+template int Atom_Alias::build<iwstring_data_source>(const_IWSubstring const&, iwstring_data_source&);
+template int Atom_Alias::build<String_Data_Source>(const_IWSubstring const&, String_Data_Source&);

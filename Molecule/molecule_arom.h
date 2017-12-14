@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 //  Include file for all the private molecule functions in aromatic.cc
 
 #ifndef COMPILING_AROMATIC_CC
@@ -57,7 +39,7 @@
 
     int _count_aromatic_bonds_in_just_one_ring (const Ring & r);
 
-    int _determine_aromaticity_by_single_fusions (int * pi_electron_count,
+    int _determine_aromaticity_by_single_fusions_to_ring (int * pi_electron_count,
                                                     int aromaticity_rules,
                                                     int * rings_in_fused_system,
                                                     int * ok_to_include,
@@ -135,7 +117,7 @@
 
     int _kekule_identify_next_atom (const int * process_these,
                                     atom_number_t & a) const;
-    int _doubly_bonded_to_something_outside_ring(atom_number_t zatom);
+    int _doubly_bonded_to_something_outside_ring(atom_number_t zatom) const;
     int _bonded_to_heteroatom_outside_system (atom_number_t a, const int * aromatic_system);
 
     int __find_kekule_form_current_config (const resizable_array<const Ring *> & rings,
@@ -163,7 +145,7 @@
 
     int _kekule_cannot_be_aromatic (int *, int &, int &);
 
-    int _convert_chain_aromatic_bonds (const int * aromatic_atoms, const int * rm);
+    int _convert_chain_aromatic_bonds (int * aromatic_atoms, const int * rm);
     int _convert_any_chain_aromatic_atoms_to_permanent_aromatic (const int * process_these_atoms);
     int _maybe_all_atoms_are_permanent_aromatic (Kekule_Temporary_Arrays &, const resizable_array<const Ring *> & rings);
     int _convert_atom_to_permanent_aromatic (atom_number_t zatom);
@@ -249,5 +231,8 @@
     int _bond_in_ring_with_all_members_permanent_aromatic (atom_number_t a1,  
                                                              atom_number_t a2,
                                                              const int * is_permanent_aromatic) const;
+    int _both_double_bonds_in_set(const Set_of_Atoms & p, const atom_number_t zatom) const;
+
+    int _has_kekule_forms(const Set_of_Atoms & r) const;
 
 /* arch-tag: 37e305b3-dfa5-44ea-8f3c-c036cab21fa5 */

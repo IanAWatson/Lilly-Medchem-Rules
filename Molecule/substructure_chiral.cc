@@ -1,26 +1,4 @@
-/**************************************************************************
-
-    Copyright (C) 2012  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
-
-#ifdef VALHALLA
-#include "VDOM_sss.h"
-#endif
 
 #include "substructure.h"
 #include "target.h"
@@ -49,7 +27,7 @@ Substructure_Chiral_Centre::~Substructure_Chiral_Centre()
   return;
 }
 int
-Substructure_Chiral_Centre::debug_print (ostream & os) const
+Substructure_Chiral_Centre::debug_print (std::ostream & os) const
 {
   os << "Substructure_Chiral_Centre::debug_print:has " << _number_explicit_connections << " explicit connections\n";
   if (NULL != _numeric)
@@ -294,250 +272,6 @@ check_match(atom_number_t north1,
   return 0;
 }
 
-#ifdef VALHALLA
-
-static void
-extract_chiral_data (atom_number_t & a,
-                     const unsigned char * p)
-{
-  if (p[1] == one_bit_8[0])
-    a = CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN;
-  else if (p[1] == one_bit_8[1])
-    a = CHIRAL_CONNECTION_IS_LONE_PAIR;
-  else
-    a = static_cast<atom_number_t>(p[1]);
-
-  return;
-}
-
-int
-Chiral_Centre::build_from_vdom_data (const unsigned char * p)
-{
-  extract_chiral_data(_top_front,  p + 1);
-  extract_chiral_data(_top_back,   p + 3);
-  extract_chiral_data(_left_down,  p + 5);
-  extract_chiral_data(_right_down, p + 7);
-
-  return 1;
-}
-
-int
-Molecule_to_Match::_build_chirality_info_from_vdom_data ()
-{
-  const unsigned char * p = reinterpret_cast<const unsigned char *> (_start_of_vdom_chiral_info);
-
-  for (int i = 0; i < _number_chiral_centres; i++)
-  {
-    atom_number_t a = static_cast<atom_number_t>(*p);
-
-    Chiral_Centre * c = new Chiral_Centre(a);
-
-    c->build_from_vdom_data (p);
-
-    p += VDOM_BYTES_PER_CHIRAL_CENTER;
-
-    _chiral_centre.add(c);
-  }
-
-  return _number_chiral_centres;
-}
-
-const Chiral_Centre *
-Molecule_to_Match::chiral_centre_at_atom (atom_number_t a) 
-{
-  if (0 == _number_chiral_centres)
-    return NULL;
-
-  if (0 == _chiral_centre.number_elements())
-    _build_chirality_info_from_vdom_data();
-
-  assert (_number_chiral_centres == _chiral_centre.number_elements());
-
-  for (int i = 0; i < _number_chiral_centres; i++)
-  {
-    const Chiral_Centre * rc = _chiral_centre[i];
-
-    if (rc->a() == a)
-      return rc;
-  }
-
-  return NULL;
-}
-
-int
-Single_Substructure_Query::_chiral_atoms_matched (Query_Atoms_Matched & matched_atoms,
-                                    Molecule_to_Match & target_molecule) const
-{
-  int n = target_molecule.number_chiral_centres();
-  if (0 == n)
-    return 1;
-
-//cerr << "Checking " << n << " chirality specifications for matches\n";
-
-  for (int i = 0; i < n; i++)
-  {
-    if (! _chirality[i]->is_matched(target_molecule))
-      return 0;
-  }
-
-  return 1;
-}
-
-int
-Substructure_Chiral_Centre::is_matched (Molecule_to_Match & target) const
-{
-  assert (NULL != _centre);
-
-  if (NULL == _centre->current_hold_atom())    // hard to imagine
-    return 0;
-
-  atom_number_t centre_atom = _centre->current_hold_atom()->atom_number();
-
-#ifdef DEBUG_SUBSTURE_CHIRAL_CENTRE_IS_MATCHED
-  cerr << "Centre matched with " << centre_atom << endl;
-#endif
-
-  const Chiral_Centre * c = target.chiral_centre_at_atom(centre_atom);
-  if (NULL == c)
-    return 0;
-
-#ifdef DEBUG_SUBSTURE_CHIRAL_CENTRE_IS_MATCHED
-  cerr << "Got chiral centre on matched atom\n";
-#endif
-
-  int matched_connections = 0;
-
-#ifdef DEBUG_SUBSTURE_CHIRAL_CENTRE_IS_MATCHED
-  cerr << " tf " << _top_front << " tb " << _top_back << " ld " << _left_down << " rd " << _right_down << endl;
-#endif
-
-  atom_number_t what_to_add_if_not_matched;
-
-  if (4 == target[centre_atom].ncon())
-    what_to_add_if_not_matched = INVALID_ATOM_NUMBER;
-  else if (target[centre_atom].hcount())
-    what_to_add_if_not_matched = CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN;
-  else
-    what_to_add_if_not_matched = CHIRAL_CONNECTION_IS_LONE_PAIR;
-
-  atom_number_t tf;
-  if (get_matched_atom_number(_top_front, tf, what_to_add_if_not_matched))
-    matched_connections++;
-
-  atom_number_t tb;
-  if (get_matched_atom_number(_top_back, tb, what_to_add_if_not_matched))
-    matched_connections++;
-
-  atom_number_t ld;
-  if (get_matched_atom_number(_left_down, ld, what_to_add_if_not_matched))
-    matched_connections++;
-
-  atom_number_t rd;
-  if (get_matched_atom_number(_right_down, rd, what_to_add_if_not_matched))
-    matched_connections++;
-
-#ifdef DEBUG_SUBSTURE_CHIRAL_CENTRE_IS_MATCHED
-  cerr << "Found " << matched_connections << " matched connections, compare " << _number_explicit_connections << endl;
-  cerr << "tf " << tf << " tb " << tb << " ld " << ld << " rd " << rd << endl;
-  cerr << _number_explicit_connections << " explicit connections, target " << c->number_connections_specified() << endl;
-#endif
-
-  if (matched_connections != _number_explicit_connections)
-    return 0;
-
-// If our query has just 3 connections, and the chiral centre we are trying to
-// match has 4, we need to be careful about how we match things up.
-// Always pass things in counterclockwise order, looking down the connection
-// being considered
-
-  if (3 == _number_explicit_connections && 4 == c->number_atoms_specified())
-  {
-    if (tf < 0)
-    {
-      if (tb == c->top_front())
-        return rd == c->left_down();
-      if (tb == c->top_back())
-        return rd == c->right_down();
-      if (tb == c->left_down())
-        return rd == c->top_front();
-      if (tb == c->right_down())
-        return rd == c->top_back();
-    }
-    else if (tb < 0)
-    {
-      if (tf == c->top_front())
-        return rd == c->right_down();
-      if (tf == c->top_back())
-        return rd == c->left_down();
-      if (tf == c->left_down())
-        return rd == c->top_back();
-      if (tf == c->right_down())
-        return rd == c->top_front();
-    }
-    else if (ld < 0)
-    {
-      if (tf == c->top_front())
-        return tb == c->top_back();
-      if (tf == c->top_back())
-        return tb == c->top_front();
-      if (tf == c->left_down())
-        return tb == c->right_down();
-      if (tf == c->right_down())
-        return tb == c->left_down();
-    }
-    else if (rd < 0)
-    {
-      if (tf == c->top_front())
-        return tb == c->top_back();
-      if (tf == c->top_back())
-        return tb == c->top_front();
-      if (tf == c->left_down())
-        return tb == c->right_down();
-      if (tf == c->right_down())
-        return tb == c->left_down();
-    }
-
-    cerr << "Substructure_Chiral_Centre:should not come to here\n";
-    return 0;
-  }
-
-// At this stage, we have assembled all the matched atoms. Now just do
-// the comparison. Make sure we pass the arguments in anti-clockwise order
-
-  if (tf >= 0)
-  {
-    if (tf == c->top_front())
-      return check_match(tb, ld, rd, c->top_back(), c->left_down(), c->right_down());
-    else if (tf == c->top_back())
-      return check_match(tb, ld, rd, c->top_front(), c->right_down(), c->left_down());
-    else if (tf == c->left_down())
-      return check_match(tb, ld, rd, c->top_front(), c->top_back(), c->right_down());
-    else if (tf == c->right_down())
-      return check_match(tb, ld, rd, c->top_front(), c->left_down(), c->top_back());
-  }
-  else if (tb >= 0)
-  {
-    if (tb == c->top_front())
-      return check_match(tf, rd, ld, c->top_back(), c->left_down(), c->right_down());
-    else if (tb == c->top_back())
-      return check_match(tf, rd, ld, c->top_front(), c->right_down(), c->left_down());
-    else if (tb == c->left_down())
-      return check_match(tf, rd, ld, c->top_front(), c->top_back(), c->right_down());
-    else if (tb == c->right_down())
-      return check_match(tf, rd, ld, c->top_front(), c->left_down(), c->top_back());
-  }
-  else
-  {
-    cerr << "Substructure_Chiral_Centre::is_matched:huh, what's matched\n";
-    return 0;
-  }
-
-  cerr << "Should not come to here\n";
-
-  return 0;
-}
-#else
-
 int
 Single_Substructure_Query::_chiral_atoms_matched (Query_Atoms_Matched & matched_atoms,
                                     Molecule_to_Match & target_molecule) const
@@ -561,7 +295,6 @@ Single_Substructure_Query::_chiral_atoms_matched (Query_Atoms_Matched & matched_
   return 1;         // all chirality specifications OK
 }
 
-#endif
 
 //#define DEBUG_SUBSTURE_CHIRAL_CENTRE_IS_MATCHED
 #ifdef DEBUG_SUBSTURE_CHIRAL_CENTRE_IS_MATCHED
@@ -865,7 +598,7 @@ Substructure_Chiral_Centre::construct_from_msi_attribute (const msi_attribute & 
 }*/
 
 int
-Substructure_Chiral_Centre::write_msi (ostream & os, 
+Substructure_Chiral_Centre::write_msi (std::ostream & os, 
                                      const IWString & ind,
                                      const char * attribute_name) const
 {

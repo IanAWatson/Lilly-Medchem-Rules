@@ -1,27 +1,4 @@
-/**************************************************************************
-
-    Copyright (C) 2012  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
-
-//#define USE_IWMALLOC
-#ifdef USE_IWMALLOC
-#include "iwmalloc.h"
-#endif
 
 #include "substructure.h"
 #include "msi_object.h"
@@ -44,21 +21,21 @@ Substructure_Query::Substructure_Query (const char * cc)
 {
   _default_values ();
 
-  set_comment (cc);
+  set_comment(cc);
 }
 
 Substructure_Query::Substructure_Query (const const_IWSubstring & cc)
 {
-  _default_values ();
+  _default_values();
 
-  set_comment (cc);
+  set_comment(cc);
 }
 
 Substructure_Query::Substructure_Query (const IWString & cc)
 {
-  _default_values ();
+  _default_values();
 
-  set_comment (cc);
+  set_comment(cc);
 }
 
 Substructure_Query::~Substructure_Query ()
@@ -76,18 +53,18 @@ Substructure_Query::ok () const
   cerr << "Checking OK for Substructure Query with " << _number_elements << " queries\n";
 #endif
 
-  if (! _operator.ok ())
+  if (! _operator.ok())
     return 0;
 
   for (int i = 0; i < _number_elements; i++)
-    if (! _things[i]->ok ())
+    if (! _things[i]->ok())
       return 0;
 
   return 1;
 }
 
 int
-Substructure_Query::debug_print (ostream & os) const
+Substructure_Query::debug_print (std::ostream & os) const
 {
   os << "Substructure Query ";
   if (1 == _number_elements)
@@ -95,21 +72,21 @@ Substructure_Query::debug_print (ostream & os) const
   else
   {
     os << _number_elements << " components";
-    _operator.debug_print (os);
+    _operator.debug_print(os);
   }
 
   IWString indentation = "   ";
   for (int i = 0; i < _number_elements; i++)
   {
     os << " Query " << i << endl;
-    _things[i]->debug_print (os, indentation);
+    _things[i]->debug_print(os, indentation);
   }
 
-  return os.good ();
+  return os.good();
 }
 
 int
-Substructure_Query::terse_details (ostream & os) const
+Substructure_Query::terse_details (std::ostream & os) const
 {
   os << "Substructure Query ";
   if (1 == _number_elements)
@@ -117,17 +94,17 @@ Substructure_Query::terse_details (ostream & os) const
   else
   {
     os << _number_elements << " components\n";
-    _operator.debug_print (os);
+    _operator.debug_print(os);
   }
 
   IWString indentation = "   ";
   for (int i = 0; i < _number_elements; i++)
   {
     os << " Query " << i << endl;
-    _things[i]->terse_details (os, indentation);
+    _things[i]->terse_details(os, indentation);
   }
 
-  return os.good ();
+  return os.good();
 }
 
 int
@@ -135,7 +112,7 @@ Substructure_Query::numeric_value (double & d, int ndx) const
 {
   for (int i = 0; i < _number_elements; i++)
   {
-    if (_things[i]->numeric_value (d, ndx))
+    if (_things[i]->numeric_value(d, ndx))
       return 1;
   }
 
@@ -147,7 +124,7 @@ Substructure_Query::set_numeric_value (double d, int ndx)
 {
   for (int i = 0; i < _number_elements; i++)
   {
-    _things[i]->set_numeric_value (d, ndx);
+    _things[i]->set_numeric_value(d, ndx);
   }
 
   return;
@@ -158,7 +135,7 @@ Substructure_Query::add_numeric_value (double d)
 {
   for (int i = 0; i < _number_elements; i++)
   {
-    _things[i]->add_numeric_value (d);
+    _things[i]->add_numeric_value(d);
   }
 
   return;
@@ -169,7 +146,7 @@ Substructure_Query::discard_all_numeric_values ()
 {
   for (int i = 0; i < _number_elements; i++)
   {
-    _things[i]->discard_all_numeric_values ();
+    _things[i]->discard_all_numeric_values();
   }
 
   return;
@@ -180,7 +157,7 @@ Substructure_Query::unique_numbers_from_initial_atom_numbers ()
 {
   for (int i = 0; i < _number_elements; i++)
   {
-    if (! _things[i]->unique_numbers_from_initial_atom_numbers ())
+    if (! _things[i]->unique_numbers_from_initial_atom_numbers())
     {
       return 0;
     }
@@ -196,9 +173,9 @@ Substructure_Query::_substructure_search (Molecule_to_Match & target,
                                           Substructure_Results & results)
 {
   if (_each_component_search)
-    return substructure_search_do_each_component (target, results);
+    return substructure_search_do_each_component(target, results);
 
-  _operator.reset ();
+  _operator.reset();
 
 #ifdef DEBUG_SUBSTRUCTURE_SEARCH
   cerr << "Query evaluating " << _number_elements << " components\n";
@@ -206,19 +183,19 @@ Substructure_Query::_substructure_search (Molecule_to_Match & target,
 
   for (int i = 0; i < _number_elements; i++)
   {
-    if (i > 0 && ! _operator.result_needed (i))    // perhaps as a result of an OR operator
+    if (i > 0 && ! _operator.result_needed(i))    // perhaps as a result of an OR operator
       continue;
 
-    int tmp = _things[i]->substructure_search (target, results);
+    int tmp = _things[i]->substructure_search(target, results);
 
 #ifdef DEBUG_SUBSTRUCTURE_SEARCH
     cerr << "Return code from i = " << i << " is " << tmp << endl;
 #endif
 
-    _operator.set_result (i, tmp);
+    _operator.set_result(i, tmp);
 
     int result;
-    if (! _operator.evaluate (result))     // need to evaluate more components
+    if (! _operator.evaluate(result))     // need to evaluate more components
       continue;
 
 //  We have enough results for a final answer
@@ -244,70 +221,70 @@ int
 Substructure_Query::substructure_search (Molecule_to_Match & target,
                                          Substructure_Results & results)
 {
-  assert (ok ());
-  assert (target.ok ());
+  assert (ok());
+  assert (target.ok());
 
-  return _substructure_search (target, results);
+  return _substructure_search(target, results);
 }
 
 int
 Substructure_Query::substructure_search (Molecule & m,
                                          Substructure_Results & results)
 {
-  Molecule_to_Match target (&m);
+  Molecule_to_Match target(&m);
 
-  return substructure_search (target, results);
+  return substructure_search(target, results);
 }
 
 int
 Substructure_Query::substructure_search (Molecule * m,
                                          Substructure_Results & results)
 {
-  return substructure_search (*m, results);
+  return substructure_search(*m, results);
 }
 int
 Substructure_Query::substructure_search (Molecule_to_Match & target)
 {
   Substructure_Results results;
 
-  return substructure_search (target, results);
+  return substructure_search(target, results);
 }
 
 int
 Substructure_Query::substructure_search (Molecule * m)
 {
-  assert (ok ());
-  assert (m->ok ());
+  assert (ok());
+  assert (m->ok());
 
-  Molecule_to_Match target (m);
+  Molecule_to_Match target(m);
   Substructure_Results results;
 
-  return substructure_search (target, results);
+  return substructure_search(target, results);
 }
 
 int
 Substructure_Query::substructure_search_do_each_component (Molecule_to_Match & target,
                                                            Substructure_Results & sresults)
 {
-  sresults.initialise (target.natoms ());
+  sresults.initialise(target.natoms());
 
   for (int i = 0; i < _number_elements; i++)
   {
     Substructure_Results tmp;
 
-    if (0 == _things[i]->substructure_search (target, tmp))
+    if (0 == _things[i]->substructure_search(target, tmp))
       continue;
 
-    sresults.add_embeddings (tmp);
+    sresults.add_embeddings(tmp);
   }
 
-  return sresults.number_embeddings ();
+  return sresults.number_embeddings();
 }
 
 int
 Substructure_Query::set_find_one_embedding_per_atom (int s)
 {
-  assert (ok ());
+  assert (ok());
 
   if (0 == _number_elements)
   {
@@ -315,9 +292,11 @@ Substructure_Query::set_find_one_embedding_per_atom (int s)
     return 0;
   }
 
+//cerr << "Substructure_Query::set_find_one_embedding_per_atom:has " << _number_elements << " components\n";
+
   for (int i = 0; i < _number_elements; i++)
   {
-    _things[i]->set_find_one_embedding_per_atom (s);
+    _things[i]->set_find_one_embedding_per_atom(s);
   }
 
   return 1;
@@ -326,7 +305,7 @@ Substructure_Query::set_find_one_embedding_per_atom (int s)
 int
 Substructure_Query::set_max_matches_to_find (int m)
 {
-  assert (ok ());
+  assert (ok());
 
   if (0 == _number_elements)
   {
@@ -336,7 +315,7 @@ Substructure_Query::set_max_matches_to_find (int m)
 
   for (int i = 0; i < _number_elements; i++)
   {
-    _things[i]->set_max_matches_to_find (m);
+    _things[i]->set_max_matches_to_find(m);
   }
 
   return 1;
@@ -345,7 +324,7 @@ Substructure_Query::set_max_matches_to_find (int m)
 int
 Substructure_Query::set_min_matches_to_find (int m)
 {
-  assert (ok ());
+  assert (ok());
 
   if (0 == _number_elements)
   {
@@ -355,7 +334,7 @@ Substructure_Query::set_min_matches_to_find (int m)
 
   for (int i = 0; i < _number_elements; i++)
   {
-    _things[i]->set_min_matches_to_find (m);
+    _things[i]->set_min_matches_to_find(m);
   }
 
   return 1;
@@ -364,7 +343,7 @@ Substructure_Query::set_min_matches_to_find (int m)
 int
 Substructure_Query::set_find_unique_embeddings_only (int s)
 {
-  assert (ok ());
+  assert (ok());
 
   if (0 == _number_elements)
   {
@@ -374,7 +353,7 @@ Substructure_Query::set_find_unique_embeddings_only (int s)
 
   for (int i = 0; i < _number_elements; i++)
   {
-    _things[i]->set_find_unique_embeddings_only (s);
+    _things[i]->set_find_unique_embeddings_only(s);
   }
 
   return 1;
@@ -383,7 +362,7 @@ Substructure_Query::set_find_unique_embeddings_only (int s)
 int
 Substructure_Query::set_do_not_perceive_symmetry_equivalent_matches (int s)
 {
-  assert (ok ());
+  assert (ok());
 
   if (0 == _number_elements)
   {
@@ -393,7 +372,7 @@ Substructure_Query::set_do_not_perceive_symmetry_equivalent_matches (int s)
 
   for (int i = 0; i < _number_elements; i++)
   {
-    _things[i]->set_do_not_perceive_symmetry_equivalent_matches (s);
+    _things[i]->set_do_not_perceive_symmetry_equivalent_matches(s);
   }
 
   return 1;
@@ -402,38 +381,38 @@ Substructure_Query::set_do_not_perceive_symmetry_equivalent_matches (int s)
 int
 Substructure_Query::max_query_atoms_matched_in_search () const
 {
-  assert (ok ());
+  assert (ok());
 
-  iwmax<int> rc (0);
+  iwmax<int> rc(0);
   for (int i = 0; i < _number_elements; i++)
   {
-    rc.extra (_things[i]->max_query_atoms_matched_in_search ());
+    rc.extra(_things[i]->max_query_atoms_matched_in_search());
   }
 
-  return rc.maxval ();
+  return rc.maxval();
 }
 
 int
 Substructure_Query::max_atoms_in_query ()
 {
-  assert (ok ());
+  assert (ok());
 
-  iwmax<int> rc (0);
+  iwmax<int> rc(0);
   for (int i = 0; i < _number_elements; i++)
   {
-    rc.extra (_things[i]->max_atoms_in_query ());
+    rc.extra(_things[i]->max_atoms_in_query());
   }
 
-  return rc.maxval ();
+  return rc.maxval();
 }
 
 int
-Substructure_Query::print_environment_matches (ostream & os) const
+Substructure_Query::print_environment_matches (std::ostream & os) const
 {
   int environment_present = 0;
   for (int i = 0; i < _number_elements; i++)
   {
-    if (_things[i]->environment_present ())
+    if (_things[i]->environment_present())
     {
       environment_present = 1;
       break;
@@ -441,27 +420,27 @@ Substructure_Query::print_environment_matches (ostream & os) const
   }
 
   if (! environment_present)
-    return os.good ();
+    return os.good();
 
   os << "Environment matches for query '" << _comment << "'\n";
 
   for (int i = 0; i < _number_elements; i++)
   {
     os << " Query component " << i << endl;
-    _things[i]->print_environment_matches (os);
+    _things[i]->print_environment_matches(os);
   }
 
-  return os.good ();
+  return os.good();
 }
 
 int
 Substructure_Query::add (Single_Substructure_Query * q,
                          int logop)
 {
-  resizable_array_p<Single_Substructure_Query>::add (q);
+  resizable_array_p<Single_Substructure_Query>::add(q);
 
   if (_number_elements > 1)
-    _operator.add_operator (logop);
+    _operator.add_operator(logop);
 
   return 1;
 }       
@@ -470,7 +449,19 @@ Substructure_Query::query_atom_with_initial_atom_number (int a) const
 {
   for (int i = 0; i < _number_elements; i++)
   {
-    Substructure_Atom * rc = _things[i]->query_atom_with_initial_atom_number (a);
+    Substructure_Atom * rc = _things[i]->query_atom_with_initial_atom_number(a);
+    if (NULL != rc)
+      return rc;
+  }
+
+  return NULL;
+}
+Substructure_Atom *
+Substructure_Query::query_atom_with_atom_map_number (int a) const
+{
+  for (int i = 0; i < _number_elements; i++)
+  {
+    Substructure_Atom * rc = _things[i]->query_atom_with_atom_map_number(a);
     if (NULL != rc)
       return rc;
   }
@@ -486,7 +477,23 @@ Substructure_Query::highest_initial_atom_number () const
 
   for (int i = 0; i < _number_elements; i++)
   {
-    int h = _things[i]->highest_initial_atom_number ();
+    int h = _things[i]->highest_initial_atom_number();
+
+    if (h > rc)
+      rc = h;
+  }
+
+  return rc;
+}
+
+int
+Substructure_Query::highest_atom_map_number () const
+{
+  int rc = -1;
+
+  for (int i = 0; i < _number_elements; i++)
+  {
+    int h = _things[i]->highest_atom_map_number();
 
     if (h > rc)
       rc = h;
@@ -500,7 +507,7 @@ Substructure_Query::set_respect_initial_atom_numbering (int s)
 {
   for (int i = 0; i < _number_elements; i++)
   {
-    _things[i]->set_respect_initial_atom_numbering (s);
+    _things[i]->set_respect_initial_atom_numbering(s);
   }
 
   return;
@@ -511,7 +518,7 @@ Substructure_Query::set_ncon (const Min_Max_Specifier<int> & n)
 {
   for (int i = 0; i < _number_elements; i++)
   {
-    _things[i]->set_ncon (n);
+    _things[i]->set_ncon(n);
   }
 
   return;
@@ -522,7 +529,7 @@ Substructure_Query::set_distance_between_hits (const Min_Max_Specifier<int> & n)
 {
   for (int i = 0; i < _number_elements; i++)
   {
-    _things[i]->set_distance_between_hits (n);
+    _things[i]->set_distance_between_hits(n);
   }
 
   return;
@@ -533,7 +540,7 @@ Substructure_Query::set_only_keep_matches_in_largest_fragment (int s)
 {
   for (int i = 0; i < _number_elements; i++)
   {
-    _things[i]->set_only_keep_matches_in_largest_fragment (s);
+    _things[i]->set_only_keep_matches_in_largest_fragment(s);
   }
 
   return;
@@ -558,7 +565,7 @@ Substructure_Query::set_embeddings_do_not_overlap (int s)
 {
   for (int i = 0; i < _number_elements; i++)
   {
-    _things[i]->set_embeddings_do_not_overlap (s);
+    _things[i]->set_embeddings_do_not_overlap(s);
   }
 
   return;
@@ -602,7 +609,18 @@ Substructure_Query::identify_atom_numbers (extending_resizable_array<int> & a) c
 {
   for (int i = 0; i < _number_elements; i++)
   {
-    _things[i]->identify_atom_numbers (a);
+    _things[i]->identify_atom_numbers(a);
+  }
+
+  return;
+}
+
+void
+Substructure_Query::identify_atom_map_numbers (extending_resizable_array<int> & a) const
+{
+  for (int i = 0; i < _number_elements; i++)
+  {
+    _things[i]->identify_atom_map_numbers(a);
   }
 
   return;
@@ -622,4 +640,55 @@ Substructure_Query::bond_between_atoms (int a1, int a2) const
   }
 
   return NULL;
+}
+
+const Substructure_Bond *
+Substructure_Query::bond_between_atom_map_numbers (int a1, int a2) const
+{
+  const Substructure_Bond * rc;
+
+  for (int i = 0; i < _number_elements; i++)
+  {
+    rc = _things[i]->bond_between_atom_map_numbers(a1, a2);
+
+    if (NULL != rc)
+      return rc;
+  }
+
+  return NULL;
+}
+
+void
+Substructure_Query::assign_unique_id_from_atom_number_if_set (extending_resizable_array<int> & numbers_in_use)
+{
+  for (auto i = 0; i < _number_elements; ++i)
+  {
+    _things[i]->assign_unique_id_from_atom_number_if_set(numbers_in_use);
+  }
+
+  return;
+}
+int
+Substructure_Query::assign_atom_map_numbers(int & amap)
+{
+  int rc = 0;
+  for (auto i = 0; i < _number_elements; ++i)
+  {
+    rc += _things[i]->assign_atom_map_numbers(amap);
+  }
+
+  return rc;
+}
+
+int
+Substructure_Query::print_connectivity_graph(std::ostream & output) const
+{
+  output << "Substructure_Query::print_connectivity_graph:has " << _number_elements << " components\n";
+
+  for (int i = 0; i < _number_elements; ++i)
+  {
+    _things[i]->print_connectivity_graph(output);
+  }
+
+  return 1;
 }

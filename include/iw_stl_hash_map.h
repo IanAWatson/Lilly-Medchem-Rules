@@ -1,29 +1,15 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef IW_STL_HASH_MAP_H
 #define  IW_STL_HASH_MAP_H
 
 #include <stdlib.h>
+#include <iostream>
 
 #include "iwconfig.h"
 
-#if (GCC_VERSION >= 40400)
+#if (GCC_VERSION >= 40405)
+#include <unordered_map>
+#define IW_Hash_Map std::unordered_map
+#elif defined(__clang__)
 #include <unordered_map>
 #define IW_Hash_Map std::unordered_map
 #elif (__GNUC__ >= 3)
@@ -36,7 +22,8 @@ using namespace stdext;
 #define IW_Hash_Map hash_map
 #endif
 
-using namespace std;
+using std::cerr;
+using std::endl;
 
 #include "iwstring.h"
 #include "iwhash.h"
@@ -59,6 +46,7 @@ class IW_STL_Hash_Map : public IW_Hash_Map<T, V, IWStringHash>
 typedef IW_STL_Hash_Map<IWString, int> IW_STL_Hash_Map_int;
 typedef IW_STL_Hash_Map<IWString, unsigned int> IW_STL_Hash_Map_uint;
 typedef IW_STL_Hash_Map<IWString, float> IW_STL_Hash_Map_float;
+typedef IW_STL_Hash_Map<IWString, double> IW_STL_Hash_Map_double;
 typedef IW_STL_Hash_Map<IWString, long> IW_STL_Hash_Map_long;
 typedef IW_STL_Hash_Map<IWString, off_t> IW_STL_Hash_Map_off_t;
 typedef IW_STL_Hash_Map<IWString, IWString> IW_STL_Hash_Map_String;

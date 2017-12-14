@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef IW_CMDLINE_H
 #define IW_CMDLINE_H
 
@@ -34,11 +16,18 @@ class Option_and_Value
   private:
     int _o;
     const char * _value;
-    int _valid_as_int;
-    int _int_val;
+    int _valid_as;
+
+    long int _long_int_val;
+    unsigned long int _unsigned_long_int_val;
+
     double _double_val;
     int _valid_as_double;
     clov_magic_number_t _magic;
+
+//  private functions
+
+    int _discern_numeric_values ();
 
   public:
     Option_and_Value (int, const char * = NULL);
@@ -49,16 +38,8 @@ class Option_and_Value
     char   option () const { return _o;}
     const char * value  () const { return _value;}
 
-//  int int_val (int &);
-//  int double_val (double &);
+    template <typename T> int value (T &) const;
 
-    int value (int &);
-    int value (unsigned int &);
-    int value (long int &);
-    int value (long long &);
-    int value (unsigned long &);
-    int value (float &);
-    int value (double &);
     int value (IWString &);
     int value (const_IWSubstring &);
     int value (char *);
@@ -82,7 +63,7 @@ class Command_Line : public resizable_array<const char *>
     ~Command_Line ();
 
     int ok () const;
-    int debug_print (ostream &) const;
+    int debug_print (std::ostream &) const;
 
     int some_options_start_with_dash () const { return _some_options_start_with_dash;}
     int unrecognised_options_encountered () const { return _unrecognised_options_encountered;}
@@ -94,13 +75,10 @@ class Command_Line : public resizable_array<const char *>
 
     const char * option_value (const char, int = 0) const;
 
-    int value (const char, int &, int = 0) const;
-    int value (const char, unsigned int &, int = 0) const;
-    int value (const char, long int &, int = 0) const;
-    int value (const char, long long &, int = 0) const;
-    int value (const char, unsigned long &, int = 0) const;
-    int value (const char, double &, int = 0) const;
-    int value (const char, float &, int = 0) const;
+    template <typename T> int value (const char, T &, int = 0) const;
+
+//  int value (const char, double &, int = 0) const;
+//  int value (const char, float &, int = 0) const;
     int value (const char, IWString &, int = 0) const;
     int value (const char, const_IWSubstring &, int = 0) const;
     int value (const char, char *, int = 0) const;
@@ -117,5 +95,17 @@ class Command_Line : public resizable_array<const char *>
 
 //  int position (char c, int f = 0) const { return option_present (c, f) - 1;}
 };
+
+template <typename T>
+int
+Option_and_Value::value (T & rc) const
+{
+  if (NULL == _value)
+    return 0;
+
+  const_IWSubstring tmp(_value);
+
+  return tmp.numeric_value(rc);
+}
 
 #endif

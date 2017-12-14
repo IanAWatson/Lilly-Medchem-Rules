@@ -1,26 +1,9 @@
-/**************************************************************************
-
-    Copyright (C) 2012  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
-#include <stdlib.h>
+#include <iostream>
 #include <string.h>
 #include <iostream>
 #include <memory>
-using namespace std;
+using std::cerr;
+using std::endl;
 
 // Define this symbol before including molecule.h
 
@@ -32,7 +15,6 @@ using namespace std;
 #include "tbb/scalable_allocator.h"
 #endif
 
-#include "iw_auto_array.h"
 #include "iwqsort.h"
 #include "iwbits.h"
 #include "primes.h"
@@ -43,10 +25,6 @@ class Rings_Found;
 #include "path.h"
 #include "molecule.h"
 #include "misc2.h"
-
-#ifdef USE_IWMALLOC
-#include "iwmalloc.h"
-#endif
 
 void
 Molecule::_initialise_ring_membership()
@@ -71,7 +49,7 @@ Molecule::_determine_ring_or_non_ring(atom_number_t a)
 
   assert (IW_RING_MEMBERSHIP_NOT_COMPUTED == _ring_membership[a]);
 
-  int * tmp = new_int(_number_elements); iw_auto_array<int> free_tmp(tmp);
+  int * tmp = new_int(_number_elements); std::unique_ptr<int[]> free_tmp(tmp);
 
   _find_raw_rings_for_fragment(frag_id, tmp);
 
@@ -309,7 +287,7 @@ Molecule::_unused_fused_ring_system_identifier()
 }
 
 int
-Molecule::print_ring_info (ostream & os) const
+Molecule::print_ring_info (std::ostream & os) const
 {
   assert (ok());
 
@@ -371,7 +349,7 @@ Molecule::print_ring_info (ostream & os) const
 }
 
 int
-Molecule::experimental_print_ring_info (ostream & os) const
+Molecule::experimental_print_ring_info (std::ostream & os) const
 {
   if (IW_NRINGS_NOT_COMPUTED == _nrings && IW_NRINGS_NOT_COMPUTED == _number_sssr_rings)
   {
@@ -576,10 +554,6 @@ Molecule::ring_membership()
   if (NULL == _ring_membership)
     _initialise_ring_membership();
 
-#ifdef USE_IWMALLOC
-  iwmalloc_check_all_malloced(stderr);
-#endif
-
   if (0 == nrings())
     set_vector(_ring_membership, _number_elements, 0);
   else
@@ -617,7 +591,7 @@ Molecule::ring_membership (int * rm)
 
   copy_vector(rm, tmp, _number_elements);
 
-  return 1;
+  return _nrings;
 }
 
 int
@@ -649,7 +623,7 @@ Molecule::in_same_ring (atom_number_t a1, atom_number_t a2)
 
   for (int i = 0; i < nr; i++)
   {
-    const Ring * r = _sssr_rings[i];
+//  const Ring * r = _sssr_rings[i];
 
     if (_sssr_rings[i]->contains_both(a1, a2))
       return 1;
@@ -719,7 +693,11 @@ Molecule::in_same_ring_system (atom_number_t a1, atom_number_t a2)
   {
     const Ring * ri = _sssr_rings[i];
 
-    if (! ri->contains(a1))
+    if (ri->contains(a1))
+      ;
+    else if (ri->contains(a2))
+      std::swap(a1, a2);
+    else 
       continue;
 
 #ifdef DEBUG_IN_SAME_RING_SYSTEM
@@ -736,7 +714,7 @@ Molecule::in_same_ring_system (atom_number_t a1, atom_number_t a2)
     cerr << "First atom in fsid " << fsid << ' ' << *ri << endl;
 #endif
 
-    if (fsid < 0)    // ring is not fused and A2 is not in it
+    if (! ri->is_fused())     // ring is not fused and A2 is not in it
       continue;
 
     for (int j = i + 1; j < nr; j++)
@@ -787,10 +765,6 @@ Molecule::ringi (int i)
 
   (void) ring_membership();   // ensure SSSR rings determined
 
-#ifdef USE_IWMALLOC
-  iwmalloc_check_all_malloced(stderr);
-#endif
-
   assert (_sssr_rings.ok_index(i));
 
   return _sssr_rings[i];
@@ -836,6 +810,8 @@ Molecule::ring_containing_atom (atom_number_t a)
 {
   if (is_non_ring_atom(a))
     return NULL;
+
+  (void) ring_membership();   // ensure ring membership available
 
   int nr = _sssr_rings.number_elements();
   for (int i = 0; i < nr; i++)
@@ -917,7 +893,7 @@ Molecule::ring_sizes_for_non_sssr_rings (atom_number_t a,
 
   (void) ring_membership();    // force ring perception
 
-  int nq = _non_sssr_rings.number_elements();
+  const int nq = _non_sssr_rings.number_elements();
   for (int i = 0; i < nq; i++)
   {
     const Ring * r = _non_sssr_rings[i];
@@ -1113,7 +1089,7 @@ Molecule::_determine_sssr_for_fragment (int f)
       fsid.add_if_not_already_present(r->fused_system_identifier());
   }
 
-  int * tmp = new int[_number_elements]; iw_auto_array<int> free_tmp(tmp);
+  int * tmp = new int[_number_elements]; std::unique_ptr<int[]> free_tmp(tmp);
 
   for (int i = 0; i < fsid.number_elements(); i++)
   {
@@ -1172,7 +1148,7 @@ Molecule::_determine_sssr_ring_membership (atom_number_t a)
 
 // Process all raw rings with the same fused system identifier
 
-  int * tmp = new int[_number_elements]; iw_auto_array<int> free_tmp(tmp);
+  int * tmp = new int[_number_elements]; std::unique_ptr<int[]> free_tmp(tmp);
 
   _find_sssr_for_these_fused_raw_rings(fsid1, tmp);
 
@@ -1279,17 +1255,13 @@ Molecule::_force_complete_sssr_determination()
     return 1;
   }
 
-  int * tmp = new int[_number_elements]; iw_auto_array<int> free_tmp(tmp);
+  int * tmp = new int[_number_elements]; std::unique_ptr<int[]> free_tmp(tmp);
 
   _sssr_for_all_raw_rings(tmp);
 
   _sort_by_ring_size();
 
   _assign_ring_numbers(nr);
-
-#ifdef USE_IWMALLOC
-  iwmalloc_check_all_malloced(stderr);
-#endif
 
   return 1;
 }
@@ -1308,7 +1280,7 @@ Molecule::get_fused_system (int fsid, Set_of_Atoms & result)
   if (nr <= 1)
   {
     cerr << "Molecule::get_fused_system: only " << nr << " rings in the molecule\n";
-    abort();
+    iwabort();
     return 0;
   }
 
@@ -1361,13 +1333,13 @@ Molecule::label_atoms_by_ring_system_no_compute (int * r) const
     }
   }
 
-// Given the use of fused_system_identifier, it is unclear that this array is even needed
+// We have more than two rings. We don't know if ring[0] is fused or not, so we restart
 
-  int * ring_already_done = new_int(nr); iw_auto_array<int> free_ring_already_done(ring_already_done);
+  int * ring_already_done = new_int(nr); std::unique_ptr<int[]> free_ring_already_done(ring_already_done);
 
-  int f = 1;   // number just assigned
+  int f = 0;       // the number we will assign
 
-  for (int i = 1; i < nr; i++)
+  for (int i = 0; i < nr; i++)
   {
     if (ring_already_done[i])
       continue;
@@ -1376,7 +1348,8 @@ Molecule::label_atoms_by_ring_system_no_compute (int * r) const
 
     f++;
 
-    ri->set_vector(r, f);
+    if (i > 0)
+      ri->set_vector(r, f);
 
     if (! ri->is_fused())
       continue;
@@ -1427,7 +1400,7 @@ Molecule::label_atoms_by_ring_system_including_spiro_fused(int * r)
     return 1;
   }
 
-  int * ring_already_done = new_int(nr); iw_auto_array<int> free_ring_already_done(ring_already_done);
+  int * ring_already_done = new_int(nr); std::unique_ptr<int[]> free_ring_already_done(ring_already_done);
 
   int f = 0;
 
@@ -1618,8 +1591,8 @@ Molecule::ok_ring (const Ring * r) const
 //#define DEBUG_EASY_CASE_TWO_RINGS
 
 int
-Molecule::_easy_case_two_rings (int fused_sys_id,
-                                int * tmp)
+Molecule::_easy_case_two_rings(int fused_sys_id,
+                               int * tmp)
 {
 //cerr << "Via _easy_case_two_rings\n";
 
@@ -1642,6 +1615,7 @@ Molecule::_easy_case_two_rings (int fused_sys_id,
 
     r->increment_vector(tmp, 1);
     r->set_fused_system_identifier(fid);
+    r->set_is_fused(1);
     if (NULL == r1)
     {
       r1 = r;
@@ -1699,6 +1673,7 @@ Molecule::_easy_case_two_rings (int fused_sys_id,
 
   other_ring.resize(_number_elements);
   other_ring.set_fused_system_identifier(fid);
+  other_ring.set_is_fused(1);
   other_ring.set_fragment_membership(r1->fragment_membership());
 
   atom_number_t first_2 = INVALID_ATOM_NUMBER;
@@ -2040,7 +2015,7 @@ Molecule::is_spiro_fused (atom_number_t zatom)
   }
 
 // Ugly, we get things like this
-// C12(N3CC4(C)C(=O)C(C)(C3)CN1C4)C1=C(C=CC(=C1)Br)NC2=O
+// C12(N3CC4(C)C(=O)C(C)(C3)CN1C4)C1=C(C=CC(=C1)Br)NC2=O 417829 PBCHM1097623:PBCHM6966522
 // where there are 3 or even 4 rings incident on the spiro fusion.
 // For now, just gather all rings incident on this atom
 
@@ -2066,10 +2041,10 @@ Molecule::is_spiro_fused (atom_number_t zatom)
     return 0;
   }
 
-  atom_number_t a0 = connections[0];
-  atom_number_t a1 = connections[1];
-  atom_number_t a2 = connections[2];
-  atom_number_t a3 = connections[3];
+//atom_number_t a0 = connections[0];
+//atom_number_t a1 = connections[1];
+//atom_number_t a2 = connections[2];
+//atom_number_t a3 = connections[3];
 
 #ifdef DEBUG_IS_SPIRO_FUSED
   cerr << "Centre atom " << zatom << endl;
@@ -2139,4 +2114,39 @@ Molecule::is_spiro_fused (atom_number_t zatom)
 // Now the more difficult case of 3 or 4 rings incident on the fusion point
 
   return 0;
+}
+int
+Molecule::fused_system_identifier (atom_number_t a)
+{
+  const int nr = nrings();
+  if (0 == nr)
+    return -1;
+
+  if (! is_ring_atom(a))
+    return -1;
+
+  ring_membership();
+
+  const Ring * r = ring_containing_atom(a);
+
+  if (NULL == r)    // should not happen
+    return -1;
+
+  return r->fused_system_identifier();
+}
+
+const Ring * const *
+Molecule::cbeginRing()
+{
+  (void) ring_membership();
+
+  return _sssr_rings.cbegin();
+}
+
+const Ring * const * 
+Molecule::cendRing()
+{
+  (void) ring_membership();
+
+  return _sssr_rings.cend();
 }

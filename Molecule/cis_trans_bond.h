@@ -1,26 +1,7 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef CIS_TRANS_BOND_H
 #define CIS_TRANS_BOND_H
 
 #include <iostream>
-using namespace std;
 #include "iwmtypes.h"
 
 class IWString;
@@ -76,7 +57,7 @@ inline int operator != (const atom_number_t a, const Cis_Trans_Bond_Leaf & l)
   return l.atom () != a;
 }
 
-inline ostream & operator << (ostream & os, const Cis_Trans_Bond_Leaf & l)
+inline std::ostream & operator << (std::ostream & os, const Cis_Trans_Bond_Leaf & l)
 {
   return os << l.atom ();
 }
@@ -107,7 +88,7 @@ class Cis_Trans_Bond
     Cis_Trans_Bond (const Cis_Trans_Bond &, int = 0);
 
     int ok () const;
-    int debug_print (ostream &) const;
+    int debug_print (std::ostream &) const;
 
     void set_left_root (atom_number_t a) { _left_root = a;}
     atom_number_t left_root () const { return _left_root;}

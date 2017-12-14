@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -31,12 +13,11 @@
 #include "iwstring.h"
 #include "iwbits.h"
 #include "iwbits_support.h"
-#include "dy_fingerprint.h"
 
 using namespace std;
 
 void
-IW_Bits_Base::_default_values ()
+IW_Bits_Base::_default_values()
 {
   _nbits  = 0;
 
@@ -46,26 +27,26 @@ IW_Bits_Base::_default_values ()
   _extra_bits = 0;
 }
 
-IW_Bits_Base::IW_Bits_Base ()
+IW_Bits_Base::IW_Bits_Base()
 {
-  _default_values ();
+  _default_values();
 
   return;
 }
 
-IW_Bits_Base::IW_Bits_Base (int initial_nbits)
+IW_Bits_Base::IW_Bits_Base(int initial_nbits)
 {
-  _default_values ();
+  _default_values();
 
   assert (0 == _nbits);
 
-  allocate_space_for_bits (initial_nbits);
+  allocate_space_for_bits(initial_nbits);
 
   return;
 }
 
 void
-IW_Bits_Base::_copy_bits (const IW_Bits_Base & rhs)
+IW_Bits_Base::_copy_bits(const IW_Bits_Base & rhs)
 {
   int ncopy = rhs._whole_bytes;
   if (rhs._extra_bits)
@@ -73,49 +54,49 @@ IW_Bits_Base::_copy_bits (const IW_Bits_Base & rhs)
 
   assert (_whole_bytes >= rhs._whole_bytes);    
 
-  memcpy (_bits, rhs._bits, ncopy);
+  memcpy(_bits, rhs._bits, ncopy);
 
   return;
 }
 
-IW_Bits_Base::IW_Bits_Base (const IW_Bits_Base & rhs)
+IW_Bits_Base::IW_Bits_Base(const IW_Bits_Base & rhs)
 {
-  assert (rhs.ok ());
+  assert (rhs.ok());
 
-  _default_values ();
+  _default_values();
 
-  allocate_space_for_bits (rhs._nbits);
+  allocate_space_for_bits(rhs._nbits);
 
-  _copy_bits (rhs);
+  _copy_bits(rhs);
 
   return;
 }
 
 IW_Bits_Base &
-IW_Bits_Base::operator = (const IW_Bits_Base & rhs)
+IW_Bits_Base::operator =(const IW_Bits_Base & rhs)
 {
-  assert (rhs.ok ());
+  assert (rhs.ok());
 
   if (_nbits != rhs._nbits)
   {
     if (NULL != _bits)
       delete [] _bits;
 
-    _default_values ();
+    _default_values();
 
-    allocate_space_for_bits (rhs._nbits);
+    allocate_space_for_bits(rhs._nbits);
   }
 
   assert (NULL != _bits);
 
-  _copy_bits (rhs);
+  _copy_bits(rhs);
 
   return *this;
 }
 
 //#define IWB_CHECK_ALREADY_DELETED
 
-IW_Bits_Base::~IW_Bits_Base ()
+IW_Bits_Base::~IW_Bits_Base()
 {
 #ifdef IWB_CHECK_ALREADY_DELETED
   if (-807 == _whole_bytes)
@@ -137,7 +118,7 @@ IW_Bits_Base::~IW_Bits_Base ()
 }
 
 int
-IW_Bits_Base::ok () const
+IW_Bits_Base::ok() const
 {
   if (0 == _nbits && NULL == _bits && 
       0 == _whole_bytes && 0 == _extra_bits)
@@ -155,13 +136,13 @@ IW_Bits_Base::ok () const
 }
 
 int
-IW_Bits_Base::debug_print (ostream & os) const
+IW_Bits_Base::debug_print(std::ostream & os) const
 {
   os << "IW_Bits_Base details ";
 
   os << "nbits = " << _nbits << endl;
 
-  printon (os);
+  printon(os);
 
   os << endl;
 
@@ -169,7 +150,7 @@ IW_Bits_Base::debug_print (ostream & os) const
 }
 
 int
-IW_Bits_Base::is_empty () const
+IW_Bits_Base::is_empty() const
 {
   return (0 == _nbits && NULL == _bits);
 }
@@ -179,14 +160,14 @@ IW_Bits_Base::is_empty () const
 */
 
 int
-IW_Bits_Base::allocate_space_for_bits (int nb)
+IW_Bits_Base::allocate_space_for_bits(int nb)
 {
   assert (nb > 0);
 
   if (NULL == _bits)
-    return _allocate_space_for_bits (nb);
+    return _allocate_space_for_bits(nb);
   else if (nb != _nbits)
-    return _increase_size_for_bits (nb);
+    return _increase_size_for_bits(nb);
 
   return 1;
 }
@@ -196,7 +177,7 @@ IW_Bits_Base::allocate_space_for_bits (int nb)
 */
 
 int
-IW_Bits_Base::_allocate_space_for_bits (int nb)
+IW_Bits_Base::_allocate_space_for_bits(int nb)
 {
   int whole_words = nb / IW_BITS_PER_WORD;
 
@@ -222,13 +203,13 @@ IW_Bits_Base::_allocate_space_for_bits (int nb)
 
   _nbits = nb;
 
-  memset (_bits, 0, whole_words * IW_BYTES_PER_WORD);
+  memset(_bits, 0, whole_words * IW_BYTES_PER_WORD);
 
   return 1;
 }
 
 int
-IW_Bits_Base::_increase_size_for_bits (int nb)
+IW_Bits_Base::_increase_size_for_bits(int nb)
 {
   int whole_words = nb / IW_BITS_PER_WORD;
   if (0 != nb % IW_BITS_PER_WORD)
@@ -320,7 +301,7 @@ eight_bit_count[256] = {
 };
 
 int
-count_bits_set (const unsigned char * s, int nbytes)
+count_bits_set(const unsigned char * s, int nbytes)
 {
   int rc = 0;
 
@@ -336,9 +317,9 @@ static unsigned int all_bits_32 = 0xffffffff;
 static unsigned int all_bits_8  = 0xff;
 
 static inline int
-_BS_count_word (register unsigned int word)
+_BS_count_word(unsigned int word)
 {
-  register int count = 0;
+  int count = 0;
   while (word > 0)
   {
     count += four_bit_count[word & 15];
@@ -353,9 +334,9 @@ _BS_count_word (register unsigned int word)
 */
 
 int
-IW_Bits_Base::nset () const
+IW_Bits_Base::nset() const
 {
-  assert (ok ());
+  assert (ok());
 
   int istop = _whole_bytes;
   if (_extra_bits)
@@ -392,16 +373,59 @@ IW_Bits_Base::any_bits_set() const
 }
 
 
+template <typename T>
 int
-IW_Bits_Base::construct_from_array_of_ints (const int * ii,
+IW_Bits_Base::construct_from_array_of_ints(const T * ii,
                                             int nb)
 {
   assert (nb > 0);
 
   if (_nbits)      // zero out any pre-existing information
-    clear ();
+    clear();
 
-  allocate_space_for_bits (nb);
+  allocate_space_for_bits(nb);
+
+  for (int i = 0; i < _whole_bytes; i++)
+  {
+    unsigned int u = _bits[i];
+
+    for (int j = 0; j < IW_BITS_PER_BYTE; j++)
+    {
+      if (*ii)
+        u |= one_bit_8[j];
+      ii++;
+    }
+    _bits[i] = u;
+  }
+
+  if (_extra_bits)
+  {
+    for (int i = 0; i < _extra_bits; i++)
+    {
+      if (*ii)
+        _bits[_whole_bytes] |= one_bit_8[i];
+      ii++;
+    }
+  }
+
+  return 1;
+}
+
+template int IW_Bits_Base::construct_from_array_of_ints(const int *, int);
+template int IW_Bits_Base::construct_from_array_of_ints(const unsigned int *, int);
+
+#ifdef OLD_VERSION_ADSKJHAKSJD
+
+int
+IW_Bits_Base::construct_from_array_of_ints(const int * ii,
+                                            int nb)
+{
+  assert (nb > 0);
+
+  if (_nbits)      // zero out any pre-existing information
+    clear();
+
+  allocate_space_for_bits(nb);
 
   for (int i = 0; i < _whole_bytes; i++)
   {
@@ -426,15 +450,17 @@ IW_Bits_Base::construct_from_array_of_ints (const int * ii,
   return 1;
 }
 
+#endif
+
 int
-IW_Bits_Base::construct_from_array_of_bits (const unsigned char * raw_bits,
+IW_Bits_Base::construct_from_array_of_bits(const unsigned char * raw_bits,
                                             const int nb)
 {
   assert (nb > 0);
 
-  allocate_space_for_bits (nb);
+  allocate_space_for_bits(nb);
 
-  memcpy (_bits, raw_bits, _nbits / IW_BITS_PER_BYTE);
+  memcpy(_bits, raw_bits, _nbits / IW_BITS_PER_BYTE);
 
   return 1;
 }
@@ -444,9 +470,9 @@ IW_Bits_Base::construct_from_array_of_bits (const unsigned char * raw_bits,
 */
 
 int
-IW_Bits_Base::construct_from_ascii_01_representation (const char * s, int n)
+IW_Bits_Base::construct_from_ascii_01_representation(const char * s, int n)
 {
-  allocate_space_for_bits (n);
+  allocate_space_for_bits(n);
 
   int eight_character_segments = n / 8;
 
@@ -492,7 +518,7 @@ IW_Bits_Base::construct_from_ascii_01_representation (const char * s, int n)
 */
 
 int
-IW_Bits_Base::construct_from_ascii_01_representation_with_spaces (const char * s, int n)
+IW_Bits_Base::construct_from_ascii_01_representation_with_spaces(const char * s, int n)
 {
   if (n == n / 2 * 2)
   {
@@ -514,7 +540,7 @@ IW_Bits_Base::construct_from_ascii_01_representation_with_spaces (const char * s
 
   int nb = n / 2 + 1; // two chars per bit, odd number of characters: 3 chars means 2 bits
 
-  allocate_space_for_bits (nb);  
+  allocate_space_for_bits(nb);  
 
   int eight_character_segments = nb / IW_BITS_PER_BYTE;
 
@@ -554,14 +580,14 @@ IW_Bits_Base::construct_from_ascii_01_representation_with_spaces (const char * s
 }
 
 /*int
-IW_Bits_Base::construct_from_ascii_01_representation (const char * s, int n)
+IW_Bits_Base::construct_from_ascii_01_representation(const char * s, int n)
 {
-  allocate_space_for_bits (n);
+  allocate_space_for_bits(n);
 
   for (int i = 0; i < n; i++)
   {
     if ('1' == s[i])
-      set (i);
+      set(i);
     else if ('0' == s[i])
       ;
     else
@@ -579,14 +605,14 @@ IW_Bits_Base::construct_from_ascii_01_representation (const char * s, int n)
 */
 
 static int
-get_number (const_IWSubstring & buffer,
+get_number(const_IWSubstring & buffer,
             int & zresult)
 {
   zresult = 0;
    
   int chars_consumed = 0;
 
-  while (buffer.length ())
+  while (buffer.length())
   {
     int j = buffer[0] - '0';
 
@@ -595,7 +621,7 @@ get_number (const_IWSubstring & buffer,
 
     zresult = zresult * 10 + j;
     chars_consumed++;
-    buffer.remove_leading_chars (1);
+    buffer.remove_leading_chars(1);
   }
 
   return chars_consumed;
@@ -608,35 +634,35 @@ get_number (const_IWSubstring & buffer,
 */
 
 int
-IW_Bits_Base::construct_from_sparse_representation (const const_IWSubstring & bit_representation)
+IW_Bits_Base::construct_from_sparse_representation(const const_IWSubstring & bit_representation)
 {
   const_IWSubstring s1, s2;
 
-  if (! bit_representation.split (s1, ';', s2) || 0 == s2.length ())
+  if (! bit_representation.split(s1, ';', s2) || 0 == s2.length())
   {
     cerr << "IW_Bits_Base::construct_from_sparse_representation: no nbits '" << bit_representation << "'\n";
     return 0;
   }
 
-  s2.strip_leading_blanks ();
+  s2.strip_leading_blanks();
 
   int nb;
-  if (! s2.numeric_value (nb) || nb < 0)
+  if (! s2.numeric_value(nb) || nb < 0)
   {
     cerr << "IW_Bits_Base::construct_from_sparse_representation: invalid nbits value '" << bit_representation << "'\n";
     return 0;
   }
 
-  allocate_space_for_bits (nb);
+  allocate_space_for_bits(nb);
 
 // Tokens must be either a number or a range
 
   int i = 0;
   const_IWSubstring token;
-  while (s1.nextword (token, i, ','))
+  while (s1.nextword(token, i, ','))
   {
     int n1;
-    int chars_consumed = get_number (token, n1);
+    int chars_consumed = get_number(token, n1);
     if (0 == chars_consumed)
     {
       cerr << "IW_Bits_Base::construct_from_sparse_representation: invalid specifier '" << token << "'\n";
@@ -649,9 +675,9 @@ IW_Bits_Base::construct_from_sparse_representation (const const_IWSubstring & bi
       return 0;
     }
 
-    if (0 == token.length ())     // was just a single number
+    if (0 == token.length())     // was just a single number
     {
-      set (n1);
+      set(n1);
       continue;
     }
 
@@ -661,12 +687,12 @@ IW_Bits_Base::construct_from_sparse_representation (const const_IWSubstring & bi
       return 0;
     }
 
-    token.remove_leading_chars (1);
+    token.remove_leading_chars(1);
 
     int n2;
-    chars_consumed = get_number (token, n2);
+    chars_consumed = get_number(token, n2);
 
-    if (0 == chars_consumed || token.length ())
+    if (0 == chars_consumed || token.length())
     {
       cerr << "IW_Bits_Base::construct_from_sparse_representation: invalid range '" << token << "'\n";
       return 0;
@@ -678,13 +704,244 @@ IW_Bits_Base::construct_from_sparse_representation (const const_IWSubstring & bi
       return 0;
     }
 
-    set_all_bits (n1, n2, 1);
+    set_all_bits(n1, n2, 1);
   }
 
   return 1;
 }
 
-//extern "C" int bits_in_common (const unsigned int *, const unsigned int *, int);
+/*int
+IW_Bits_Base::append_sparse_form(IWString & buffer) const
+{
+  buffer.make_room_for_extra_items(nb);    // can never be that many
+
+  for (int i = 0; i < nb; i++)
+  {
+  }
+
+  return 1;
+}*/
+
+#include "dy_fingerprint.h"
+
+/*
+  The code to determine the number of bytes is lifted from du_ascii2bin
+*/
+
+int
+IW_Bits_Base::construct_from_daylight_ascii_bit_rep(const char * ascii,
+                      const int nchars)
+{
+  unsigned int nbytes = (nchars - 1) / 4;
+  nbytes *= 3;
+  int i = ascii[nchars - 1] - '0';
+  nbytes -= (3 - i);
+
+  int number_bits = nbytes * IW_BITS_PER_BYTE;
+
+  if (! allocate_space_for_bits(number_bits))
+  {
+    cerr << "IW_Bits_Base::construct_from_daylight_ascii_bit_rep: cannot allocate " << number_bits << " bits\n";
+    return 0;
+  }
+
+  if (0 == number_bits)
+    return 1;
+
+#ifdef USE_IWMALLOC
+  iwmalloc_check_all_malloced(stderr);
+#endif
+
+  unsigned int bytes_read;
+  if (! (du_ascii2bin(ascii, nchars, _bits, bytes_read)))
+  {
+    cerr << "IW_Bits_Base::construct_from_daylight_ascii_bit_rep: du_ascii2bin failed\n";
+    cerr << "nchars = " << nchars << endl;
+    return 0;
+  }
+#ifdef USE_IWMALLOC
+  iwmalloc_check_all_malloced(stderr);
+#endif
+
+  return 1;
+}
+
+int
+IW_Bits_Base::construct_from_daylight_ascii_representation(const const_IWSubstring & ascii)
+{
+  return construct_from_daylight_ascii_bit_rep(ascii.rawchars(), ascii.length());
+}
+
+static int
+determine_nbits_nset(const const_IWSubstring & fp,
+                      int i, int & nbits, int & nset)
+{
+  assert (';' == fp[i]);
+
+  i++;
+
+  const_IWSubstring token;
+
+  if (! fp.nextword(token, i, ';') || ! fp.nextword(token, i, ';'))
+  {
+    cerr << "determine_nbits_nset::bad data '" << fp << "'\n";
+    return 0;
+  }
+
+  if (! fp.nextword(token, i, ';') || ! token.numeric_value(nbits) || nbits <= 0)
+  {
+    cerr << "determine_nbits_nset::bad nbits '" << fp << "'\n";
+    return 0;
+  }
+
+  if (! fp.nextword(token, i, ';') || ! token.numeric_value(nset) || nset < 0 || nset > nbits)
+  {
+    cerr << "determine_nbits_nset::bad nset '" << fp << "'\n";
+    return 0;
+  }
+
+  return 1;
+}
+
+/*
+  At some stage, try to remove this because valgrind will complain about
+  reading from unitialised memory
+*/
+
+static int
+determine_nbits_nset (const char * fp, int & nbits, int & nset)
+{
+  if (2 != IW_SSCANF(fp, ";%*d;%*d;%d;%d", &nbits, &nset))
+  {
+    cerr << "determine_nbits_nset: cannot determine nbits, nset '" << fp << "'\n";
+    return 0;
+  }
+
+  if (nbits <= 0 || nset < 0 || nset > nbits)
+  {
+    cerr << "determine_nbits_nset: bad nbits (" << nbits << ") nset (" << nset << ") value '";
+    while (*fp != '>')
+    {
+      cerr << *fp;
+      fp++;
+    }
+    
+    cerr << "', nset = " << nset << ", nbits = " << nbits << endl;
+    return 0;
+  }
+
+  return 1;
+}
+
+/*
+  ASCII is points to the info from the TDT. IT does NOT include
+  the dataitem name
+  The info about size and such starts at TDT + NCHARS
+*/
+
+int
+IW_Bits_Base::_construct_from_tdt_record(const char * ascii,
+                                         int nchars,
+                                         int check_nset)
+{
+  int expected_nbits = -1;   // initialise negative so it won't be checked
+  int expected_nset;
+  if (check_nset)
+    determine_nbits_nset(ascii + nchars, expected_nbits, expected_nset);
+
+  if (! construct_from_daylight_ascii_bit_rep(ascii, nchars))
+  {
+    cerr << "IW_Bits_Base::construct_from_tdt_record: inner call failed\n";
+    return 0;
+  }
+
+  if (! check_nset)
+    return 1;
+
+  if (expected_nset != nset())
+  {
+    cerr << "IW_Bits_Base::_construct_from_tdt_record: check nset failed\n";
+    cerr << "Expected " << expected_nset << " got " << nset() << " bits set\n";
+    return 0;
+  }
+
+  return 1;
+}
+
+int
+IW_Bits_Base::construct_from_tdt_record(const IWString & tdt_record,
+                                         int check_nset)
+{
+//assert (tdt_record.ends_with('>'));    // new version may include newline
+
+  int openangle = tdt_record.index('<');
+
+  int semicolon = tdt_record.index(';');
+
+  return _construct_from_tdt_record(tdt_record.rawchars() + openangle + 1, 
+                  semicolon - openangle - 1, check_nset);
+}
+
+int
+IW_Bits_Base::construct_from_tdt_record(const const_IWSubstring & tdt_record,
+                                         int check_nset)
+{
+//assert (tdt_record.ends_with('>'));
+
+  int openangle = tdt_record.index('<');
+
+  int semicolon = tdt_record.index(';');
+
+  return _construct_from_tdt_record(tdt_record.rawchars() + openangle + 1,
+              semicolon - openangle - 1, check_nset);
+}
+
+/*
+  This variant is used by IW_DY_Fingerprint which needs to have nset returned
+*/
+
+int
+IW_Bits_Base::construct_from_tdt_record_nset(const const_IWSubstring & tdt_record,
+                      int & nset)
+{
+//assert (tdt_record.ends_with('>'));
+
+  int openangle = tdt_record.index('<');
+
+  assert (openangle > 0);
+
+  int semicolon = tdt_record.index(';');
+
+  const char * s = tdt_record.rawchars();
+
+  int file_nbits;
+//if (2 != IW_SSCANF(s + semicolon, ";%*d;%*d;%d;%d", &file_nbits, &nset))
+  if (! determine_nbits_nset(tdt_record, semicolon, file_nbits, nset))
+  {
+    cerr << "IW_Bits_Base::construct_from_tdt_record_nset: cannot parse nbits/nset\n";
+    cerr << tdt_record << endl;
+    return 0;
+  }
+
+  assert (file_nbits >= nset);
+
+  allocate_space_for_bits(file_nbits);
+
+  if (! construct_from_daylight_ascii_bit_rep(s + openangle + 1,
+                       semicolon - openangle - 1))
+  {
+    cerr << "IW_Bits_Base::construct_from_tdt_record_nset: inner call failed\n";
+    return 0;
+  }
+
+#ifdef USE_IWMALLOC
+  iwmalloc_check_all_malloced(stderr);
+#endif
+
+  return 1;
+}
+
+//extern "C" int bits_in_common(const unsigned int *, const unsigned int *, int);
 
 /*
   Because we have carefully allocated words worth of storage, we can
@@ -692,17 +949,17 @@ IW_Bits_Base::construct_from_sparse_representation (const const_IWSubstring & bi
 */
 
 int
-IW_Bits_Base::bits_in_common (const IW_Bits_Base & f2) const
+IW_Bits_Base::bits_in_common(const IW_Bits_Base & f2) const
 {
-  assert (ok ());
-  assert (f2.ok ());
+  assert (ok());
+  assert (f2.ok());
   assert (_nbits == f2._nbits);
 
   int number_words = _nbits / IW_BITS_PER_WORD;
   if (0 != _nbits % IW_BITS_PER_WORD)
     number_words++;
 
-  return ::bits_in_common ((const unsigned int *) _bits, (const unsigned int *) f2._bits, number_words);
+  return ::bits_in_common((const unsigned int *) _bits, (const unsigned int *) f2._bits, number_words);
 }
 
 /*
@@ -710,10 +967,10 @@ IW_Bits_Base::bits_in_common (const IW_Bits_Base & f2) const
 */
 
 void
-IW_Bits_Base::iwand (const IW_Bits_Base & f2) 
+IW_Bits_Base::iwand(const IW_Bits_Base & f2) 
 {
-  assert (ok ());
-  assert (f2.ok ());
+  assert (ok());
+  assert (f2.ok());
   assert (_nbits == f2._nbits);
 
   unsigned int * w1 = (unsigned int *) _bits;
@@ -739,7 +996,7 @@ IW_Bits_Base::iwand (const IW_Bits_Base & f2)
 */
 
 void
-IW_Bits_Base::iwand (const IW_Bits_Base & f2, int & changed) 
+IW_Bits_Base::iwand(const IW_Bits_Base & f2, int & changed) 
 {
   unsigned int * w1 = (unsigned int *) _bits;
   unsigned int * w2 = (unsigned int *) f2._bits;
@@ -764,10 +1021,10 @@ IW_Bits_Base::iwand (const IW_Bits_Base & f2, int & changed)
 }
 
 void
-IW_Bits_Base::iwor (const IW_Bits_Base & f2) 
+IW_Bits_Base::iwor(const IW_Bits_Base & f2) 
 {
-  assert (ok ());
-  assert (f2.ok ());
+  assert (ok());
+  assert (f2.ok());
   assert (_nbits == f2._nbits);
 
   unsigned int * w1 = (unsigned int *) _bits;
@@ -791,10 +1048,10 @@ IW_Bits_Base::iwor (const IW_Bits_Base & f2)
 */
 
 void
-IW_Bits_Base::iwor (const IW_Bits_Base & f2, int & changed) 
+IW_Bits_Base::iwor(const IW_Bits_Base & f2, int & changed) 
 {
-  assert (ok ());
-  assert (f2.ok ());
+  assert (ok());
+  assert (f2.ok());
   assert (_nbits == f2._nbits);
 
   unsigned int * w1 = (unsigned int *) _bits;
@@ -822,10 +1079,10 @@ IW_Bits_Base::iwor (const IW_Bits_Base & f2, int & changed)
 */
 
 void
-IW_Bits_Base::iwxor (const IW_Bits_Base & f2)
+IW_Bits_Base::iwxor(const IW_Bits_Base & f2)
 {
-  assert (ok ());
-  assert (f2.ok ());
+  assert (ok());
+  assert (f2.ok());
   assert (f2._nbits == _nbits);
 
   unsigned int * w1 = (unsigned int *) _bits;
@@ -851,8 +1108,8 @@ IW_Bits_Base::iwxor (const IW_Bits_Base & f2)
 void
 IW_Bits_Base::unset_bits_in_rhs(const IW_Bits_Base & f2)
 {
-  assert (ok ());
-  assert (f2.ok ());
+  assert (ok());
+  assert (f2.ok());
   assert (f2._nbits == _nbits);
 
   int istop = _whole_bytes;
@@ -906,12 +1163,12 @@ static const_IWSubstring bxtable []  = { "0000",
 #define RIGHT_NIBBLE 0x0f
 
 static void
-append_ascii_01 (IWString & s, unsigned char c)
+append_ascii_01(IWString & s, unsigned char c)
 {
   unsigned int nibble = (c & LEFT_NIBBLE) >> 4;
 
 #ifdef TEST_NIBBLE
-  cerr << "For character '" << int (c) << "' left nibble is " << nibble;
+  cerr << "For character '" << int(c) << "' left nibble is " << nibble;
 #endif
 
   s += bxtable[nibble];
@@ -928,15 +1185,15 @@ append_ascii_01 (IWString & s, unsigned char c)
 }
 
 int
-IW_Bits_Base::append_ascii_01_representation (IWString & s) const
+IW_Bits_Base::append_ascii_01_representation(IWString & s) const
 {
-  if (s.elements_allocated () - s.number_elements () < _nbits)
-    s.resize (s.number_elements () + _nbits + 1);
+  if (s.elements_allocated() - s.number_elements() < _nbits)
+    s.resize(s.number_elements() + _nbits + 1);
 
   const unsigned char * b = (const unsigned char *) _bits;
   for (int i = 0; i < _whole_bytes; i++)
   {
-    append_ascii_01 (s, b[i]);
+    append_ascii_01(s, b[i]);
   }
 
   if (_extra_bits)
@@ -957,7 +1214,7 @@ IW_Bits_Base::append_ascii_01_representation (IWString & s) const
 
 
 int 
-print_byte (ostream & os, unsigned char bits, int nbits,
+print_byte(std::ostream & os, unsigned char bits, int nbits,
             const char t, const char f,
             int include_space)
 {
@@ -981,7 +1238,7 @@ print_byte (ostream & os, unsigned char bits, int nbits,
 
 
 int
-print_bits (ostream & os, const void * bits, int nbits,
+print_bits(std::ostream & os, const void * bits, int nbits,
             const char t, const char f,
             int include_space)
 {
@@ -991,33 +1248,33 @@ print_bits (ostream & os, const void * bits, int nbits,
     int bits_to_print = nbits - i;
     if (bits_to_print > IW_BITS_PER_BYTE)
       bits_to_print = IW_BITS_PER_BYTE;
-    if (! print_byte (os, *s, bits_to_print, t, f, include_space))
+    if (! print_byte(os, *s, bits_to_print, t, f, include_space))
       return 0;
     s++;
   }
 
-  return os.good ();
+  return os.good();
 }
 
 int
-IW_Bits_Base::printon (ostream & os, const char t, const char f,
+IW_Bits_Base::printon(std::ostream & os, const char t, const char f,
                        int include_space) const
 {
 //cerr << "printon writing " << _whole_bytes << " bytes\n";
   for (int i = 0; i < _whole_bytes; i++)
   {
-    print_byte (os, _bits[i], IW_BITS_PER_BYTE, t, f, include_space);
+    print_byte(os, _bits[i], IW_BITS_PER_BYTE, t, f, include_space);
   }
 
   if (_extra_bits)
-    return print_bits (os, _bits + _whole_bytes, _extra_bits, t, f, include_space);
+    return print_bits(os, _bits + _whole_bytes, _extra_bits, t, f, include_space);
   else
-    return os.good ();
+    return os.good();
 }
 
 
 void
-word_string_form (IWString & buffer, const unsigned int zword,
+word_string_form(IWString & buffer, const unsigned int zword,
                   int bits_to_print,
                   const char t, const char f,
                   int include_space)
@@ -1034,7 +1291,7 @@ word_string_form (IWString & buffer, const unsigned int zword,
 }
 
 void
-byte_string_form (IWString & buffer, const unsigned char zbyte,
+byte_string_form(IWString & buffer, const unsigned char zbyte,
                   int bits_to_print,
                   const char t, const char f,
                   int include_space)
@@ -1058,24 +1315,24 @@ byte_string_form (IWString & buffer, const unsigned char zbyte,
 */
 
 int
-IW_Bits_Base::append_string_form (IWString & buffer, const char t, const char f,
+IW_Bits_Base::append_string_form(IWString & buffer, const char t, const char f,
                        int include_space) const
 {
-  buffer.resize (buffer.nchars () + _nbits + _nbits * (include_space != 0));
+  buffer.resize(buffer.nchars() + _nbits + _nbits * (include_space != 0));
 
   for (int i = 0; i < _whole_bytes; i++)
   {
-    byte_string_form (buffer, _bits[i], IW_BITS_PER_BYTE, t, f, include_space);
+    byte_string_form(buffer, _bits[i], IW_BITS_PER_BYTE, t, f, include_space);
   }
 
   if (_extra_bits)
-    byte_string_form (buffer, _bits[_whole_bytes], _extra_bits, t, f, include_space);
+    byte_string_form(buffer, _bits[_whole_bytes], _extra_bits, t, f, include_space);
 
   return 1;
 }
 
 static int
-_first_bit (unsigned int w)
+_first_bit(unsigned int w)
 {
   for (int i = 0; i < 32; i++)
   {
@@ -1087,7 +1344,7 @@ _first_bit (unsigned int w)
 }
 
 static int
-_first_bit (unsigned char c)
+_first_bit(unsigned char c)
 {
   for (int i = 0; i < 8; i++)
   {
@@ -1099,9 +1356,9 @@ _first_bit (unsigned char c)
 }
 
 int
-IW_Bits_Base::set_vector (int * vec) const
+IW_Bits_Base::set_vector(int * vec) const
 {
-  assert (ok ());
+  assert (ok());
   assert (_nbits);
 
   int * iptr = vec;
@@ -1140,9 +1397,9 @@ IW_Bits_Base::set_vector (int * vec) const
 }
 
 int
-IW_Bits_Base::set_vector (int * vec, int istop) const
+IW_Bits_Base::set_vector(int * vec, int istop) const
 {
-  assert (ok ());
+  assert (ok());
   assert (_nbits);
 
   int rc = 0;
@@ -1180,9 +1437,9 @@ IW_Bits_Base::set_vector (int * vec, int istop) const
 */
 
 int
-IW_Bits_Base::increment_vector (int * population) const
+IW_Bits_Base::increment_vector(int * population) const
 {
-  assert (ok ());
+  assert (ok());
   assert (_nbits);
 
   int * iptr = population;
@@ -1210,10 +1467,10 @@ IW_Bits_Base::increment_vector (int * population) const
 }
 
 int
-IW_Bits_Base::increment_vector (int * population,
+IW_Bits_Base::increment_vector(int * population,
                                 int increment) const
 {
-  assert (ok ());
+  assert (ok());
   assert (_nbits);
 
   int * iptr = population;
@@ -1245,9 +1502,9 @@ IW_Bits_Base::increment_vector (int * population,
 */
 
 int
-IW_Bits_Base::is_set (int ibit) const
+IW_Bits_Base::is_set(int ibit) const
 {
-  assert (ok ());
+  assert (ok());
   assert (ibit >= 0 && ibit <= _nbits);
 
   int ibyte = ibit / IW_BITS_PER_BYTE;
@@ -1261,9 +1518,9 @@ IW_Bits_Base::is_set (int ibit) const
 }
 
 void
-IW_Bits_Base::set (int ibit, int new_value)
+IW_Bits_Base::set(int ibit, int new_value)
 {
-  assert (ok ());
+  assert (ok());
   assert (ibit >= 0);
 
   if (ibit >= _nbits)
@@ -1274,7 +1531,7 @@ IW_Bits_Base::set (int ibit, int new_value)
 
   int ibyte = ibit / IW_BITS_PER_BYTE;
 
-//cerr << "Setting bit " << ibit << " to " << new_value << " ibyte " << ibyte << " new value " << hex << int (_bits[ibyte]) << dec << endl;
+//cerr << "Setting bit " << ibit << " to " << new_value << " ibyte " << ibyte << " new value " << hex << int(_bits[ibyte]) << dec << endl;
 
   int bit_offset = ibit % IW_BITS_PER_BYTE;
 
@@ -1291,23 +1548,23 @@ IW_Bits_Base::set (int ibit, int new_value)
 }
 
 void
-IW_Bits_Base::clear ()
+IW_Bits_Base::clear()
 {
-  assert (ok ());
+  assert (ok());
 
   int nb = _whole_bytes;
   if (_extra_bits)
     nb++;
 
-  memset (_bits, 0, nb);
+  memset(_bits, 0, nb);
 
   return;
 }
 
 float
-IW_Bits_Base::compute_weight (const float * weight) const
+IW_Bits_Base::compute_weight(const float * weight) const
 {
-  assert (ok ());
+  assert (ok());
 
   float rc = 0.0;
   for (int i = 0; i < _whole_bytes; i++)
@@ -1336,9 +1593,9 @@ IW_Bits_Base::compute_weight (const float * weight) const
 }
 
 int
-IW_Bits_Base::compute_weight (const int * weight) const
+IW_Bits_Base::compute_weight(const int * weight) const
 {
-  assert (ok ());
+  assert (ok());
 
   int rc = 0;
   for (int i = 0; i < _whole_bytes; i++)
@@ -1372,10 +1629,10 @@ IW_Bits_Base::compute_weight (const int * weight) const
 */
 
 int
-IW_Bits_Base::compute_weight_inc_missing (const int * weight,
+IW_Bits_Base::compute_weight_inc_missing(const int * weight,
                                           int missing_bit_value) const
 {
-  assert (ok ());
+  assert (ok());
 
   int rc = 0;
   for (int i = 0; i < _whole_bytes; i++)
@@ -1414,10 +1671,10 @@ IW_Bits_Base::compute_weight_inc_missing (const int * weight,
 }
 
 float
-IW_Bits_Base::compute_weight_inc_missing (const float * weight,
+IW_Bits_Base::compute_weight_inc_missing(const float * weight,
                                           int missing_bit_value) const
 {
-  assert (ok ());
+  assert (ok());
 
   float rc = 0;
   for (int i = 0; i < _whole_bytes; i++)
@@ -1464,8 +1721,8 @@ IW_Bits_Base::compute_weight_inc_missing (const float * weight,
 int
 IW_Bits_Base::operator == (const IW_Bits_Base & rhs) const
 {
-  assert (ok ());
-  assert (rhs.ok ());
+  assert (ok());
+  assert (rhs.ok());
 
   if (_nbits != rhs._nbits)
     return 0;
@@ -1475,7 +1732,7 @@ IW_Bits_Base::operator == (const IW_Bits_Base & rhs) const
   if (_extra_bits)
     whole_bytes++;
 
-  return 0 == memcmp (_bits, rhs._bits, whole_bytes);
+  return 0 == memcmp(_bits, rhs._bits, whole_bytes);
 #endif
 
   unsigned int * w1 = (unsigned int *) _bits;
@@ -1496,11 +1753,11 @@ IW_Bits_Base::operator == (const IW_Bits_Base & rhs) const
   if (0 == extra_bytes)
     return 1;
 
-  return 0 == memcmp (_bits + number_words * IW_BYTES_PER_WORD, rhs._bits + number_words * IW_BYTES_PER_WORD, extra_bytes);
+  return 0 == memcmp(_bits + number_words * IW_BYTES_PER_WORD, rhs._bits + number_words * IW_BYTES_PER_WORD, extra_bytes);
 }
 
 int
-operator != (const IW_Bits_Base & lhs, const IW_Bits_Base & rhs)
+operator !=(const IW_Bits_Base & lhs, const IW_Bits_Base & rhs)
 {
   return ! (lhs == rhs);
 }
@@ -1508,18 +1765,18 @@ operator != (const IW_Bits_Base & lhs, const IW_Bits_Base & rhs)
 IW_Bits_Base
 operator & (const IW_Bits_Base & lhs, const IW_Bits_Base & rhs)
 {
-  assert (lhs.ok ());
-  assert (rhs.ok ());
+  assert (lhs.ok());
+  assert (rhs.ok());
 
   IW_Bits_Base rc = lhs;
-  rc.iwand (rhs);
+  rc.iwand(rhs);
 
-  return IW_Bits_Base (rc);
+  return IW_Bits_Base(rc);
 }
 
 
 int
-IW_Bits_Base::first_bit () const
+IW_Bits_Base::first_bit() const
 {
   unsigned int * w1 = (unsigned int *) _bits;
 
@@ -1530,7 +1787,7 @@ IW_Bits_Base::first_bit () const
     if (0 == w1[i])
       continue;
 
-    return IW_BITS_PER_WORD * i + _first_bit (w1[i]);
+    return IW_BITS_PER_WORD * i + _first_bit(w1[i]);
   }
   
   int extra_bytes = _whole_bytes % IW_BYTES_PER_WORD;
@@ -1542,7 +1799,7 @@ IW_Bits_Base::first_bit () const
     if (0 == c)
       continue;
 
-    return number_words * IW_BITS_PER_WORD + i * IW_BITS_PER_BYTE + _first_bit (c);
+    return number_words * IW_BITS_PER_WORD + i * IW_BITS_PER_BYTE + _first_bit(c);
   }
 
   if (_extra_bits)
@@ -1551,12 +1808,83 @@ IW_Bits_Base::first_bit () const
     if (0 == c)
       return -1;
 
-    return _whole_bytes * IW_BITS_PER_BYTE + _first_bit (c);
+    return _whole_bytes * IW_BITS_PER_BYTE + _first_bit(c);
   }
 
   return -1;
 
   return -1;
+}
+
+char *
+IW_Bits_Base::daylight_ascii_representation(int & nchars) const
+{
+  assert (0 == (0x00000003 & _nbits));    // must be a multiple of 4 bits
+
+  return du_bin2ascii(&nchars, _nbits / IW_BITS_PER_BYTE, (char *) _bits);
+}
+
+int
+IW_Bits_Base::daylight_ascii_representation(IWString & result) const
+{
+  assert (0 == (0x00000003 & _nbits));    // must be a multiple of 4 bits
+
+  int nchars;
+
+  char * ascii = du_bin2ascii(&nchars, _nbits / IW_BITS_PER_BYTE, (char *) _bits);
+
+  result.set_and_assume_ownership(ascii, nchars);
+
+  return 1;
+}
+
+int
+IW_Bits_Base::write_daylight_ascii_representation(std::ostream & output, const IWString & tag) const
+{
+  output << tag;
+  if (! tag.ends_with('<'))
+    output << '<';
+
+  write_daylight_ascii_representation(output);
+
+  output << ">\n";
+
+  return output.good();
+}
+
+int
+IW_Bits_Base::write_daylight_ascii_representation(std::ostream & output) const
+{
+  IWString zascii;
+
+  zascii.resize(_nbits / 6 + 48);
+
+  if (! daylight_ascii_representation(zascii))
+  {
+    cerr << "IW_Bits_Base::write_daylight_ascii_representation: cannot form ascii representation\n";
+    return 0;
+
+  }
+
+  int ns = nset();
+
+  zascii << ';' << _nbits << ';' << ns << ';' << _nbits << ';' << ns << ";1";
+
+  output << zascii;
+
+  return output.good();
+}
+
+int
+IW_Bits_Base::daylight_ascii_representation_including_nset_info(IWString & zascii) const
+{
+  daylight_ascii_representation(zascii);
+
+  int ns = nset();
+
+  zascii << ';' << _nbits << ';' << ns << ';' << _nbits << ';' << ns << ";1";
+
+  return zascii.length();
 }
 
 //#define DEBUG_OPERATOR_PLUSEQ
@@ -1577,18 +1905,18 @@ IW_Bits_Base::operator += (const IW_Bits_Base & rhs)
   }
 
 #ifdef DEBUG_OPERATOR_PLUSEQ
-  cerr << "Combine " << _nbits << " bits in " << _whole_bytes << " bytes, nset = " << nset () << endl;
-  cerr << "   with " << rhs._nbits << " bits in " << rhs._whole_bytes << " bytes, nset = " << rhs.nset () << endl;
+  cerr << "Combine " << _nbits << " bits in " << _whole_bytes << " bytes, nset = " << nset() << endl;
+  cerr << "   with " << rhs._nbits << " bits in " << rhs._whole_bytes << " bytes, nset = " << rhs.nset() << endl;
 #endif
 
   int total_bits = _nbits + rhs._nbits;
 
   int wb = _whole_bytes;   // save the value, will be changed by allocate_space_...
 
-  allocate_space_for_bits (total_bits);
+  allocate_space_for_bits(total_bits);
 
 #ifdef DEBUG_OPERATOR_PLUSEQ
-  cerr << "After allocating space " << nset () << " in " << _whole_bytes << " bytes\n";
+  cerr << "After allocating space " << nset() << " in " << _whole_bytes << " bytes\n";
 #endif
 
 // Now append the bits from rhs. How many words to copy?
@@ -1607,7 +1935,7 @@ IW_Bits_Base::operator += (const IW_Bits_Base & rhs)
   }
 
 #ifdef DEBUG_OPERATOR_PLUSEQ
-  cerr << "After join, nbits = " << _nbits << " nset = " << nset () << endl;
+  cerr << "After join, nbits = " << _nbits << " nset = " << nset() << endl;
   cerr << "Whole words = " << _whole_words << " extra = " << _extra_bits << endl;
 #endif
 
@@ -1787,9 +2115,9 @@ static const unsigned char last_bits_8[8] = {
 */
 
 void
-IW_Bits_Base::set_all ()
+IW_Bits_Base::set_all()
 {
-  assert (ok ());
+  assert (ok());
 
   unsigned int * w1 = (unsigned int *) _bits;
 
@@ -1820,7 +2148,7 @@ IW_Bits_Base::set_all ()
 */
 
 void
-IW_Bits_Base::set_all_bits (int istart, int istop, int v)
+IW_Bits_Base::set_all_bits(int istart, int istop, int v)
 {
 #ifdef SHOW_PATTERNS
   static int first = 1;
@@ -1871,7 +2199,7 @@ IW_Bits_Base::set_all_bits (int istart, int istop, int v)
 
   if (istart == istop)
   {
-    set (istart, v);
+    set(istart, v);
     return;
   }
 
@@ -1965,15 +2293,15 @@ IW_Bits_Base::set_all_bits (int istart, int istop, int v)
 */
 
 int
-IW_Bits_Base::rearrange (const int * xref, IW_Bits_Base & b2) const
+IW_Bits_Base::rearrange(const int * xref, IW_Bits_Base & b2) const
 {
-  assert (ok ());
+  assert (ok());
   assert (0 == _extra_bits);      // current code would overflow the XREF array - fix if ever this becomes a problem
 
-//b2.clear ();    WE ASSUME THAT B2 IS CLEARED - perhaps it isn't
+//b2.clear();    WE ASSUME THAT B2 IS CLEARED - perhaps it isn't
 
-  if (b2.nbits () < _nbits)
-    b2.allocate_space_for_bits (_nbits);
+  if (b2.nbits() < _nbits)
+    b2.allocate_space_for_bits(_nbits);
 
   if (0 == _nbits)
     return 1;
@@ -2002,7 +2330,7 @@ IW_Bits_Base::rearrange (const int * xref, IW_Bits_Base & b2) const
       }
 
       if (_bits[i] & one_bit_8[j])    // the J'th bit in the word is set
-        b2.set (xref[zbit]);
+        b2.set(xref[zbit]);
     }
   }
 
@@ -2010,7 +2338,7 @@ IW_Bits_Base::rearrange (const int * xref, IW_Bits_Base & b2) const
 }
 
 void
-IW_Bits_Base::flip ()
+IW_Bits_Base::flip()
 {
   unsigned int * w1 = (unsigned int *) _bits;
 
@@ -2041,7 +2369,7 @@ IW_Bits_Base::flip ()
 }
 
 int
-IW_Bits_Base::fold (int nfold)
+IW_Bits_Base::fold(int nfold)
 {
   assert (nfold > 0);
   assert (0 == _whole_bytes % 4);
@@ -2064,7 +2392,7 @@ IW_Bits_Base::fold (int nfold)
   if (1 == nfold)
     return 1;
 
-  return fold (nfold - 1);
+  return fold(nfold - 1);
 }
 
 /*
@@ -2072,12 +2400,12 @@ IW_Bits_Base::fold (int nfold)
 */
 
 int
-IW_Bits_Base::is_subset (const IW_Bits_Base & rhs) const
+IW_Bits_Base::is_subset(const IW_Bits_Base & rhs) const
 {
   if (_nbits != rhs._nbits)
   {
     cerr << "IW_Bits_Base::is_subset: different sized bits cannot be subsets\n";
-    abort ();
+    abort();
   }
 
   unsigned int * w1 = (unsigned int *) _bits;
@@ -2117,12 +2445,12 @@ IW_Bits_Base::is_subset (const IW_Bits_Base & rhs) const
 }
 
 int
-IW_Bits_Base::shift (int s)
+IW_Bits_Base::shift(int s)
 {
   if (s > 0)
-    return _right_shift (s);
+    return _right_shift(s);
   else if (s < 0)
-    return _left_shift (-s);
+    return _left_shift(-s);
 
   return 1;
 }
@@ -2132,39 +2460,39 @@ IW_Bits_Base::shift (int s)
 */
 
 int
-IW_Bits_Base::_right_shift (int s)
+IW_Bits_Base::_right_shift(int s)
 {
   assert (s > 0);
   int old_nbits = _nbits;
 
-  if (! allocate_space_for_bits (_nbits + s))
+  if (! allocate_space_for_bits(_nbits + s))
   {
     return 0;
   }
 
   for (int i = 0; i < old_nbits; i++)
   {
-    if (is_set (old_nbits - i - 1))
-      set (_nbits - i - 1, 1);
+    if (is_set(old_nbits - i - 1))
+      set(_nbits - i - 1, 1);
     else
-      set (_nbits - i - 1, 0);
+      set(_nbits - i - 1, 0);
   }
 
   for (int i = 0; i < s; i++)
   {
-    set (i, 0);
+    set(i, 0);
   }
 
   return 1;
 }
 
 int
-IW_Bits_Base::_left_shift (int s)
+IW_Bits_Base::_left_shift(int s)
 {
   assert (s > 0);
 
   cerr << "Not implemented\n";
-  abort ();
+  abort();
   return 1;
 }
 
@@ -2177,9 +2505,9 @@ IW_Bits_Base::_left_shift (int s)
 */
 
 void *
-IW_Bits_Base::copy_to_contiguous_storage (void * p) const
+IW_Bits_Base::copy_to_contiguous_storage(void * p) const
 {
-  assert (ok ());
+  assert (ok());
 
   if (NULL == _bits)
   {
@@ -2187,7 +2515,7 @@ IW_Bits_Base::copy_to_contiguous_storage (void * p) const
     return NULL;
   }
 
-  memcpy (p, this, sizeof (IW_Bits_Base));
+  memcpy(p, this, sizeof(IW_Bits_Base));
 
 // Now copy the bytes
 
@@ -2195,19 +2523,19 @@ IW_Bits_Base::copy_to_contiguous_storage (void * p) const
   if (_extra_bits)
     bytes_to_copy++;
 
-  memcpy (reinterpret_cast<unsigned char *>(p) + sizeof(IW_Bits_Base), _bits, bytes_to_copy);
+  memcpy(reinterpret_cast<unsigned char *>(p) + sizeof(IW_Bits_Base), _bits, bytes_to_copy);
 
   IW_Bits_Base * target = reinterpret_cast<IW_Bits_Base *>(p);
 
-  target->_bits = (unsigned char *) ((unsigned char *) target + sizeof (IW_Bits_Base));
+  target->_bits = (unsigned char *)((unsigned char *) target + sizeof(IW_Bits_Base));
 
-  return (reinterpret_cast<unsigned char *>(p) + sizeof (IW_Bits_Base) + bytes_to_copy);
+  return (reinterpret_cast<unsigned char *>(p) + sizeof(IW_Bits_Base) + bytes_to_copy);
 }
 
 void *
-IW_Bits_Base::copy_to_contiguous_storage_gpu (void * p) const
+IW_Bits_Base::copy_to_contiguous_storage_gpu(void * p) const
 {
-  assert (ok ());
+  assert (ok());
 
   if (NULL == _bits)
   {
@@ -2215,7 +2543,7 @@ IW_Bits_Base::copy_to_contiguous_storage_gpu (void * p) const
     return NULL;
   }
 
-  memcpy (p, &_nbits, sizeof (int));
+  memcpy(p, &_nbits, sizeof(int));
 
 // Now copy the bytes
 
@@ -2223,13 +2551,13 @@ IW_Bits_Base::copy_to_contiguous_storage_gpu (void * p) const
   if (_extra_bits)
     bytes_to_copy++;
 
-  memcpy (reinterpret_cast<unsigned char *>(p) + sizeof(int), _bits, bytes_to_copy);
+  memcpy(reinterpret_cast<unsigned char *>(p) + sizeof(int), _bits, bytes_to_copy);
 
-  return (reinterpret_cast<unsigned char *>(p) + sizeof (int) + bytes_to_copy);
+  return(reinterpret_cast<unsigned char *>(p) + sizeof(int) + bytes_to_copy);
 }
 
 const void *
-IW_Bits_Base::build_from_contiguous_storage (const void * p,
+IW_Bits_Base::build_from_contiguous_storage(const void * p,
                                              int allocate_arrays)
 {
   if (allocate_arrays && NULL != _bits)
@@ -2525,7 +2853,7 @@ static int first_bit_set [] = {
 };
 
 int
-IW_Bits_Base::next_on_bit (int & ndx) const
+IW_Bits_Base::next_on_bit(int & ndx) const
 {
   assert (ndx >= 0);
 

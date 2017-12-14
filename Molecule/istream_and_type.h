@@ -1,31 +1,9 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef IW_ISTREAM_AND_TYPE
 #define IW_ISTREAM_AND_TYPE
-
-using namespace std;
 
 #ifdef USE_IWMALLOC
 #include "iwmalloc.h"
 #endif
-
-#include "cmdline.h"
 
 #include "iwstring_data_source.h"
 #include "iwcrex.h"
@@ -100,7 +78,7 @@ class data_source_and_type : public iwstring_data_source
     int estimate_molecules_in_file ();
 };
 
-#if (IW_IMPLEMENTATIONS_EXPOSED) || defined(ISTREAM_AND_TYPE_IMPLEMENTATION)
+#if defined(ISTREAM_AND_TYPE_IMPLEMENTATION) || defined (IW_IMPLEMENTATIONS_EXPOSED)
 
 #include "molecule.h"
 
@@ -183,7 +161,7 @@ data_source_and_type<T>::data_source_and_type (int input_type,
 {
   if (0 == input_type)
   {
-    input_type = discern_file_type_from_name (fname);
+    input_type = discern_file_type_from_name(fname);
     if (0 == input_type)
     {
       cerr << "Data_Source_and_Type:: cannot discern input type '" << fname << "'\n";
@@ -452,6 +430,10 @@ data_source_and_type<T>::_set_rx_for_input_type (IW_Regular_Expression & rx) con
       
     case IWMTYPE_MRK:
       rx.set_pattern ("^[ 0-9]{5} [ 0-9]{5} *$");
+      break;
+
+    case PDB:
+      rx.set_pattern("^END$");
       break;
 
     default:

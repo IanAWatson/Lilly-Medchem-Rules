@@ -22,6 +22,7 @@
 //#include <iostream>
 
 #include "iwgrep-2.5.h"
+#include "iwcrex.h"
 
 using namespace std;
 
@@ -441,3 +442,5 @@ IW_grep_25_regex::s (IWString & s, const const_IWSubstring & zto)
 
   return rc;
 }
+
+template class IW_Regular_Expression_Template<IW_grep_25_regex>;

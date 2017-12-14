@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef PATH_SCORING_H
 #define PATH_SCORING_H
 
@@ -79,14 +61,14 @@ class Atom;
     and one for everything else
 */
 
-#define NUMBER_OF_POSSIBLE_ELEMENTS (26 + 26*26 + 1)
+#define NUMBER_OF_POSSIBLE_ELEMENTS (26 + 26*26 + 1 + 1)   // needs to be 1 larger than the highest possible value
 
 #define SIZE_OF_ATOMIC_NUMBERS_ENCOUNTERED_ARRAY (11 * NUMBER_OF_POSSIBLE_ELEMENTS)
 
 class Atomic_Numbers_Encounterd
 {
   friend
-    ostream & operator << (ostream &, const Atomic_Numbers_Encounterd &);
+    std::ostream & operator << (std::ostream &, const Atomic_Numbers_Encounterd &);
 
   private:
     atomic_number_t _found[SIZE_OF_ATOMIC_NUMBERS_ENCOUNTERED_ARRAY];
@@ -125,15 +107,19 @@ class Atomic_Numbers_Encounterd
   During a scan through a molecule, different paths may become
   blocked at different times. We need to record the number of
   steps each path scoring object has taken
+
+  Feb 2015. In some cases, the first bond matters.
 */
 
 class Path_Scoring: public resizable_array_p<Atomic_Numbers_Encounterd>
 {
   friend
-    ostream & operator << (ostream &, const Path_Scoring &);
+    std::ostream & operator << (std::ostream &, const Path_Scoring &);
 
   private:
     atom_number_t _start_atom;
+
+    int _first_bond;
 
     int _assigned_rank;
 
@@ -148,7 +134,7 @@ class Path_Scoring: public resizable_array_p<Atomic_Numbers_Encounterd>
     Path_Scoring ();
 
     int ok () const;
-    int debug_print (ostream &) const;
+    int debug_print (std::ostream &) const;
 
     int operator == (const Path_Scoring &) const;
     int operator != (const Path_Scoring &) const;
@@ -160,6 +146,7 @@ class Path_Scoring: public resizable_array_p<Atomic_Numbers_Encounterd>
     int nsteps () const { return _nsteps;}
 
     int initialise (atom_number_t, const Atom *);
+    void set_first_bond (int s) { _first_bond = s;}
 
     atom_number_t start_atom () const { return _start_atom;}
 

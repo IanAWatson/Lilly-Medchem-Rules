@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
 
 #include <assert.h>
@@ -25,8 +7,8 @@
 #include "tbb/scalable_allocator.h"
 #endif
 
-#include "iwconfig.h"
 #include "molecule.h"
+#include "mdl.h"
 #include "chiral_centre.h"
 #include "misc2.h"
 #include "iwminmax.h"
@@ -75,13 +57,13 @@ Chiral_Centre::Chiral_Centre(const Chiral_Centre & rhs)
 
 Chiral_Centre::~Chiral_Centre()
 {
-  assert (ok());
+  assert(ok());
 
   _default_values();
 }
 
 static void
-print_atom (ostream & os,
+print_atom (std::ostream & os,
             const char * s,
             atom_number_t a)
 {
@@ -104,33 +86,33 @@ print_atom (ostream & os,
 }
 
 int
-Chiral_Centre::debug_print (ostream & os) const
+Chiral_Centre::debug_print (std::ostream & os) const
 {
   os << "Chiral centre at atom " << _a << endl;
   if (! ok())
     os << "Warning, OK function fails\n";
 
-  print_atom (os, "    Top Front = ", _top_front);
+  print_atom(os, "    Top Front = ", _top_front);
   os << endl;
 
-  print_atom (os, "        Top Back  = ", _top_back);
+  print_atom(os, "        Top Back  = ", _top_back);
   os << endl;
 
-  print_atom (os, "Left Bottom = ", _left_down);
+  print_atom(os, "Left Bottom = ", _left_down);
   os << "    ";
-  print_atom (os, "Right Bottom = ", _right_down);
+  print_atom(os, "Right Bottom = ", _right_down);
   os << endl;
 
   return os.good();
 }
 
 void
-Molecule::_print_atom_and_type (ostream & os,
+Molecule::_print_atom_and_type (std::ostream & os,
                               const char * s,
                               atom_number_t centre,
                               atom_number_t a) const
 {
-  print_atom (os, s, a);
+  print_atom(os, s, a);
 
   if (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN == a)
     ;
@@ -140,8 +122,8 @@ Molecule::_print_atom_and_type (ostream & os,
     ;
   else if (a >= 0 && a < _number_elements)
   {
-    os << " (" << atomic_symbol (a) << ")";
-    if (INVALID_ATOM_NUMBER != centre && ! are_bonded (centre, a))
+    os << " (" << atomic_symbol(a) << ")";
+    if (INVALID_ATOM_NUMBER != centre && ! are_bonded(centre, a))
       os << " NOT BONDED!!";
   }
   else
@@ -151,12 +133,12 @@ Molecule::_print_atom_and_type (ostream & os,
 }
 
 int
-Molecule::print_chiral_centre_details (const Chiral_Centre * c, ostream & os) const
+Molecule::print_chiral_centre_details (const Chiral_Centre * c, std::ostream & os) const
 {
   atom_number_t centre = c->a();
 
-  _print_atom_and_type (os, "Chiral centre at atom ", INVALID_ATOM_NUMBER, centre);
-  os << ' ' << ncon (c->a()) << " connections";
+  _print_atom_and_type(os, "Chiral centre at atom ", INVALID_ATOM_NUMBER, centre);
+  os << ' ' << ncon(c->a()) << " connections";
   if (c->chirality_known())
     os << " chirality known\n";
   else
@@ -165,15 +147,15 @@ Molecule::print_chiral_centre_details (const Chiral_Centre * c, ostream & os) co
   if (! ok())
     os << "Warning, OK function fails\n";
 
-  _print_atom_and_type (os, "Top Front = ", centre, c->top_front());
+  _print_atom_and_type(os, "Top Front = ", centre, c->top_front());
   os << endl;
 
-  _print_atom_and_type (os, "Top Back = ", centre, c->top_back());
+  _print_atom_and_type(os, "Top Back = ", centre, c->top_back());
   os << endl;
 
-  _print_atom_and_type (os, "Left Down = ", centre, c->left_down());
+  _print_atom_and_type(os, "Left Down = ", centre, c->left_down());
   os << " ";
-  _print_atom_and_type (os, "Right Down = ", centre, c->right_down());
+  _print_atom_and_type(os, "Right Down = ", centre, c->right_down());
   os << endl;
 
   return os.good();
@@ -230,6 +212,7 @@ Molecule::valid_chiral_centre (const Chiral_Centre * c) const
   }
   else if (3 == acon)
   {
+//  cerr << "IH " << c->implicit_hydrogen_count() << " LP " << c->lone_pair_count() << endl;
     if (1 != (c->implicit_hydrogen_count() + c->lone_pair_count()))
       return 0;
   }
@@ -255,7 +238,7 @@ Molecule::valid_chiral_centre (const Chiral_Centre * c) const
     ;
   else if (INVALID_ATOM_NUMBER == top_back)
     ;
-  else if (! a->is_bonded_to (top_back))
+  else if (! a->is_bonded_to(top_back))
     return 0;
 
   atom_number_t left_down = c->left_down();
@@ -266,7 +249,7 @@ Molecule::valid_chiral_centre (const Chiral_Centre * c) const
     ;
   else if (INVALID_ATOM_NUMBER == left_down)
     ;
-  else if (! a->is_bonded_to (left_down))
+  else if (! a->is_bonded_to(left_down))
     return 0;
 
   atom_number_t right_down = c->right_down();
@@ -276,7 +259,7 @@ Molecule::valid_chiral_centre (const Chiral_Centre * c) const
     ;
   else if (INVALID_ATOM_NUMBER == right_down)
     ;
-  else if (! a->is_bonded_to (right_down))
+  else if (! a->is_bonded_to(right_down))
     return 0;
 
   return 1;
@@ -307,23 +290,25 @@ atom_not_set (int zatom)
 }
 
 /*
-  Note that the assert (ok()) is at the end of the function.
+  Note that the assert(ok()) is at the end of the function.
 */
 
 int
 Chiral_Centre::complete() const
 {
+//debug_print(cerr);
   int number_not_set = 0;
 
-  number_not_set += atom_not_set (_top_front);
-  number_not_set += atom_not_set (_top_back);
-  number_not_set += atom_not_set (_left_down);
-  number_not_set += atom_not_set (_right_down);
+  number_not_set += atom_not_set(_top_front);
+  number_not_set += atom_not_set(_top_back);
+  number_not_set += atom_not_set(_left_down);
+  number_not_set += atom_not_set(_right_down);
 
+//cerr << number_not_set << " not set\n";
   if (number_not_set)
     return 0;
 
-  assert (ok());
+  assert(ok());
 
   return 1;
 }
@@ -351,8 +336,8 @@ Chiral_Centre::number_atoms_specified () const
 int
 Chiral_Centre::involves (atom_number_t at) const
 {
-  assert (INVALID_ATOM_NUMBER != at);
-  assert (ok());
+  assert(INVALID_ATOM_NUMBER != at);
+  assert(ok());
 
   if (at == _a)
     return 1;
@@ -376,11 +361,11 @@ Chiral_Centre::involves (atom_number_t at) const
 int
 Chiral_Centre::involves (atom_number_t a1, atom_number_t a2) const
 {
-  assert (INVALID_ATOM_NUMBER != a1);
-  assert (INVALID_ATOM_NUMBER != a2);
-  assert (a1 != a2);
+  assert(INVALID_ATOM_NUMBER != a1);
+  assert(INVALID_ATOM_NUMBER != a2);
+  assert(a1 != a2);
 
-  assert (ok());
+  assert(ok());
 
   if (_a == a1)
     ;
@@ -412,7 +397,7 @@ Chiral_Centre::involves (atom_number_t a1, atom_number_t a2) const
 int
 Chiral_Centre::make_copy (const Chiral_Centre & rhs, const int * xref)
 {
-  assert (rhs.complete());
+  assert(rhs.complete());
 
   _a = xref[rhs._a];
 
@@ -452,7 +437,7 @@ Chiral_Centre::make_copy (const Chiral_Centre & rhs, const int * xref)
 int
 Chiral_Centre::invert()
 {
-  assert (complete());
+  assert(complete());
 
   atom_number_t tmp = _left_down;
 
@@ -469,6 +454,7 @@ Chiral_Centre::invert()
 int
 Chiral_Centre::convert_to_implicit_hydrogen (atom_number_t h)
 {
+//cerr << "Chiral_Centre::convert_to_implicit_hydrogen:atom " << h << " was an explicit hydrogen\n";
   if (h == _top_front)
     _top_front = CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN;
   else if (h == _top_back)
@@ -481,11 +467,9 @@ Chiral_Centre::convert_to_implicit_hydrogen (atom_number_t h)
   {
     cerr << "Chiral_Centre::convert_to_implicit_hydrogen: does not involve " << h << endl;
     debug_print (cerr);
-    assert (NULL == "This should not happen");
+    assert(NULL == "This should not happen");
   }
 
-//cerr << "After converting atom " << h << " to an implicit H\n";
-//debug_print (cerr);
   return 1;
 }
 
@@ -496,7 +480,7 @@ Molecule::_adjust_chiral_centres_for_loss_of_atom (atom_number_t a,
                                                    int was_hydrogen)
 {
 #ifdef DEBUG_ADJUST_CHIRAL_CENTRES_FOR_LOSS_OF_ATOM
-  cerr << "Removing atom " << a << " Hydrogen(?) = " << was_hydrogen << endl;
+  cerr << "Removing atom " << a << " Hydrogen(?) = " << was_hydrogen << " need to check " << _chiral_centres.number_elements() << " existing chiral centres\n";
 #endif
 
   int nc = _chiral_centres.number_elements();
@@ -505,9 +489,9 @@ Molecule::_adjust_chiral_centres_for_loss_of_atom (atom_number_t a,
   {
     Chiral_Centre * cc = _chiral_centres[i];
 
-    if (! cc->involves (a))
+    if (! cc->involves(a))
     {
-      cc->adjust_for_loss_of_atom (a);
+      cc->adjust_for_loss_of_atom(a);
       continue;
     }
 
@@ -519,12 +503,14 @@ Molecule::_adjust_chiral_centres_for_loss_of_atom (atom_number_t a,
 
     if (was_hydrogen && 0 == cc->implicit_hydrogen_count())
     {
-      cc->convert_to_implicit_hydrogen (a);
-      cc->adjust_for_loss_of_atom (a);
+      cc->convert_to_implicit_hydrogen(a);
+      cc->adjust_for_loss_of_atom(a);
     }
     else
     {
-      _chiral_centres.remove_item (i);
+      _things[cc->a()]->set_implicit_hydrogens_known(0);   // hopefully true in most cases
+
+      _chiral_centres.remove_item(i);
       i--;
       nc--;
       rc++;
@@ -537,18 +523,18 @@ Molecule::_adjust_chiral_centres_for_loss_of_atom (atom_number_t a,
 int
 Molecule::_stereo_centre_hydrogens_become_implicit (Chiral_Centre * c)
 {
-  if (1 == atomic_number (c->top_front()))
-    c->set_top_front (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
-  else if (1 == atomic_number (c->top_back()))
-    c->set_top_back (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
-  else if (1 == atomic_number (c->left_down()))
-    c->set_left_down (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
-  else if (1 == atomic_number (c->right_down()))
-    c->set_right_down (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
+  if (1 == atomic_number(c->top_front()))
+    c->set_top_front(CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
+  else if (1 == atomic_number(c->top_back()))
+    c->set_top_back(CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
+  else if (1 == atomic_number(c->left_down()))
+    c->set_left_down(CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
+  else if (1 == atomic_number(c->right_down()))
+    c->set_right_down(CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
   else
   {
-    c->debug_print (cerr);
-    assert (NULL == "How could this happen?");
+    c->debug_print(cerr);
+    assert(NULL == "How could this happen?");
   }
 
   return 1;
@@ -563,7 +549,7 @@ Molecule::_stereo_centre_hydrogens_become_implicit (Chiral_Centre * c)
 int
 Molecule::stereo_centre_hydrogens_become_implicit()
 {
-  assert (ok());
+  assert(ok());
 
   int rc = 0;
   int nc = _chiral_centres.number_elements();
@@ -573,7 +559,7 @@ Molecule::stereo_centre_hydrogens_become_implicit()
     if (1 == c->implicit_hydrogen_count())   // can have only 1 implicit H
       continue;
 
-    rc += _stereo_centre_hydrogens_become_implicit (c);
+    rc += _stereo_centre_hydrogens_become_implicit(c);
   }
 
   return rc;
@@ -582,7 +568,7 @@ Molecule::stereo_centre_hydrogens_become_implicit()
 int
 Chiral_Centre::set_top_front (atom_number_t ntf)
 {
-  assert (ok());
+  assert(ok());
 
   if (ntf == _a ||
       ntf == _top_back ||
@@ -590,7 +576,7 @@ Chiral_Centre::set_top_front (atom_number_t ntf)
       ntf == _right_down)
   {
     cerr << "Chiral_Centre::set_top_front: atom " << ntf << " not allowed\n";
-    debug_print (cerr);
+    debug_print(cerr);
     return 0;
   }
 
@@ -602,7 +588,7 @@ Chiral_Centre::set_top_front (atom_number_t ntf)
 int
 Chiral_Centre::set_top_back (atom_number_t ntb)
 {
-  assert (ok());
+  assert(ok());
 
   if (ntb == _a ||
       ntb == _top_front ||
@@ -610,7 +596,7 @@ Chiral_Centre::set_top_back (atom_number_t ntb)
       ntb == _right_down)
   {
     cerr << "Chiral_Centre::set_top_back: atom " << ntb << " not allowed\n";
-    debug_print (cerr);
+    debug_print(cerr);
     return 0;
   }
 
@@ -622,14 +608,14 @@ Chiral_Centre::set_top_back (atom_number_t ntb)
 int
 Chiral_Centre::set_left_down (atom_number_t nld)
 {
-  assert (ok());
+  assert(ok());
   if (nld == _a ||
       nld == _top_front ||
       nld == _top_back ||
       nld == _right_down)
   {
     cerr << "Chiral_Centre::set_left_down: atom " << nld << " not allowed\n";
-    debug_print (cerr);
+    debug_print(cerr);
     return 0;
   }
 
@@ -641,14 +627,14 @@ Chiral_Centre::set_left_down (atom_number_t nld)
 int
 Chiral_Centre::set_right_down (atom_number_t nrd)
 {
-  assert (ok());
+  assert(ok());
   if (nrd == _a ||
       nrd == _top_front ||
       nrd == _top_back ||
       nrd == _left_down)
   {
     cerr << "Chiral_Centre::set_right_down: atom " << nrd << " not allowed\n";
-    debug_print (cerr);
+    debug_print(cerr);
     return 0;
   }
 
@@ -673,6 +659,24 @@ Chiral_Centre::adjust_for_loss_of_atom (atom_number_t l)
     _right_down--;
 
   return;
+}
+
+int
+Chiral_Centre::adjust_atom_numbers (const int * xref)
+{
+  if (_a >= 0)
+    _a = xref[_a];
+
+  if (_top_front >= 0)
+    _top_front = xref[_top_front];
+  if (_top_back >= 0)
+    _top_back = xref[_top_back];
+  if (_left_down >= 0)
+    _left_down = xref[_left_down];
+  if (_right_down >= 0)
+    _right_down = xref[_right_down];
+
+  return ok();
 }
 
 /*
@@ -724,7 +728,7 @@ Chiral_Centre::centre_atom_has_a_lone_pair()
   else
   {
     cerr << "Chiral_Centre::centre_atom_has_a_lone_pair: Both left_down and right_down set\n";
-    debug_print (cerr);
+    debug_print(cerr);
 //  abort();
     cerr << "IGNORED - check your molecule!\n";
     return 0;
@@ -745,8 +749,8 @@ Molecule::_smi_process_new_chiral_centre (Chiral_Centre * c,
                                           int hcount) const
 {
   atom_number_t a = c->a();
-  assert (a == _number_elements - 1);
-  assert (hcount >= 0 && hcount <= 1);
+  assert(a == _number_elements - 1);
+  assert(hcount >= 0 && hcount <= 1);
 
   int acon = _things[_number_elements - 1]->ncon();
 
@@ -754,13 +758,13 @@ Molecule::_smi_process_new_chiral_centre (Chiral_Centre * c,
   cerr << "Processing new chiral centre, atom " << a << ", hcount = " << hcount << endl;
   cerr << "Atom has " << acon << " connections\n";
   if (1 == acon)
-    cerr << "Single connection to atom " << other (a, 0) << endl;
+    cerr << "Single connection to atom " << other(a, 0) << endl;
 #endif
 
   if (0 == acon)
   {
     if (hcount)
-      c->set_top_front (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
+      c->set_top_front(CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
 /*  else
     {
       cerr << "Molecule::_smi_process_new_chiral_centre: zero hcount to acon = 0\n";
@@ -771,22 +775,22 @@ Molecule::_smi_process_new_chiral_centre (Chiral_Centre * c,
   }
   else if (1 == acon)
   {
-    atom_number_t j = other (a, 0);
-    c->set_top_front (j);
+    atom_number_t j = other(a, 0);
+    c->set_top_front(j);
     if (hcount)
-      c->set_top_back (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
+      c->set_top_back(CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
   }
   else
   {
     cerr << "Molecule::_smi_process_new_chiral_centre: atom " << a << " ncon = " << acon << endl;
-    assert (NULL == "How could this happen?");
+    assert(NULL == "How could this happen?");
   }
 
-  c->set_chirality_known (1);    // chiral centres derived from smiles are of known chirality
+  c->set_chirality_known(1);    // chiral centres derived from smiles are of known chirality
 
 #ifdef DEBUG_SMI_PROCESS_NEW_CHIRAL_CENTRE
   cerr << "New chiral centre constructed\n";
-  c->debug_print (cerr);
+  c->debug_print(cerr);
 #endif
 
   return 1;
@@ -818,7 +822,7 @@ Molecule::remove_no_delete_chiral_centre_at_atom (atom_number_t zatom)
     if (zatom != c->a())
       continue;
 
-    _chiral_centres.remove_no_delete (i);
+    _chiral_centres.remove_no_delete(i);
 
     _set_modified();
 
@@ -831,8 +835,8 @@ Molecule::remove_no_delete_chiral_centre_at_atom (atom_number_t zatom)
 Chiral_Centre *
 Molecule::chiral_centre_in_molecule_not_indexed_by_atom_number (int i) const
 {
-  assert (ok());
-  assert (_chiral_centres.ok_index (i));
+  assert(ok());
+  assert(_chiral_centres.ok_index(i));
 
   return _chiral_centres[i];
 }
@@ -850,7 +854,7 @@ Molecule::_smi_atom_bonded_to_chiral_centre (atom_number_t previous_atom,
 {
 // First fetch the chiral centre anchored on PREVIOUS_ATOM
 
-  Chiral_Centre * c = chiral_centre_at_atom (previous_atom);
+  Chiral_Centre * c = chiral_centre_at_atom(previous_atom);
   if (NULL == c)
   {
     cerr << "Molecule::_smi_last_atom_is_part_of_chiral_centre: no chiral atom found\n";
@@ -860,14 +864,14 @@ Molecule::_smi_atom_bonded_to_chiral_centre (atom_number_t previous_atom,
 
 #ifdef DEBUG_SMI_LAST_ATOM_IS_PART_OF_CHIRAL_CENTRE
   cerr << "Got another connection to chiral atom " << previous_atom << endl;
-  c->debug_print (cerr);
+  c->debug_print(cerr);
 #endif
 
 // In the case where the first atom in the molecule has chirality by no Hydrogen, top_front will be unset
 
   if (INVALID_ATOM_NUMBER == c->top_front())
   {
-    c->set_top_front (atom_bonded_to_chiral_centre);
+    c->set_top_front(atom_bonded_to_chiral_centre);
     return 1;
   }
 
@@ -875,7 +879,7 @@ Molecule::_smi_atom_bonded_to_chiral_centre (atom_number_t previous_atom,
 
   if (INVALID_ATOM_NUMBER == c->top_back())
   {
-    c->set_top_back (atom_bonded_to_chiral_centre);
+    c->set_top_back(atom_bonded_to_chiral_centre);
     return 1;
   }
 
@@ -893,7 +897,7 @@ Molecule::_smi_atom_bonded_to_chiral_centre (atom_number_t previous_atom,
     {
       cerr << "Molecule::_smi_last_atom_is_part_of_chiral_centre: chiral specifier is complete\n";
       cerr << "Atom " << atom_bonded_to_chiral_centre << endl;
-      c->debug_print (cerr);
+      c->debug_print(cerr);
       return 0;
     }
 
@@ -919,7 +923,7 @@ Molecule::_smi_atom_bonded_to_chiral_centre (atom_number_t previous_atom,
         return 0;
       }
 
-      c->set_left_down (atom_bonded_to_chiral_centre);
+      c->set_left_down(atom_bonded_to_chiral_centre);
     }
     else     // this is the 4th atom
     {
@@ -930,7 +934,7 @@ Molecule::_smi_atom_bonded_to_chiral_centre (atom_number_t previous_atom,
         return 0;
       }
 
-      c->set_right_down (atom_bonded_to_chiral_centre);
+      c->set_right_down(atom_bonded_to_chiral_centre);
     }
   }
   else if (2 == previous_atom_chiral_count)    // type @@, going clockwise
@@ -944,7 +948,7 @@ Molecule::_smi_atom_bonded_to_chiral_centre (atom_number_t previous_atom,
         return 0;
       }
 
-      c->set_right_down (atom_bonded_to_chiral_centre);
+      c->set_right_down(atom_bonded_to_chiral_centre);
     }
     else    // this is the 4th atom of the chiral centre
     {
@@ -955,7 +959,7 @@ Molecule::_smi_atom_bonded_to_chiral_centre (atom_number_t previous_atom,
         return 0;
       }
 
-      c->set_left_down (atom_bonded_to_chiral_centre);
+      c->set_left_down(atom_bonded_to_chiral_centre);
     }
   }
   else
@@ -966,7 +970,7 @@ Molecule::_smi_atom_bonded_to_chiral_centre (atom_number_t previous_atom,
 
 #ifdef DEBUG_SMI_LAST_ATOM_IS_PART_OF_CHIRAL_CENTRE
   cerr << "After adding atom ";
-  c->debug_print (cerr);
+  c->debug_print(cerr);
 #endif
 
   return 1;
@@ -990,39 +994,39 @@ Molecule::_check_for_incomplete_chiral_specifications (Chiral_Centre * c)
 
 #ifdef DEBUG_CHECK_FOR_INCOMPLETE_CHIRAL_SPECIFICATIONS
   cerr << "Checking for incomplete chiral specification\n";
-  c->debug_print (cerr);
+  c->debug_print(cerr);
 #endif
 
-  if (atom_not_set (c->top_front()) ||
-      atom_not_set (c->top_back())  ||
-      atom_not_set (c->left_down()) ||
-      atom_not_set (c->right_down()))
+  if (atom_not_set(c->top_front()) ||
+      atom_not_set(c->top_back())  ||
+      atom_not_set(c->left_down()) ||
+      atom_not_set(c->right_down()))
   {
-    int notset = atom_not_set (c->top_front()) + atom_not_set (c->top_back()) + atom_not_set (c->left_down()) + atom_not_set (c->right_down());
+    int notset = atom_not_set(c->top_front()) + atom_not_set(c->top_back()) + atom_not_set(c->left_down()) + atom_not_set(c->right_down());
     if (1 == notset && _automatically_add_implicit_hydrogen_to_incomplete_chiral_centre && 0 == c->implicit_hydrogen_count())
     {
       cerr << "Molecule::_check_for_incomplete_chiral_specifications:filling missing implicit hydrogen on atom " << c->a() <<endl;
-      if (atom_not_set (c->top_front()))
-        c->set_top_front (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
-      else if (atom_not_set (c->top_back()))
-        c->set_top_back (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
-      else if (atom_not_set (c->left_down()))
-        c->set_left_down (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
-      else if (atom_not_set (c->right_down()))
-        c->set_right_down (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
+      if (atom_not_set(c->top_front()))
+        c->set_top_front(CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
+      else if (atom_not_set(c->top_back()))
+        c->set_top_back(CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
+      else if (atom_not_set(c->left_down()))
+        c->set_left_down(CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
+      else if (atom_not_set(c->right_down()))
+        c->set_right_down(CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
       else
       {
         cerr << "Molecule::_check_for_incomplete_chiral_specifications:nset inconsistency\n";
         return 0;
       }
 
-      _things[zatom]->set_implicit_hydrogens (1, 1);   // 2nd arg means over-ride known value
+      _things[zatom]->set_implicit_hydrogens(1, 1);   // 2nd arg means over-ride known value
 
       return 1;
     }
 
     cerr << "Molecule::_check_for_incomplete_chiral_specifications: incomplete chiral centre, type " << atomic_symbol(c->a()) << endl;
-    c->debug_print (cerr);
+    c->debug_print(cerr);
     return 0;
   }
 
@@ -1039,26 +1043,26 @@ Molecule::_check_for_incomplete_chiral_specifications (Chiral_Centre * c)
   {
     cerr << "Molecule::_check_for_incomplete_chiral_specifications: Atom " << zatom <<
             " has 4 connections, but incomplete!!!\n";
-    print_chiral_centre_details (c, cerr);
+    print_chiral_centre_details(c, cerr);
     return 0;
   }
 
-  assert (3 == acon);
+  assert(3 == acon);
 
-  if (1 != implicit_hydrogens (c->a()))
+  if (1 != implicit_hydrogens(c->a()))
   {
     cerr << "Molecule::_check_for_incomplete_chiral_specifications: Atom " << zatom <<
-            " has " << implicit_hydrogens (c->a()) << " implicit hydrogens\n";
+            " has " << implicit_hydrogens(c->a()) << " implicit hydrogens\n";
     return 0;
   }
 
   if (INVALID_ATOM_NUMBER == c->left_down())
-    c->set_left_down (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
+    c->set_left_down(CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
   else if (INVALID_ATOM_NUMBER == c->right_down())
-    c->set_right_down (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
+    c->set_right_down(CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
   else
   {
-    assert (NULL == "this should not happen");
+    assert(NULL == "this should not happen");
   }
 
   return 1;
@@ -1069,12 +1073,14 @@ Molecule::_check_for_incomplete_chiral_specifications()
 {
   int rc = 1;    // assume OK unless we run into a problem
 
+//cerr << "Molecule::_check_for_incomplete_chiral_specifications:have " << _chiral_centres.number_elements() << " chiral centres to check\n";
+
   for (int i = _chiral_centres.number_elements() - 1; i >= 0; i--)
   {
     Chiral_Centre * c = _chiral_centres[i];
 
     int lp;
-    if (lone_pair_count (c->a(), lp) && 1 == lp)
+    if (lone_pair_count(c->a(), lp) && 1 == lp)
     {
       const Atom * a = _things[c->a()];
       if (16 == a->atomic_number() && 4 == a->ncon())   // not sure what chirality this is
@@ -1103,6 +1109,8 @@ Molecule::_check_for_incomplete_chiral_specifications()
     if (! ignore_incorrect_chiral_input())
       rc = 0;
   }
+
+//cerr << "Molecule::_check_for_incomplete_chiral_specifications:at end of processing have " << _chiral_centres.number_elements() << " chiral centres\n";
 
   return rc;
 
@@ -1136,11 +1144,11 @@ assign_zorder (atom_number_t a,
 
 // When constructing a smiles, ring closures are done before openings
 
-  int i = ring_closures.index (a);
+  int i = ring_closures.index(a);
   if (i >= 0)
     return -(nro + nrc) + i;
 
-  i = ring_openings.index (a);
+  i = ring_openings.index(a);
   if (i >= 0)
     return -nro + i;
 
@@ -1170,9 +1178,9 @@ Chiral_Centre::_discern_clockwise (IWString & smiles,
                                    const resizable_array<atom_number_t> & ring_openings,
                                    const resizable_array<atom_number_t> & ring_closures) const
 {
-  const int zsw    = assign_zorder (south_west, zorder, ring_openings, ring_closures);
-  const int znorth = assign_zorder (north, zorder, ring_openings, ring_closures);
-  const int zse    = assign_zorder (south_east, zorder, ring_openings, ring_closures);
+  const int zsw    = assign_zorder(south_west, zorder, ring_openings, ring_closures);
+  const int znorth = assign_zorder(north, zorder, ring_openings, ring_closures);
+  const int zse    = assign_zorder(south_east, zorder, ring_openings, ring_closures);
 
 #ifdef DEBUG_APPEND_SMILES_CHIRALITY_SYMBOL
   cerr << "South West = " << south_west << " zsw = " << zsw << endl;
@@ -1206,27 +1214,28 @@ Chiral_Centre::append_smiles_chirality_symbol (IWString & smiles,
 {
   resizable_array<atom_number_t> ring_openings;
 
-  int nrob = ring_opening_bonds.number_elements();
-  ring_openings.resize (nrob);
+  const int nrob = ring_opening_bonds.number_elements();
+  ring_openings.resize(nrob);
   for (int i = 0; i < nrob; i++)
   {
     const Bond * b = ring_opening_bonds[i];
-    ring_openings.add (b->other (_a));
+    ring_openings.add(b->other(_a));
   }
 
-  assert (_a != previous_atom);
+  assert(_a != previous_atom);
 
   smiles += '@';    // there will be at least one of these, from now on,
                     // we just need to identify the clockwise (@@) centres
 
 // Looking down the PREVIOUS_ATOM - _A bond, the other bonds look like:
 
-//          North
+/*          North
 //            |
 //            |
 //           / \
 //          /   \
 //         SW    SE
+*/
 
 // Pass to discern_clockwise SOUTH_WEST, NORTH, SOUTH_EAST
 
@@ -1249,37 +1258,37 @@ Chiral_Centre::append_smiles_chirality_symbol (IWString & smiles,
 #endif
 
   if (previous_atom == top_front())
-    _discern_clockwise (smiles, zorder, _left_down, _top_back, _right_down, ring_openings, ring_closures);
+    _discern_clockwise(smiles, zorder, _left_down, _top_back, _right_down, ring_openings, ring_closures);
   else if (previous_atom == top_back())
-    _discern_clockwise (smiles, zorder, _right_down, _top_front, _left_down, ring_openings, ring_closures);
+    _discern_clockwise(smiles, zorder, _right_down, _top_front, _left_down, ring_openings, ring_closures);
   else if (previous_atom == left_down())
-    _discern_clockwise (smiles, zorder, _top_front, _right_down, _top_back, ring_openings, ring_closures);
+    _discern_clockwise(smiles, zorder, _top_front, _right_down, _top_back, ring_openings, ring_closures);
   else if (previous_atom == right_down())
-    _discern_clockwise (smiles, zorder, _top_back, _left_down, _top_front, ring_openings, ring_closures);
+    _discern_clockwise(smiles, zorder, _top_back, _left_down, _top_front, ring_openings, ring_closures);
 
   else if (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN == _top_front)
-    _discern_clockwise (smiles, zorder, _left_down, _top_back, _right_down, ring_openings, ring_closures);
+    _discern_clockwise(smiles, zorder, _left_down, _top_back, _right_down, ring_openings, ring_closures);
   else if (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN == _top_back)
-    _discern_clockwise (smiles, zorder, _right_down, _top_front, _left_down, ring_openings, ring_closures);
+    _discern_clockwise(smiles, zorder, _right_down, _top_front, _left_down, ring_openings, ring_closures);
   else if (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN == _left_down)
-    _discern_clockwise (smiles, zorder, _top_front, _right_down, _top_back, ring_openings, ring_closures);
+    _discern_clockwise(smiles, zorder, _top_front, _right_down, _top_back, ring_openings, ring_closures);
   else if (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN == _right_down)
-    _discern_clockwise (smiles, zorder, _top_back, _left_down, _top_front, ring_openings, ring_closures);
+    _discern_clockwise(smiles, zorder, _top_back, _left_down, _top_front, ring_openings, ring_closures);
 
   else if (CHIRAL_CONNECTION_IS_LONE_PAIR == _top_front)
-    _discern_clockwise (smiles, zorder, _left_down, _top_back, _right_down, ring_openings, ring_closures);
+    _discern_clockwise(smiles, zorder, _left_down, _top_back, _right_down, ring_openings, ring_closures);
   else if (CHIRAL_CONNECTION_IS_LONE_PAIR == _top_back)
-    _discern_clockwise (smiles, zorder, _right_down, _top_front, _left_down, ring_openings, ring_closures);
+    _discern_clockwise(smiles, zorder, _right_down, _top_front, _left_down, ring_openings, ring_closures);
   else if (CHIRAL_CONNECTION_IS_LONE_PAIR == _left_down)
-    _discern_clockwise (smiles, zorder, _top_front, _right_down, _top_back, ring_openings, ring_closures);
+    _discern_clockwise(smiles, zorder, _top_front, _right_down, _top_back, ring_openings, ring_closures);
   else if (CHIRAL_CONNECTION_IS_LONE_PAIR == _right_down)
-    _discern_clockwise (smiles, zorder, _top_back, _left_down, _top_front, ring_openings, ring_closures);
+    _discern_clockwise(smiles, zorder, _top_back, _left_down, _top_front, ring_openings, ring_closures);
   else
   {
     cerr << "Chiral_Centre::append_smiles_chirality_symbol: huh, previous atom is " << previous_atom << endl;
     cerr << "Smiles is '" << smiles << "'\n";
-    debug_print (cerr);
-//  assert (NULL == "this should not happen");
+    debug_print(cerr);
+//  assert(NULL == "this should not happen");
   }
 
   return 1;
@@ -1334,15 +1343,15 @@ do_orientation (const unsigned int * rank,
                 atom_number_t se)
 {
   if (CHIRAL_CONNECTION_IS_LONE_PAIR == north)
-    return do_orientation (rank, sw, se);
+    return do_orientation(rank, sw, se);
   if (CHIRAL_CONNECTION_IS_LONE_PAIR == sw)
-    return do_orientation (rank, se, north);
+    return do_orientation(rank, se, north);
   if (CHIRAL_CONNECTION_IS_LONE_PAIR == se)
-    return do_orientation (rank, north, sw);
+    return do_orientation(rank, north, sw);
 
 // No lone pairs, do normal processing
 
-  return do_orientation (rank[north], rank[sw], rank[se]);
+  return do_orientation(rank[north], rank[sw], rank[se]);
 }
 
 //#define DEBUG_CC_ORIENTATION
@@ -1374,37 +1383,37 @@ Chiral_Centre::orientation (const unsigned int * rank) const
 {
 #ifdef DEBUG_CC_ORIENTATION
   cerr << "Orientation";
-  write_rank (" tf ", _top_front, rank);
-  write_rank (" tb ", _top_back, rank);
-  write_rank (" ld ", _left_down, rank);
-  write_rank (" rd ", _right_down, rank);
+  write_rank(" tf ", _top_front, rank);
+  write_rank(" tb ", _top_back, rank);
+  write_rank(" ld ", _left_down, rank);
+  write_rank(" rd ", _right_down, rank);
   cerr << endl;
 #endif
 
 // Deal with implicit hydrogens first
 
   if (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN == _top_front)
-    return do_orientation (rank, _top_back, _left_down, _right_down);
+    return do_orientation(rank, _top_back, _left_down, _right_down);
   if (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN == _top_back)
-    return do_orientation (rank, _top_front, _right_down, _left_down);
+    return do_orientation(rank, _top_front, _right_down, _left_down);
   if (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN == _right_down)
-    return do_orientation (rank, _left_down, _top_back, _top_front);
+    return do_orientation(rank, _left_down, _top_back, _top_front);
   if (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN == _left_down)
-    return do_orientation (rank, _top_front, _top_back, _right_down);
+    return do_orientation(rank, _top_front, _top_back, _right_down);
 
 // then lone pairs
 
   if (CHIRAL_CONNECTION_IS_LONE_PAIR == _top_front)
-    return do_orientation (rank[_top_back], rank[_left_down], rank[_right_down]);
+    return do_orientation(rank[_top_back], rank[_left_down], rank[_right_down]);
 
   if (CHIRAL_CONNECTION_IS_LONE_PAIR == _top_back)
-    return do_orientation (rank[_top_front], rank[_right_down], rank[_left_down]);
+    return do_orientation(rank[_top_front], rank[_right_down], rank[_left_down]);
 
   if (CHIRAL_CONNECTION_IS_LONE_PAIR == _left_down)
-    return do_orientation (rank[_top_front], rank[_top_back], rank[_right_down]);
+    return do_orientation(rank[_top_front], rank[_top_back], rank[_right_down]);
 
   if (CHIRAL_CONNECTION_IS_LONE_PAIR == _right_down)
-    return do_orientation (rank[_top_back], rank[_top_front], rank[_left_down]);
+    return do_orientation(rank[_top_back], rank[_top_front], rank[_left_down]);
 
 // Looks like all connections are actual atoms, fetch their ranks
 
@@ -1421,27 +1430,217 @@ Chiral_Centre::orientation (const unsigned int * rank) const
 // All ranks are different, now this gets ugly
 
   if (rtf > rtb && rtf > rld && rtf > rrd)
-    return do_orientation (rtb, rld, rrd);
+    return do_orientation(rtb, rld, rrd);
   if (rtb > rtf && rtb > rld && rtb > rrd)
-    return do_orientation (rtf, rrd, rld);
+    return do_orientation(rtf, rrd, rld);
   if (rld > rtf && rld > rtb && rld > rrd)
-    return do_orientation (rtf, rtb, rrd);
+    return do_orientation(rtf, rtb, rrd);
   if (rrd > rtf && rrd > rtb && rrd > rld)
-    return do_orientation (rtb, rtf, rld);
+    return do_orientation(rtb, rtf, rld);
 
-  assert (NULL == "Should not come to here");
+  assert(NULL == "Should not come to here");
 
   return 0;
 }
+
+/*static int
+do_chiral_influence (const unsigned int * rank,
+                     atom_number_t left,
+                     atom_number_t right, 
+                     atom_number_t a1,
+                     atom_number_t a2)
+{
+  unsigned int rl = rank[left];
+  unsigned int rr = rank[right];
+
+  if (rl == rr)
+    return 0;
+
+  if (rl < rr)
+    return -1;
+  else
+    return 1;
+}*/
+
+/*
+  The chiral centre had just a single lone pair or just a single implicit hydrogen
+*/
+
+/*static int
+do_chiral_influence (const unsigned int r1, const unsigned int r2)
+{
+  if (r1 == r2)
+    return 0;
+
+  if (r1 < r2)
+    return -1;
+  else
+    return 1;
+}*/
+
+/*
+  The chiral centre had both a lone pair and an implicit hydrogen. Those
+  two atoms have defined an orientation
+*/
+
+/*static int
+do_chiral_influence (atom_number_t left,
+                     atom_number_t right,
+                     atom_number_t a1,
+                     atom_number_t a2)
+{
+  if (a1 == left && a2 == right)
+   return 1;
+
+  if (a2 == left && a1 == right)
+   return -1;
+
+  abort();
+
+  return 0;
+}*/
+
+/*
+  One connection has been fixed
+*/
+
+/*static int
+do_chiral_influence (const unsigned int * rank,
+                     atom_number_t north,
+                     atom_number_t sw,
+                     atom_number_t se,
+                     atom_number_t a1,
+                     atom_number_t a2)
+{
+
+// All three of north, se and sw are actual atoms. One of them isn't a1 or a2
+
+  if (a1 != north && a2 != north)
+    return do_chiral_influence(se, sw, a1, a2);
+  if (a1 != se && a2 != se)
+    return do_chiral_influence(sw, north, a1, a2);
+  if (a1 != sw && a2 != sw)
+    return do_chiral_influence(north, se, a1, a2);
+
+  cerr << "do_chiral_influence: yipes, no match found\n";
+  abort();
+  return 0;
+}*/
+
+/*
+  We come here when the chiral centre has an implicit hydrogen.
+  Check to see if it also has a lone pair
+*/
+
+/*static int
+do_chiral_influence_check_lp (const unsigned int * rank,
+                              atom_number_t north,
+                              atom_number_t sw,
+                              atom_number_t se,
+                              atom_number_t a1,
+                              atom_number_t a2)
+{
+  if (CHIRAL_CONNECTION_IS_LONE_PAIR == north)
+    return do_chiral_influence(rank, se, sw, a1, a2);
+  if (CHIRAL_CONNECTION_IS_LONE_PAIR == sw)
+    return do_chiral_influence(rank, north, se, a1, a2);
+  if (CHIRAL_CONNECTION_IS_LONE_PAIR == se)
+    return do_chiral_influence(rank, sw, north, a1, a2);
+
+// no special treatment needed
+
+  return do_chiral_influence (rank, north, sw, se, a1, a2);
+}*/
+
+/*
+  Used during unique determinations
+*/
+
+/*int
+Chiral_Centre::influence (const unsigned int * rank,
+                          atom_number_t a1, atom_number_t a2) const
+{
+  assert(rank[a1] == rank[a2]);    // these are the atoms we are trying to resolve
+
+  if (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN == _top_front)
+    return do_chiral_influence_check_lp (rank, _top_back, _left_down, _right_down, a1, a2);
+  if (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN == _top_back)
+    return do_chiral_influence_check_lp (rank, _top_front, _right_down, _left_down, a1, a2);
+  if (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN == _right_down)
+    return do_chiral_influence_check_lp (rank, _top_front, _top_back, _left_down, a1, a2);
+  if (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN == _left_down)
+    return do_chiral_influence_check_lp (rank, _top_front, _top_back, _right_down, a1, a2);
+
+// then lone pairs
+
+  if (CHIRAL_CONNECTION_IS_LONE_PAIR == _top_front)
+    return do_chiral_influence (rank, _top_back, _left_down, _right_down, a1, a2);
+
+  if (CHIRAL_CONNECTION_IS_LONE_PAIR == _top_back)
+    return do_chiral_influence (rank, _top_front, _right_down, _left_down, a1, a2);
+
+  if (CHIRAL_CONNECTION_IS_LONE_PAIR == _right_down)
+    return do_chiral_influence (rank, _top_back, _top_front, _left_down, a1, a2);
+
+  if (CHIRAL_CONNECTION_IS_LONE_PAIR == _left_down)
+    return do_chiral_influence (rank, _top_front, _top_back, _right_down, a1, a2);
+
+// All the atoms are actual atoms. Match the atoms up. Put the A1 match
+// along the Z axis and look for anticlockwise from the A2 atom
+
+  if (_top_front == a1)
+  {
+    if (_top_back == a2)
+      return do_chiral_influence (rank[_left_down], rank[_right_down]);
+    if (_left_down == a2)
+      return do_chiral_influence (rank[_right_down], rank[_top_back]);
+    if (_right_down == a2)
+      return do_chiral_influence (rank[_top_back], rank[_left_down]);
+  }
+
+  if (_top_back == a1)
+  {
+    if (_top_front == a2)
+      return do_chiral_influence (rank[_right_down], rank[_left_down]);
+    if (_left_down == a2)
+      return do_chiral_influence (rank[_top_front], rank[_right_down]);
+    if (_right_down == a2)
+      return do_chiral_influence (rank[_left_down], rank[_top_front]);
+  }
+
+  if (_left_down == a1)
+  {
+    if (_top_front == a2)
+      return do_chiral_influence (rank[_top_back], rank[_right_down]);
+    if (_top_back == a2)
+      return do_chiral_influence (rank[_right_down], rank[_top_front]);
+    if (_right_down == a2)
+      return do_chiral_influence (rank[_top_front], rank[_top_back]);
+  }
+
+  if (_right_down == a1)
+  {
+    if (_top_front == a2)
+      return do_chiral_influence (rank[_left_down], rank[_top_back]);
+    if (_top_back == a2)
+      return do_chiral_influence (rank[_top_front], rank[_left_down]);
+    if (_left_down == a2)
+      return do_chiral_influence (rank[_top_front], rank[_top_back]);
+  }
+
+  abort();
+
+  return 0;
+}*/
 
 static unsigned int
 get_rank_for_connection (const unsigned int * rank, atom_number_t a)
 {
   if (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN == a)
-    return numeric_limits<unsigned int>::max();
+    return std::numeric_limits<unsigned int>::max();
 
   if (CHIRAL_CONNECTION_IS_LONE_PAIR == a)
-    return numeric_limits<unsigned int>::max() - 1;
+    return std::numeric_limits<unsigned int>::max() - 1;
 
   return  rank[a];
 }
@@ -1452,9 +1651,9 @@ do_influence (const unsigned int * rank,
               atom_number_t sw,
               atom_number_t se)
 {
-  unsigned int rank_north = get_rank_for_connection (rank, north);
-  unsigned int rank_sw    = get_rank_for_connection (rank, sw);
-  unsigned int rank_se    = get_rank_for_connection (rank, se);
+  unsigned int rank_north = get_rank_for_connection(rank, north);
+  unsigned int rank_sw    = get_rank_for_connection(rank, sw);
+  unsigned int rank_se    = get_rank_for_connection(rank, se);
 
   if (rank_north > rank_sw && rank_sw > rank_se)
     return 1;
@@ -1486,20 +1685,39 @@ Chiral_Centre::influence (const unsigned int * rank,
                           atom_number_t zatom) const
 {
   if (_top_front == zatom)
-    return do_influence (rank, _top_back, _left_down, _right_down);
+    return do_influence(rank, _top_back, _left_down, _right_down);
   if (_top_back == zatom)
-    return do_influence (rank, _top_front, _right_down, _left_down);
+    return do_influence(rank, _top_front, _right_down, _left_down);
   if (_left_down == zatom)
-    return do_influence (rank, _top_front, _top_back, _right_down);
+    return do_influence(rank, _top_front, _top_back, _right_down);
   if (_right_down == zatom)
-    return do_influence (rank, _top_front, _left_down, _top_back);
+    return do_influence(rank, _top_front, _left_down, _top_back);
 
   return 0;
 }
 
+/*
+  What is the highest atom number less than BELOW.
+  Note that this works only because both CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN
+  and INVALID_ATOM_NUMBER are negative quantities
+*/
 
+/*int
+Chiral_Centre::_highest_valid_atom_number (atom_number_t below) const
+{
+  iwmax<atom_number_t> amax (-1);
 
+  if (_top_front < below)
+    amax.extra (_top_front);
+  if (_top_back < below)
+    amax.extra (_top_back);
+  if (_left_down < below)
+    amax.extra (_left_down);
+  if (_right_down < below)
+    amax.extra (_right_down);
 
+  return amax.maxval();
+}*/
 
 int
 Chiral_Centre::mdl_stereo_centre_value (atom_number_t sw,
@@ -1527,6 +1745,7 @@ Chiral_Centre::mdl_stereo_centre_value() const
   if (0 == _chirality_known)
     return 3;
 
+/*
 // MDL wants the highest atom number to be pointing into the page.
 // Therefore this is the opposite of what we had for smiles
 // Pass the arguments SW N SE
@@ -1535,39 +1754,40 @@ Chiral_Centre::mdl_stereo_centre_value() const
 //             |
 //            / \
 //          SW   SE
-//
+
+*/
 
   if (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN == _top_front)
-    return mdl_stereo_centre_value (_right_down, _top_back, _left_down);
+    return mdl_stereo_centre_value(_right_down, _top_back, _left_down);
   if (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN == _top_back)
-    return mdl_stereo_centre_value (_left_down, _top_front, _right_down);
+    return mdl_stereo_centre_value(_left_down, _top_front, _right_down);
   if (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN == _left_down)
-    return mdl_stereo_centre_value (_top_front, _top_back, _right_down);
+    return mdl_stereo_centre_value(_top_front, _top_back, _right_down);
   if (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN == _right_down)
-    return mdl_stereo_centre_value (_top_back, _top_front, _left_down);
+    return mdl_stereo_centre_value(_top_back, _top_front, _left_down);
 
   if (CHIRAL_CONNECTION_IS_LONE_PAIR == _top_front)
-    return mdl_stereo_centre_value (_right_down, _top_back, _left_down);
+    return mdl_stereo_centre_value(_right_down, _top_back, _left_down);
   if (CHIRAL_CONNECTION_IS_LONE_PAIR == _top_back)
-    return mdl_stereo_centre_value (_left_down, _top_front, _right_down);
+    return mdl_stereo_centre_value(_left_down, _top_front, _right_down);
   if (CHIRAL_CONNECTION_IS_LONE_PAIR == _left_down)
-    return mdl_stereo_centre_value (_top_front, _top_back, _right_down);
+    return mdl_stereo_centre_value(_top_front, _top_back, _right_down);
   if (CHIRAL_CONNECTION_IS_LONE_PAIR == _right_down)
-    return mdl_stereo_centre_value (_top_back, _top_front, _left_down);
+    return mdl_stereo_centre_value(_top_back, _top_front, _left_down);
 
 // No implicit H
 
   if (_top_front > _top_back && _top_front > _left_down && _top_front > _right_down)
-    return mdl_stereo_centre_value (_right_down, _top_back, _left_down);
+    return mdl_stereo_centre_value(_right_down, _top_back, _left_down);
   if (_top_back > _top_front && _top_back > _left_down && _top_back > _right_down)
-    return mdl_stereo_centre_value (_left_down, _top_front, _right_down);
+    return mdl_stereo_centre_value(_left_down, _top_front, _right_down);
   if (_left_down > _top_front && _left_down > _top_back && _left_down > _right_down)
-    return mdl_stereo_centre_value (_top_front, _top_back, _right_down);
+    return mdl_stereo_centre_value(_top_front, _top_back, _right_down);
   if (_right_down > _top_front && _right_down > _top_back && _right_down > _left_down)
-    return mdl_stereo_centre_value (_top_back, _top_front, _left_down);
+    return mdl_stereo_centre_value(_top_back, _top_front, _left_down);
 
   cerr << "Chiral_Centre::mdl_stereo_centre_value: Huh??\n";
-  debug_print (cerr);
+  debug_print(cerr);
   iwabort();
 
   return 0;
@@ -1626,7 +1846,7 @@ Chiral_Centre *
 Molecule::create_chiral_centre (atom_number_t zatom,
                                 int zero_connections_ok)
 {
-  assert (NULL == chiral_centre_at_atom (zatom));    // cannot already be one at atom A
+  assert(NULL == chiral_centre_at_atom(zatom));    // cannot already be one at atom A
 
   Atom * a = _things[zatom];
 
@@ -1639,33 +1859,33 @@ Molecule::create_chiral_centre (atom_number_t zatom,
     ;
   else if (4 == acon + a->implicit_hydrogens())
     ;
-  else if (a->lone_pair_count (lp) && 1 == lp)
+  else if (a->lone_pair_count(lp) && 1 == lp)
     ;
   else
   {
     cerr << "Molecule::create_chiral_centre: atom " << zatom << " (" << a->atomic_symbol() << ") has " << acon <<
             " connections\n";
-    debug_print (cerr);
+    debug_print(cerr);
     return NULL;
   }
 
-  Chiral_Centre * c = new Chiral_Centre (zatom);
+  Chiral_Centre * c = new Chiral_Centre(zatom);
   if (acon)
   {
-    c->set_top_front (a->other (zatom, 0));
-    c->set_top_back  (a->other (zatom, 1));
-    c->set_left_down (a->other (zatom, 2));
+    c->set_top_front(a->other(zatom, 0));
+    c->set_top_back (a->other(zatom, 1));
+    c->set_left_down(a->other(zatom, 2));
     if (4 == acon)
-      c->set_right_down (a->other (zatom, 3));
+      c->set_right_down(a->other(zatom, 3));
     else if (lp)
-      c->set_right_down (CHIRAL_CONNECTION_IS_LONE_PAIR);
+      c->set_right_down(CHIRAL_CONNECTION_IS_LONE_PAIR);
     else
-      c->set_right_down (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
+      c->set_right_down(CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
   }
 
-  _chiral_centres.add (c);
+  _chiral_centres.add(c);
 
-  _set_modified (zatom);
+  _set_modified(zatom);
 
   return c;
 }
@@ -1690,11 +1910,12 @@ Molecule::create_chiral_centre (atom_number_t zatom,
 */
 
 int
-Molecule::_complete_chiral_centre_from_mdl_files (Chiral_Centre * c)
+Molecule::_complete_chiral_centre_from_mdl_files (Chiral_Centre * c,
+                                                  const MDL_File_Supporting_Material & mdlfos)
 {
 #ifdef DEBUG_COMPLETE_CHIRAL_CENTRE
   cerr << "Molecule::_complete_chiral_centre_from_mdl_files:completing\n";
-  c->debug_print (cerr);
+  c->debug_print(cerr);
 #endif
 
   atom_number_t a = c->a();
@@ -1704,6 +1925,8 @@ Molecule::_complete_chiral_centre_from_mdl_files (Chiral_Centre * c)
   int acon = atom_a->ncon();
 
   if (acon == atom_a->nbonds())   // good, fully saturated
+    ;
+  else if (6 == atom_a->atomic_number())  // the most common case
     ;
   else if (16 == atom_a->atomic_number())  // many different possibilities
     ;
@@ -1723,22 +1946,22 @@ Molecule::_complete_chiral_centre_from_mdl_files (Chiral_Centre * c)
 
   for (int i = 0; i < acon; i++)
   {
-    atom_number_t j = atom_a->other (a, i);
-    if (1 == _things[j]->atomic_number() && mdl_read_h_correct_chiral_centres())
+    atom_number_t j = atom_a->other(a, i);
+    if (1 == _things[j]->atomic_number() && mdlfos.mdl_read_h_correct_chiral_centres())
     {
       if (_things[j]->isotope())
       {
         hydrogen_isotope_present++;
-        con.add (j);
+        con.add(j);
       }
       else
       {
         explicit_hydrogen_present++;
-        con.add (_number_elements + j);    // special atom number that will be larger than any other atom number
+        con.add(_number_elements + j);    // special atom number that will be larger than any other atom number
       }
     }
     else
-      con.add (j);
+      con.add(j);
   }
 
   int ih = _things[a]->implicit_hydrogens();
@@ -1760,9 +1983,15 @@ Molecule::_complete_chiral_centre_from_mdl_files (Chiral_Centre * c)
 
 // Three connections and a lone pair is fine.
 
-  int lone_pairs;
-  if (3 == tcon && lone_pair_count (a, lone_pairs) && 1 == lone_pairs)
-    ;
+  int lone_pairs = 0;
+  if (3 == tcon)
+  {
+    if ( ! lone_pair_count(a, lone_pairs))
+      return 0;
+      
+    if (1 != lone_pairs)
+      return 0;
+  }
   else if (acon < 3 || tcon < 3 || tcon > 4)
   {
     cerr << "Molecule::_complete_chiral_centre_from_mdl_files: atom " << a << 
@@ -1772,7 +2001,7 @@ Molecule::_complete_chiral_centre_from_mdl_files (Chiral_Centre * c)
     return 0;
   }
 
-  con.sort (int_comparitor_larger);
+  con.sort(int_comparitor_larger);
 
   if (explicit_hydrogen_present)
   {
@@ -1805,14 +2034,14 @@ Molecule::_complete_chiral_centre_from_mdl_files (Chiral_Centre * c)
   }
   else
   {
-    c->set_top_front (con[2]);
+    c->set_top_front(con[2]);
 
     if (4 == acon)
-      c->set_top_back (con[3]);
+      c->set_top_back(con[3]);
     else if (ih)
-      c->set_top_back (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
+      c->set_top_back(CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN);
     else if (lone_pairs)
-      c->set_top_back (CHIRAL_CONNECTION_IS_LONE_PAIR);
+      c->set_top_back(CHIRAL_CONNECTION_IS_LONE_PAIR);
     else
     {
       cerr << "Molecule::_complete_chiral_centre_from_mdl_files:three connections by no H or LP\n";
@@ -1822,8 +2051,8 @@ Molecule::_complete_chiral_centre_from_mdl_files (Chiral_Centre * c)
 
 #ifdef DEBUG_COMPLETE_CHIRAL_CENTRE
   cerr << "Input chirality = " << c->chirality_known() << " top done\n";
-  c->debug_print (cerr);
-  cerr << "Other atoms are 0: " << other (a, 0) << " and 1 " << other (a, 1) << endl;
+  c->debug_print(cerr);
+  cerr << "Other atoms are 0: " << other(a, 0) << " and 1 " << other(a, 1) << endl;
 #endif
 
 // As coded, I believe this to be incorrect, but Concord seems to interpret
@@ -1831,18 +2060,18 @@ Molecule::_complete_chiral_centre_from_mdl_files (Chiral_Centre * c)
 
   if (1 == c->chirality_known())     // clockwise
   {
-    c->set_left_down  (con[1]);
-    c->set_right_down (con[0]);
+    c->set_left_down (con[1]);
+    c->set_right_down(con[0]);
   }
   else if (2 == c->chirality_known())  // anti-clockwise
   {
-    c->set_left_down  (con[0]);
-    c->set_right_down (con[1]);
+    c->set_left_down (con[0]);
+    c->set_right_down(con[1]);
   }
   else
   {
-    c->debug_print (cerr);
-    assert (NULL == "Unknown chirality_known value");
+    c->debug_print(cerr);
+    assert(NULL == "Unknown chirality_known value");
   }
 
   return 1;
@@ -1856,7 +2085,7 @@ Molecule::_complete_chiral_centre_from_mdl_files (Chiral_Centre * c)
 
 
 int
-Molecule::_complete_chiral_centres_from_mdl_files()
+Molecule::_complete_chiral_centres_from_mdl_files(const MDL_File_Supporting_Material & mdlfos)
 {
   int rc = 1;    // assume OK until we find a problem
 
@@ -1869,14 +2098,14 @@ Molecule::_complete_chiral_centres_from_mdl_files()
     if (c->complete())
       continue;
 
-    if (_complete_chiral_centre_from_mdl_files (c))
+    if (_complete_chiral_centre_from_mdl_files(c, mdlfos))
       continue;
 
     if (ignore_incorrect_chiral_input())
     {
-      cerr << "Discarding invalid chiral centre on atom " << c->a() << " '" << _molecule_name << "'\n";
+      cerr << "Discarding invalid chiral centre on atom " << c->a() << " '" << smarts_equivalent_for_atom(c->a()) << "'\n";
 
-      _chiral_centres.remove_item (i);
+      _chiral_centres.remove_item(i);
     }
     else
       rc = 0;
@@ -1888,8 +2117,8 @@ Molecule::_complete_chiral_centres_from_mdl_files()
 int
 Molecule::invert_chirality_on_atom (atom_number_t a)
 {
-  Chiral_Centre * c = chiral_centre_at_atom (a);
-  assert (c);
+  Chiral_Centre * c = chiral_centre_at_atom(a);
+  assert(c);
 
   c->invert();
 
@@ -1906,10 +2135,10 @@ Molecule::_check_chiral_centres() const
   int nc = _chiral_centres.number_elements();
   for (int i = 0; i < nc; i++)
   {
-    if (! valid_chiral_centre (_chiral_centres[i]))
+    if (! valid_chiral_centre(_chiral_centres[i]))
     {
-      cerr << "Yipes, chiral centre " << i << " is bad\n";
-      print_chiral_centre_details (_chiral_centres[i], cerr);
+      cerr << "Yipes, chiral centre " << i << " is bad, " << smarts_equivalent_for_atom(_chiral_centres[i]->a()) << endl;
+      print_chiral_centre_details(_chiral_centres[i], cerr);
       return 0;
     }
   }
@@ -1938,7 +2167,7 @@ Chiral_Centre::got_ring_opening_bond (int ring_number, int chiral_count)
 {
 #ifdef DEBUG_GOT_RING_OPENING_BOND
   cerr << "Ring " << ring_number << " opens from chiral centre ";
-  debug_print (cerr);
+  debug_print(cerr);
 #endif
 
   if (INVALID_ATOM_NUMBER == _top_front)
@@ -1968,7 +2197,7 @@ Chiral_Centre::got_ring_opening_bond (int ring_number, int chiral_count)
     return 1;
   }
 
-  assert (1 == ((INVALID_ATOM_NUMBER == _left_down) + (INVALID_ATOM_NUMBER == _right_down)));    // just one of these should be unset
+  assert(1 == ((INVALID_ATOM_NUMBER == _left_down) + (INVALID_ATOM_NUMBER == _right_down)));    // just one of these should be unset
 
   if (INVALID_ATOM_NUMBER == _left_down)
   {
@@ -1983,7 +2212,7 @@ Chiral_Centre::got_ring_opening_bond (int ring_number, int chiral_count)
   }
 
   cerr << "Chiral_Centre::got_ring_opening_bond: chiral count = " << chiral_count << endl;
-  debug_print (cerr);
+  debug_print(cerr);
 
   return 0;
 }
@@ -2002,11 +2231,11 @@ Chiral_Centre::got_ring_opening_bond (int ring_number, int chiral_count)
 int
 Chiral_Centre::got_ring_closure_bond (int ring_number, atom_number_t a)
 {
-  assert (INVALID_ATOM_NUMBER != a);
+  assert(INVALID_ATOM_NUMBER != a);
 
 #ifdef DEBUG_GOT_RING_CLOSURE_BOND
   cerr << "Atom " << a << " closes ring " << ring_number << endl;
-  debug_print (cerr);
+  debug_print(cerr);
 #endif
 
   if (_top_front == CHIRAL_CENTRE_PENDING_RING_CLOSURE(ring_number))
@@ -2034,7 +2263,7 @@ Chiral_Centre::got_ring_closure_bond (int ring_number, atom_number_t a)
   }
 
   cerr << "Chiral_Centre::got_ring_closure_bond: not pending ring " << ring_number << endl;
-  debug_print (cerr);
+  debug_print(cerr);
   iwabort();
   return 0;
 }
@@ -2047,7 +2276,7 @@ do_copy (atom_number_t & a,
   if (initial >= 0)     // valid atom number, not a lone pair or implicit Hydrogen
   {
     a = initial - diff;
-    assert (a >= 0);
+    assert(a >= 0);
   }
   else
     a = initial;
@@ -2058,16 +2287,16 @@ do_copy (atom_number_t & a,
 int
 Chiral_Centre::make_copy (const Chiral_Centre * c2)
 {
-  assert (c2->ok());
+  assert(c2->ok());
 
   _chirality_known = c2->_chirality_known;
 
   int diff = c2->_a - _a;
 
-  do_copy (_top_back, c2->_top_back, diff);
-  do_copy (_top_front, c2->_top_front, diff);
-  do_copy (_left_down, c2->_left_down, diff);
-  do_copy (_right_down, c2->_right_down, diff);
+  do_copy(_top_back, c2->_top_back, diff);
+  do_copy(_top_front, c2->_top_front, diff);
+  do_copy(_left_down, c2->_left_down, diff);
+  do_copy(_right_down, c2->_right_down, diff);
 
   return 1;
 }
@@ -2091,7 +2320,7 @@ Chiral_Centre::implicit_hydrogen_is_now_atom_number (atom_number_t a)
   else
   {
     cerr << "Chiral_Centre::implicit_hydrogen_is_now_atom_number: huh, no implicit hydrogen\n";
-    debug_print (cerr);
+    debug_print(cerr);
     cerr << "Proposed atom was " << a << endl;
 
     return 0;
@@ -2118,7 +2347,7 @@ Chiral_Centre::lone_pair_is_now_atom_number (atom_number_t a)
   else
   {
     cerr << "Chiral_Centre::implicit_hydrogen_is_now_atom_number: huh, no implicit hydrogen\n";
-    debug_print (cerr);
+    debug_print(cerr);
     cerr << "Proposed atom was " << a << endl;
 
     return 0;
@@ -2169,7 +2398,7 @@ Chiral_Centre::make_top_front (atom_number_t ntf)
   }
 
   cerr << "Chiral_Centre::make_top_front: I don't use atom " << ntf << endl;
-  debug_print (cerr);
+  debug_print(cerr);
   iwabort();
   
   return 0;
@@ -2227,7 +2456,7 @@ Chiral_Centre::atom_is_now_lone_pair (atom_number_t a)
 int
 Chiral_Centre::all_atoms_in_subset (const int * subset, int id) const
 {
-  assert (complete());
+  assert(complete());
 
   if (subset[_a] < 0)
     return 0;
@@ -2266,15 +2495,15 @@ Chiral_Centre::all_atoms_in_subset (const int * subset, int id) const
 int
 Molecule::remove_chiral_centre_at_atom (atom_number_t a)
 {
-  assert (ok());
-  assert (a >= 0 && a < _number_elements);
+  assert(ok());
+  assert(a >= 0 && a < _number_elements);
 
   for (int i = 0; i < _chiral_centres.number_elements(); i++)
   {
     if (a == _chiral_centres[i]->a())
     {
-      _chiral_centres.remove_item (i);
-      _things[a]->set_implicit_hydrogens_known (0);
+      _chiral_centres.remove_item(i);
+      _things[a]->set_implicit_hydrogens_known(0);
 
       _set_modified();
 
@@ -2298,10 +2527,10 @@ Molecule::remove_all_chiral_centres()
   {
     const Chiral_Centre * ci = _chiral_centres[i];
     atom_number_t a = ci->a();
-    _things[a]->set_implicit_hydrogens_known (0);
+    _things[a]->set_implicit_hydrogens_known(0);
   }
 
-  _chiral_centres.resize (0);
+  _chiral_centres.resize(0);
 
   _set_modified();
 
@@ -2319,11 +2548,11 @@ Molecule::_add_chiral_centre_checking_for_duplicate (Chiral_Centre * c)
     if (a != _chiral_centres[i]->a())
       continue;
 
-    _chiral_centres.remove_item (i);
+    _chiral_centres.remove_item(i);
     break;
   }
 
-  _chiral_centres.add (c);
+  _chiral_centres.add(c);
 
   return 1;
 }
@@ -2337,14 +2566,14 @@ int
 Molecule::add_chiral_centre (Chiral_Centre * c,
                              int check_for_existing)
 {
-  assert (valid_chiral_centre (c));
+  assert(valid_chiral_centre(c));
 
   int rc;
   if (check_for_existing && _chiral_centres.number_elements())
-    rc = _add_chiral_centre_checking_for_duplicate (c);
+    rc = _add_chiral_centre_checking_for_duplicate(c);
   else
   {
-    _chiral_centres.add (c);
+    _chiral_centres.add(c);
     rc = 1;
   }
 
@@ -2362,7 +2591,7 @@ Molecule::involved_in_chiral_centre (int * s, int v) const
 
   for (int i = 0; i < n; i++)
   {
-    _chiral_centres[i]->set_vector (s, v);
+    _chiral_centres[i]->set_vector(s, v);
   }
 
   return n;
@@ -2377,7 +2606,7 @@ Molecule::at_centre_of_chiral_centre (int * s, int v) const
   {
     atom_number_t j = _chiral_centres[i]->a();
 
-    assert (j >= 0 && j < _number_elements);
+    assert(j >= 0 && j < _number_elements);
 
     s[j] = v;
   }
@@ -2432,21 +2661,21 @@ atom_matches (atom_number_t & target, atom_number_t zold, atom_number_t znew)
 int
 Chiral_Centre::change_atom_number (atom_number_t zold, atom_number_t znew)
 {
-  assert (ok());
+  assert(ok());
 
-  if (atom_matches (_a, zold, znew))
+  if (atom_matches(_a, zold, znew))
     return 1;
-  if (atom_matches (_top_back, zold, znew))
+  if (atom_matches(_top_back, zold, znew))
     return 1;
-  if (atom_matches (_top_front, zold, znew))
+  if (atom_matches(_top_front, zold, znew))
     return 1;
-  if (atom_matches (_left_down, zold, znew))
+  if (atom_matches(_left_down, zold, znew))
     return 1;
-  if (atom_matches (_right_down,  zold, znew))
+  if (atom_matches(_right_down,  zold, znew))
     return 1;
 
   cerr << "Chiral_Centre::change_atom_number: no involvement with atom " << zold << endl;
-  debug_print (cerr);
+  debug_print(cerr);
 
   return 0;
 }
@@ -2475,11 +2704,11 @@ do_move_atom_to_end_of_atom_list (atom_number_t & target, atom_number_t zatom, i
 int
 Chiral_Centre::move_atom_to_end_of_atom_list (atom_number_t zatom, int atoms_in_molecule)
 {
-  do_move_atom_to_end_of_atom_list (_a,          zatom, atoms_in_molecule);
-  do_move_atom_to_end_of_atom_list (_top_front,  zatom, atoms_in_molecule);
-  do_move_atom_to_end_of_atom_list (_top_back,   zatom, atoms_in_molecule);
-  do_move_atom_to_end_of_atom_list (_left_down,  zatom, atoms_in_molecule);
-  do_move_atom_to_end_of_atom_list (_right_down, zatom, atoms_in_molecule);
+  do_move_atom_to_end_of_atom_list(_a,          zatom, atoms_in_molecule);
+  do_move_atom_to_end_of_atom_list(_top_front,  zatom, atoms_in_molecule);
+  do_move_atom_to_end_of_atom_list(_top_back,   zatom, atoms_in_molecule);
+  do_move_atom_to_end_of_atom_list(_left_down,  zatom, atoms_in_molecule);
+  do_move_atom_to_end_of_atom_list(_right_down, zatom, atoms_in_molecule);
 
   return 1;
 }
@@ -2508,25 +2737,25 @@ check_atom_numbers_swapped (atom_number_t & target,
 int
 Chiral_Centre::atom_numbers_are_swapped (atom_number_t a1, atom_number_t a2)
 {
-  assert (a1 != a2);
+  assert(a1 != a2);
 
   int done1 = 0;
   int done2 = 0;
 
 #ifdef DEBUG_ATOM_NUMBERS_ARE_SWAPPED
   cerr << "Before swapping " << a1 << " and " << a2 << endl;
-  debug_print (cerr);
+  debug_print(cerr);
 #endif
 
-  check_atom_numbers_swapped (_a, a1, done1, a2, done2);
-  check_atom_numbers_swapped (_top_front, a1, done1, a2, done2);
-  check_atom_numbers_swapped (_top_back, a1, done1, a2, done2);
-  check_atom_numbers_swapped (_left_down, a1, done1, a2, done2);
-  check_atom_numbers_swapped (_right_down, a1, done1, a2, done2);
+  check_atom_numbers_swapped(_a, a1, done1, a2, done2);
+  check_atom_numbers_swapped(_top_front, a1, done1, a2, done2);
+  check_atom_numbers_swapped(_top_back, a1, done1, a2, done2);
+  check_atom_numbers_swapped(_left_down, a1, done1, a2, done2);
+  check_atom_numbers_swapped(_right_down, a1, done1, a2, done2);
 
 #ifdef DEBUG_ATOM_NUMBERS_ARE_SWAPPED
   cerr << "After swapping " << a1 << " and " << a2 << endl;
-  debug_print (cerr);
+  debug_print(cerr);
 #endif
 
   return 1;
@@ -2643,7 +2872,21 @@ Molecule::_discern_chirality_from_3d_structure(atom_number_t zatom)
   return 1;
 }
 
+/*static int
+do_print_canonical_ranking(Molecule & m, 
+                           std::ostream & os)
+{
+  int matoms = m.natoms();
 
+  for (int i = 0; i < matoms; i++)
+  {
+    const Atom * a = m.atomi(i);
+
+    os << i << " " << a->atomic_symbol() << " " << a->ncon() << " connnections, rank " << m.canonical_rank(i) << endl;
+  }
+
+  return 1;
+}*/
 
 int
 Molecule::discern_chirality_from_3d_structure()
@@ -2686,5 +2929,19 @@ reset_chiral_centre_file_scope_variables()
 {
   _automatically_add_implicit_hydrogen_to_incomplete_chiral_centre = 0;
 }
+void
+Chiral_Centre::new_atom_numbers (const int * xref)
+{
+  if (_a >= 0 && xref[_a] != _a)
+    _a = xref[_a];
+  if (_top_back >= 0 && xref[_top_back] != _top_back)
+    _top_back = xref[_top_back];
+  if (_top_front >= 0 && xref[_top_front] != _top_front)
+    _top_front = xref[_top_front];
+  if (_left_down >= 0 && xref[_left_down] != _left_down)
+    _left_down = xref[_left_down];
+  if (_right_down >= 0 && xref[_right_down] != _right_down)
+    _right_down = xref[_right_down];
 
-// arch-tag: e6cc1884-7f5a-41b1-a1d7-386536bf0ea0
+  return;
+}

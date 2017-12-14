@@ -1,27 +1,8 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
 #include <ctype.h>
 #include <memory>
 
 #include "misc.h"
-#include "iw_auto_array.h"
 
 #include "substructure.h"
 #include "target.h"
@@ -34,17 +15,20 @@ Substructure_Ring_Base::Substructure_Ring_Base ()
 
   _only_keep_matches_in_largest_fragment = 0;
 
-  _is_heteroatom = new_int (HIGHEST_ATOMIC_NUMBER + 1, 1);
+  _is_heteroatom = new_int(HIGHEST_ATOMIC_NUMBER + 1, 1);
   _is_heteroatom[6] = 0;
 
 //  Should we include Hydrogen?
+
+  _environment_can_match_in_ring_atoms = 0;
 
   return;
 }
 
 Substructure_Ring_Base::~Substructure_Ring_Base ()
 {
-  DELETE_IF_NOT_NULL (_is_heteroatom);
+  if (NULL != _is_heteroatom)
+    delete [] _is_heteroatom;
 
   return;
 }
@@ -61,7 +45,7 @@ Substructure_Ring_Base::_environment_matches (Molecule_to_Match & target,
   int atom_to_process = 0;
 
 #ifdef DEBUG_ENVIRONMENT_MATCHES
-  cerr << "Processing " << matched_query_atoms.number_elements () << " environment children\n";
+  cerr << "Processing " << matched_query_atoms.number_elements() << " environment children\n";
 #endif
 
   while (atom_to_process >= 0)
@@ -70,15 +54,15 @@ Substructure_Ring_Base::_environment_matches (Molecule_to_Match & target,
     cerr << "Processing child " << atom_to_process << endl;
 #endif
 
-    Substructure_Atom * a = const_cast<Substructure_Atom *> (matched_query_atoms[atom_to_process]);
+    Substructure_Atom * a = const_cast<Substructure_Atom *>(matched_query_atoms[atom_to_process]);
 
-    if (! a->move_to_next_match_from_current_anchor (previously_matched_atoms, matched_query_atoms))
+    if (! a->move_to_next_match_from_current_anchor(previously_matched_atoms, matched_query_atoms))
     {
 #ifdef DEBUG_ENVIRONMENT_MATCHES
-      cerr << "Move to next failed for query environment atom " << a->unique_id () << endl;
+      cerr << "Move to next failed for query environment atom " << a->unique_id() << endl;
 #endif
 
-      a->remove_your_children (matched_query_atoms, previously_matched_atoms);
+      a->remove_your_children(matched_query_atoms, previously_matched_atoms);
 
       atom_to_process--;
       if (atom_to_process < 0)
@@ -87,15 +71,15 @@ Substructure_Ring_Base::_environment_matches (Molecule_to_Match & target,
     else
     {
 #ifdef DEBUG_ENVIRONMENT_SEARCH
-      cerr << "Move to next match succeeded " << a->unique_id () << "(" << a->atom_number_matched () <<
-              "), or = " << a->or_id () << " atom to process = " << atom_to_process << " matched = " << matched_query_atoms.number_elements () << endl;
+      cerr << "Move to next match succeeded " << a->unique_id() << "(" << a->atom_number_matched() <<
+              "), or = " << a->or_id() << " atom to process = " << atom_to_process << " matched = " << matched_query_atoms.number_elements() << endl;
 #endif
 
-      a->add_your_children (matched_query_atoms);   // does nothing if already added
+      a->add_your_children(matched_query_atoms);   // does nothing if already added
 
       atom_to_process++;
 
-      if (atom_to_process >= matched_query_atoms.number_elements ())      // the == condition is the only one which should ever happen
+      if (atom_to_process >= matched_query_atoms.number_elements())      // the == condition is the only one which should ever happen
       {
         rc++;
         break;        // break from while (atom_to_process >= 0) loop, we are only interested in one embedding per start atom
@@ -123,15 +107,15 @@ Substructure_Ring_Base::_environment_matches (Molecule_to_Match & target,
                                               int * already_matched)
 {
 #ifdef DEBUG_ENVIRONMENT_SEARCH
-  cerr << "Start environment match, root atom has " << root_atom.attributes_specified () << " attributes specified\n";
+  cerr << "Start environment match, root atom has " << root_atom.attributes_specified() << " attributes specified\n";
 #endif
 
   Query_Atoms_Matched qam;    // scope here just for efficiency
-  qam.resize (20);            // 20 seems pretty large
+  qam.resize(20);            // 20 seems pretty large
 
-  int matoms = target.natoms ();
+  int matoms = target.natoms();
 
-  int * copy_ring = new int[matoms]; iw_auto_array<int> free_copy_ring(copy_ring);
+  int * copy_ring = new int[matoms]; std::unique_ptr<int[]> free_copy_ring(copy_ring);
   copy_vector(copy_ring, ring, matoms);
 
   int nhits = 0;
@@ -143,36 +127,42 @@ Substructure_Ring_Base::_environment_matches (Molecule_to_Match & target,
 
     Target_Atom & a = target[i];
 
-    copy_vector (already_matched, copy_ring, matoms);
+    copy_vector(already_matched, copy_ring, matoms);
 
-    already_matched[i] = 0;    // the matches () function needs it this way
+    already_matched[i] = 0;    // the matches() function needs it this way
 
-    if (! root_atom.matches (a, already_matched))
+    if (! root_atom.matches(a, already_matched))
       continue;
 
-    root_atom.set_hold (&a, already_matched);
+    root_atom.set_hold(&a, already_matched);
 
-    if (qam.number_elements ())
-      qam.resize_keep_storage (0);
+    if (qam.number_elements())
+      qam.resize_keep_storage(0);
 
-    if (0 == root_atom.add_your_children (qam))    // root atom only, no children
+    if (0 == root_atom.add_your_children(qam))    // root atom only, no children
     {
 #ifdef DEBUG_ENVIRONMENT_SEARCH
       cerr << "Root atom hit, nhits = " << (nhits + 1) << endl;
 #endif
 
       nhits++;
-      root_atom.recursive_release_hold ();
+      root_atom.recursive_release_hold();
       continue;
     }
 
-    int tmp = _environment_matches (target, qam, already_matched);
+    if (_environment_can_match_in_ring_atoms)
+    {
+      set_vector(already_matched, matoms, 0);
+      already_matched[i] = 1;
+    }
+
+    int tmp = _environment_matches(target, qam, already_matched);
 
 #ifdef DEBUG_ENVIRONMENT_SEARCH
     cerr << "At atom " << i << " matches = " << tmp << endl;
 #endif
 
-    root_atom.recursive_release_hold ();
+    root_atom.recursive_release_hold();
 
     already_matched[i] = 1;
 
@@ -208,36 +198,36 @@ Substructure_Ring_Base::_environment_matches (Molecule_to_Match & target,
                                               int * ring,
                                               int * already_matched)
 {
-  int ne = _environment_atom.number_elements ();
+  int ne = _environment_atom.number_elements();
 
   for (int i = 0; i < ne; i++)
   {
     Substructure_Atom * r = _environment_atom[i];
 
-    int nhits = _environment_matches (target, *r, ring, already_matched);
+    int nhits = _environment_matches(target, *r, ring, already_matched);
 
 #ifdef DEBUG_L1_ENVIRONMENT_MATCHES
     cerr << "Result for atom " << i << " is " << nhits << endl;
 #endif
 
-    if (_environment_numerical_requirement[i]->is_set ())
-      nhits = _environment_numerical_requirement[i]->matches (nhits);
+    if (_environment_numerical_requirement[i]->is_set())
+      nhits = _environment_numerical_requirement[i]->matches(nhits);
 
 #ifdef DEBUG_L1_ENVIRONMENT_MATCHES
-    if (_environment_numerical_requirement[i]->is_set ())
+    if (_environment_numerical_requirement[i]->is_set())
       cerr << "After filtering by numerical requirement result is " << nhits << endl;
 #endif
 
-    _environment_logexp.set_result (i, nhits);
+    _environment_logexp.set_result(i, nhits);
 
     int zresult;
 
 #ifdef DEBUG_L1_ENVIRONMENT_MATCHES
-    if (_environment_logexp.evaluate (zresult))
+    if (_environment_logexp.evaluate(zresult))
       cerr << "Result available, will return " << zresult << endl;
 #endif
 
-    if (_environment_logexp.evaluate (zresult))
+    if (_environment_logexp.evaluate(zresult))
       return zresult;
   }
 
@@ -257,16 +247,16 @@ Substructure_Ring_Base::_environment_matches (Molecule_to_Match & target,
   cerr << "Starting _environment_matches\n";
 #endif
 
-  _environment_logexp.reset ();
+  _environment_logexp.reset();
 
-  if (0 == _environment_atom.number_elements ())
+  if (0 == _environment_atom.number_elements())
     return 1;
 
-  int matoms = target.natoms ();
+  int matoms = target.natoms();
 
-  int * already_matched = new int[matoms]; iw_auto_array<int> free_already_matched (already_matched);
+  int * already_matched = new int[matoms]; std::unique_ptr<int[]> free_already_matched(already_matched);
 
-  return _environment_matches (target, ring, already_matched);
+  return _environment_matches(target, ring, already_matched);
 }
 
 /*
@@ -297,13 +287,13 @@ is_logexp_operator (const const_IWSubstring & s,
                     int offset,
                     int & zop)
 {
-  if (s.matches_at_position (offset, "&&"))
+  if (s.matches_at_position(offset, "&&"))
     zop = IW_LOGEXP_AND;
-  else if (s.matches_at_position (offset, "||"))
+  else if (s.matches_at_position(offset, "||"))
     zop = IW_LOGEXP_OR;
-  else if (s.matches_at_position (offset, "^^"))
+  else if (s.matches_at_position(offset, "^^"))
     zop = IW_LOGEXP_XOR;
-  else if (s.matches_at_position (offset, ";;"))
+  else if (s.matches_at_position(offset, ";;"))
     zop = IW_LOGEXP_LOW_PRIORITY_AND;
   else
     return 0;
@@ -314,7 +304,7 @@ is_logexp_operator (const const_IWSubstring & s,
 static int
 count_components (const const_IWSubstring & renv)
 {
-  int nchars = renv.length ();
+  int nchars = renv.length();
 
   if (0 == nchars)
     return 0;
@@ -328,7 +318,7 @@ count_components (const const_IWSubstring & renv)
     if (renv[i + 1] != renv[i])
       continue;
 
-    if (is_operator_character (renv[i]))
+    if (is_operator_character(renv[i]))
       rc++;
   }
 
@@ -346,23 +336,23 @@ get_next_token (const const_IWSubstring & renv,
                 IWString & token)
 {
   zop = 0;
-  token.resize_keep_storage (0);
+  token.resize_keep_storage(0);
 
-  if (is_logexp_operator (renv, renv_ndx, zop))
+  if (is_logexp_operator(renv, renv_ndx, zop))
     renv_ndx += 2;
 
-  while (renv_ndx < renv.length ())
+  while (renv_ndx < renv.length())
   {
     int notused;
 
     if (is_logexp_operator(renv, renv_ndx, notused))
-      return token.length ();
+      return token.length();
 
-    token.add (renv[renv_ndx]);
+    token.add(renv[renv_ndx]);
     renv_ndx++;
   }
 
-  return token.length ();
+  return token.length();
 }
 
 /*
@@ -375,19 +365,19 @@ consume_digits (IWString & s,
 {
   c = 0;
 
-  while (s.length ())
+  while (s.length())
   {
     char c0 = s[0];
     
     int tmp = c0 - '0';
     if (tmp < 0 || tmp > 9)
-      return s.length ();
+      return s.length();
 
     c = c * 10 + tmp;
-    s.remove_leading_chars (1);
+    s.remove_leading_chars(1);
   }
 
-  return s.length ();
+  return s.length();
 }
 
 static int
@@ -401,31 +391,31 @@ discern_leading_numerical_qualifier (Min_Max_Specifier<int> & m,
   if ('<' == c0)
   {
     relational = -1;
-    token.remove_leading_chars (1);
+    token.remove_leading_chars(1);
   }
   else if ('>' == c0)
   {
     relational = 1;
-    token.remove_leading_chars (1);
+    token.remove_leading_chars(1);
   }
-  else if (isdigit (c0))
+  else if (isdigit(c0))
     ;
   else
     return 1;
 
   int c;
-  if (! consume_digits (token, c))
+  if (! consume_digits(token, c))
   {
     cerr << "discern_leading_numerical_qualifier: invalid numeric specifier\n";
     return 0;
   }
 
   if (0 == relational)
-    m.add (c);
+    m.add(c);
   else if (relational < 0)
-    m.set_max (c - 1);
+    m.set_max(c - 1);
   else if (relational > 0)
-    m.set_min (c + 1);
+    m.set_min(c + 1);
     
   return 1;
 }
@@ -433,7 +423,7 @@ discern_leading_numerical_qualifier (Min_Max_Specifier<int> & m,
 int
 Substructure_Ring_Base::_construct_environment (const const_IWSubstring & renv)
 {
-  int ne = count_components (renv);
+  int ne = count_components(renv);
 
   if (0 == ne)
   {
@@ -441,14 +431,14 @@ Substructure_Ring_Base::_construct_environment (const const_IWSubstring & renv)
     return 0;
   }
 
-  if (renv.ends_with ('&') || renv.ends_with ('|') || renv.ends_with ('^') || renv.ends_with (';'))
+  if (renv.ends_with('&') || renv.ends_with('|') || renv.ends_with('^') || renv.ends_with(';'))
   {
     cerr << "Substructure_Ring_Base::_construct_environment: invalid environment '" << renv << "'\n";
     return 0;
   }
 
-  _environment_numerical_requirement.make_room_for_extra_items (ne);
-  _environment_atom.make_room_for_extra_items (ne);
+  _environment_numerical_requirement.make_room_for_extra_items(ne);
+  _environment_atom.make_room_for_extra_items(ne);
 
   int renv_ndx = 0;
 
@@ -456,7 +446,7 @@ Substructure_Ring_Base::_construct_environment (const const_IWSubstring & renv)
   {
     int zop;
     IWString token;
-    if (! get_next_token (renv, renv_ndx, zop, token))
+    if (! get_next_token(renv, renv_ndx, zop, token))
     {
       cerr << "Substructure_Atom::_construct_environment: invalid specification, renv_ndx = " << renv_ndx << endl;
       return 0;
@@ -477,44 +467,44 @@ Substructure_Ring_Base::_construct_environment (const const_IWSubstring & renv)
 
     Min_Max_Specifier<int> * mms = new Min_Max_Specifier<int>;
 
-    if (! discern_leading_numerical_qualifier (*mms, token))
+    if (! discern_leading_numerical_qualifier(*mms, token))
     {
       cerr << "Cannot discern leading numerical qualifier\n";
       return 0;
     }
 
-    const_IWSubstring smarts (token);
+    const_IWSubstring smarts(token);
 
     Substructure_Atom * a = new Substructure_Atom;
 
-    if (! a->parse_smarts_specifier (smarts))
+    if (! a->parse_smarts_specifier(smarts))
     {
       cerr << "Substructure_Ring_Base::_construct_environment: invalid smarts '" << token << "'\n";
       return 0;
     }
 
-    a->attributes_specified ();    // needed to initialise some things
+    a->attributes_specified();    // needed to initialise some things
 
-    _environment_numerical_requirement.add (mms);
-    _environment_atom.add (a);
+    _environment_numerical_requirement.add(mms);
+    _environment_atom.add(a);
 
-    if (1 == _environment_atom.number_elements ())  // no operator for the first one
+    if (1 == _environment_atom.number_elements())  // no operator for the first one
       ;
     else if (zop)
     {
-      if (! _environment_logexp.add_operator (zop))
+      if (! _environment_logexp.add_operator(zop))
       {
         cerr << "Substructure_Ring_Base::_construct_environment: huh, operator not recognised '" << zop << "'\n";
         return 0;
       }
     }
     else
-      _environment_logexp.add_operator ('&');
+      _environment_logexp.add_operator('&');
   }
 
 #ifdef DEBUG_BUILD_ENV
   cerr << "Substructure_Ring_Base::_construct_environment: after building\n";
-  _environment_logexp.debug_print (cerr);
+  _environment_logexp.debug_print(cerr);
 #endif
 
   return 1;

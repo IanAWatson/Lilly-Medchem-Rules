@@ -1,32 +1,13 @@
-/**************************************************************************
-
-    Copyright (C) 2012  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 /*
   Ring finder just like Bob Pearlman's
 */
 
-#include <stdlib.h>
-#include <memory>
-using namespace std;
-//#include <string.h>
-
 #include <iostream>
+#include <memory>
 #include <iomanip>
+
+using std::cerr;
+using std::endl;
 
 #ifdef IW_USE_TBB_SCALABLE_ALLOCATOR
 #include "tbb/scalable_allocator.h"
@@ -38,7 +19,6 @@ using namespace std;
 #endif
 
 #include "misc.h"
-#include "iw_auto_array.h"
 #include "iwaray.h"
 #include "assert.h"
 
@@ -109,7 +89,7 @@ Beep::ok() const
 }
 
 int
-Beep::debug_print (ostream & os) const
+Beep::debug_print(std::ostream & os) const
 {
   os << "Info on Beep with " << nbits() << " bits, " << _pi_electrons << " pi electrons\n";
 
@@ -118,7 +98,7 @@ Beep::debug_print (ostream & os) const
 
   for (int i = 0; i < nbits(); i++)
   {
-    if (is_set (i))
+    if (is_set(i))
       os << " Bond " << i << " set\n";
   }
 
@@ -141,17 +121,17 @@ Path_Message::_default_values()
   return;
 }
 
-Path_Message::Path_Message (atom_number_t a,
-                            int peosa,
-                            int saans,
-                            int ee,
-                            int bonds_in_molecule) :
-              Beep (bonds_in_molecule),
+Path_Message::Path_Message(atom_number_t a,
+                           const int peosa,
+                           const int saans,
+                           const int ee,
+                           const int bonds_in_molecule) :
+              Beep(bonds_in_molecule),
               _start_atom(a),
-              _pi_electrons_on_start_atom (peosa),
-              _start_atom_atomic_number_score (saans),
-              _start_edge (ee),
-              _bonds_in_molecule (bonds_in_molecule)
+              _pi_electrons_on_start_atom(peosa),
+              _start_atom_atomic_number_score(saans),
+              _start_edge(ee),
+              _bonds_in_molecule(bonds_in_molecule)
 {
   _default_values();
 
@@ -161,18 +141,18 @@ Path_Message::Path_Message (atom_number_t a,
 
 //cerr << "Path_Message::Path_Message:_start_atom_atomic_number_score " << _start_atom_atomic_number_score << endl;
 
-  set (_start_edge, 1);
+  set(_start_edge, 1);
 
   return;
 }
 
-Path_Message::Path_Message (const Path_Message * p) :
-                         Beep (p->_bonds_in_molecule),
-                         _start_atom (p->_start_atom),
-                         _pi_electrons_on_start_atom (p->_pi_electrons_on_start_atom),
-                         _start_atom_atomic_number_score (p->_start_atom_atomic_number_score),
-                         _start_edge (p->_start_edge),
-                         _bonds_in_molecule (p->_bonds_in_molecule)
+Path_Message::Path_Message(const Path_Message * p) :
+                         Beep(p->_bonds_in_molecule),
+                         _start_atom(p->_start_atom),
+                         _pi_electrons_on_start_atom(p->_pi_electrons_on_start_atom),
+                         _start_atom_atomic_number_score(p->_start_atom_atomic_number_score),
+                         _start_edge(p->_start_edge),
+                         _bonds_in_molecule(p->_bonds_in_molecule)
 {
   _default_values();
 
@@ -183,7 +163,7 @@ Path_Message::Path_Message (const Path_Message * p) :
   if (_extra_bits)
     bytes_to_copy++;
 
-  memcpy (_bits, p->_bits, bytes_to_copy);
+  memcpy(_bits, p->_bits, bytes_to_copy);
 
 //cerr << "Path_Message::copy constructor:_start_atom_atomic_number_score " << _start_atom_atomic_number_score << endl;
 
@@ -191,14 +171,14 @@ Path_Message::Path_Message (const Path_Message * p) :
 }
 
 int
-Path_Message::debug_print (ostream & os)
+Path_Message::debug_print (std::ostream & os)
 {
-  assert (os.good());
+  assert(os.good());
 
   os << "Info on Path message starting with atom " << _start_atom << " (score " << _start_atom_atomic_number_score << ") edge " <<
         _start_edge << ", " << nset() << " bits set, score " << _atomic_number_score << endl;
 
-  (void) Beep::debug_print (os);
+  (void) Beep::debug_print(os);
 
   os << "Last atom is " << _last_atom << endl;
 
@@ -206,11 +186,11 @@ Path_Message::debug_print (ostream & os)
 }
 
 void
-Path_Message::include_in_path (atom_number_t a, int zbond,
-                               int pe, int h)
+Path_Message::include_in_path(const atom_number_t a, const int zbond,
+                               const int pe, const int h)
 {
-  assert (! is_set (zbond));
-  assert (pe >= 0);
+  assert(! is_set(zbond));
+  assert(pe >= 0);
 
   _last_atom = a;
   _pi_electrons += pe;
@@ -218,7 +198,7 @@ Path_Message::include_in_path (atom_number_t a, int zbond,
 
 //cerr << "_atomic_number_score incremented by " << h << " to " << _atomic_number_score << endl;
 
-  set (zbond, 1);
+  set(zbond, 1);
 
   return;
 }
@@ -231,7 +211,7 @@ Path_Message::node_collision (const Path_Message * p) const
   else
     return 0;
 
-  return 0 == bits_in_common (*p);
+  return 0 == bits_in_common(*p);
 }
 
 int
@@ -242,7 +222,7 @@ Path_Message::inverse_edge_collision (const Path_Message * p) const
   else
     return 0;
 
-  return 1 == bits_in_common (*p);
+  return 1 == bits_in_common(*p);
 }
 
 //#define DEBUG_PATH_MESSAGES
@@ -323,14 +303,14 @@ Rings_Found::node_collision_ring (Beep * r)
 {
 #ifdef DEBUG_RINGS_FOUND
   cerr << "Rings_Found::node_collision_ring checking\n";
-  r->printon (cerr);
+  r->printon(cerr);
   cerr << endl;
 #endif
 
 // If there are other Beep's in the receive buffer, check for this
 // being a duplicate
 
-  if (_node_collision_rings.number_elements() && is_duplicate (_node_collision_rings, r))
+  if (_node_collision_rings.number_elements() && is_duplicate(_node_collision_rings, r))
   {
 #ifdef DEBUG_RINGS_FOUND
     cerr << "Duplicate (incoming) ring discarded\n";
@@ -340,7 +320,7 @@ Rings_Found::node_collision_ring (Beep * r)
     return;
   }
 
-  _node_collision_rings.add (r);
+  _node_collision_rings.add(r);
 
   return;
 }
@@ -350,7 +330,7 @@ Rings_Found::inverse_edge_collision_ring (Beep * r)
 {
 #ifdef DEBUG_RINGS_FOUND
   cerr << "Rings_Found::inverse_edge_collision_ring checking\n";
-  r->printon (cerr);
+  r->printon(cerr);
   cerr << endl;
 #endif
 
@@ -359,7 +339,7 @@ Rings_Found::inverse_edge_collision_ring (Beep * r)
 // If there are other Beep's in the receive buffer, check for this
 // being a duplicate
 
-  if (nr && is_duplicate (_inverse_edge_collision_rings, r))
+  if (nr && is_duplicate(_inverse_edge_collision_rings, r))
   {
 #ifdef DEBUG_RINGS_FOUND
     cerr << "Duplicate (incoming) ring discarded\n";
@@ -369,7 +349,7 @@ Rings_Found::inverse_edge_collision_ring (Beep * r)
     return;
   }
 
-  _inverse_edge_collision_rings.add (r);
+  _inverse_edge_collision_rings.add(r);
 
   return;
 }
@@ -382,13 +362,18 @@ Rings_Found::inverse_edge_collision_ring (Beep * r)
 */
 
 static int
-beep_pi_electron_comparitor (Beep * const * bp1, Beep * const * bp2)
+beep_pi_electron_comparitor(Beep * const * bp1, Beep * const * bp2)
 {
   const Beep * b1 = *bp1;
   const Beep * b2 = *bp2;
 
+//#define DEBUG_BEEP_PI_ELECTRON_COMPARITOR
 #ifdef DEBUG_BEEP_PI_ELECTRON_COMPARITOR
-  cerr << "Comparing pi electrons " << b1->pi_electrons() << " and " << b2->pi_electrons() << endl;
+  b1->printon(cerr);
+  cerr << endl;
+  b2->printon(cerr);
+  cerr << endl;
+  cerr << "Comparing pi electrons " << b1->pi_electrons() << " (" << b1->nset() << " bonds) and " << b2->pi_electrons() << " (" << b2->nset() << " bonds)\n";
   b1->debug_print(cerr);
   b2->debug_print(cerr);
 #endif
@@ -445,9 +430,9 @@ beep_pi_electron_comparitor (Beep * const * bp1, Beep * const * bp2)
 //#define DEBUG_BEEP_COMPARATOR
 
 static int
-beep_comparator (Beep * const * bp1, Beep * const * bp2)
+beep_comparator(Beep * const * bp1, Beep * const * bp2)
 {
-  int pe = beep_pi_electron_comparitor (bp1, bp2);
+  int pe = beep_pi_electron_comparitor(bp1, bp2);
 
 #ifdef DEBUG_BEEP_COMPARATOR
   cerr << "Comparing beeps with " << (*bp1)->nset() << " and " << (*bp2)->nset() << " bonds, pe = " << pe << endl;
@@ -490,7 +475,7 @@ Rings_Found::_beep_is_unique_over_non_sssr_beeps (const Beep * new_beep) const
 #ifdef DEBUG_BEEP_IS_UNIQUE_OVER_NON_SSSR_BEEPS
   cerr << "Checking " << nq << " non sssr beeps\n";
   cerr << "New beep is ";
-  new_beep->printon (cerr);
+  new_beep->printon(cerr);
   cerr << endl;
 #endif
 
@@ -521,7 +506,7 @@ Rings_Found::_beep_is_unique (const Beep * b) const
   {
     int f = tmp.first_bit();
 
-    assert (f >= 0);
+    assert(f >= 0);
 
     const Beep * bf = _matrix_of_beeps[f];
 //  if (NULL == bf)
@@ -530,7 +515,7 @@ Rings_Found::_beep_is_unique (const Beep * b) const
     if (NULL == bf)
       return 1;
 
-    tmp.iwxor (*bf);
+    tmp.iwxor(*bf);
 //  cerr << "After XOR ";
 //  tmp.printon (cerr);
 //  cerr << endl;
@@ -554,11 +539,11 @@ Rings_Found::_is_sssr_ring (const Beep * b)
 {
   Beep * tmp = new Beep;
   *tmp = *b;
-//tmp->make_copy (b);
+//tmp->make_copy(b);
 
 #ifdef DEBUG_FIND_UNIQUE_RINGS
   cerr << "SSSR: Determining uniqueness of beep ";
-  b->printon (cerr);
+  b->printon(cerr);
   cerr << ' ' << b->nset() << endl;
 #endif
 
@@ -566,7 +551,7 @@ Rings_Found::_is_sssr_ring (const Beep * b)
   {
     int f = tmp->first_bit();
 
-    assert (f >= 0);
+    assert(f >= 0);
 
     const Beep * bf = _matrix_of_beeps[f];
 
@@ -576,9 +561,9 @@ Rings_Found::_is_sssr_ring (const Beep * b)
       return 1;
     }
 
-    tmp->iwxor (*bf);
+    tmp->iwxor(*bf);
 //  cerr << "After XOR ";
-//  tmp->printon (cerr);
+//  tmp->printon(cerr);
 //  cerr << endl;
 //  cerr << "nset = " << tmp->nset() << endl;
 
@@ -604,7 +589,7 @@ Rings_Found::_is_esssr_ring (const Beep * b)
 
 #ifdef DEBUG_FIND_UNIQUE_RINGS
   cerr << "ESSSR: Determining uniqueness of beep ";
-  b->printon (cerr);
+  b->printon(cerr);
   cerr << ' ' << b->nset() << endl;
 #endif
 
@@ -657,18 +642,15 @@ remove_duplicate_beeps (resizable_array_p<Beep> & beeps)
 #endif
 
 void
-Rings_Found::_assign_single_bond_counts (Beep * beep)
+Rings_Found::_assign_single_bond_counts(Beep * beep)
 {
-  IW_Bits_Base b(_is_single_bond);
-  b.iwand(*beep);
-
-  beep->set_single_bond_count(b.nset());
+  beep->set_single_bond_count(beep->bits_in_common(_is_single_bond));
 
   return;
 }
 
 void
-Rings_Found::_assign_single_bond_counts (resizable_array_p<Beep> & beeps)
+Rings_Found::_assign_single_bond_counts(resizable_array_p<Beep> & beeps)
 {
   int n = beeps.number_elements();
 
@@ -726,7 +708,7 @@ Rings_Found::_determine_uniqueness (resizable_array_p<Beep> & beeps)
     if (_expected_nrings > 2)
       _assign_single_bond_counts(beeps);
 
-    beeps.sort (beep_comparator);
+    beeps.sort(beep_comparator);
 
 #ifdef DEBUG_DETERMINE_UNIQUENESS
     cerr << "After sorting by pi electrons we have\n";
@@ -773,7 +755,7 @@ Rings_Found::_determine_uniqueness (resizable_array_p<Beep> & beeps)
   cerr << "_determine_uniqueness:_sssr_rings_perceived now contains " << _sssr_rings_perceived.number_elements() << " rings, non sssr " << _non_sssr_rings.number_elements() << endl;
 #endif
 
-  beeps.resize_no_delete (0);    // we have grabbed all we want
+  beeps.resize_no_delete(0);    // we have grabbed all we want
 
   return;
 }
@@ -788,8 +770,8 @@ Rings_Found::_determine_uniqueness (resizable_array_p<Beep> & beeps)
 void
 Rings_Found::process_new_rings(const Molecule & m)
 {
-  int nri = _inverse_edge_collision_rings.number_elements();
-  int nrn = _node_collision_rings.number_elements();
+  const int nri = _inverse_edge_collision_rings.number_elements();
+  const int nrn = _node_collision_rings.number_elements();
 
 #ifdef DEBUG_RINGS_FOUND
   cerr << "Rings found has " << _sssr_rings_perceived.number_elements() << 
@@ -805,7 +787,7 @@ Rings_Found::process_new_rings(const Molecule & m)
 // for uniqueness.
 
   if (nri)
-    _determine_uniqueness (_inverse_edge_collision_rings);
+    _determine_uniqueness(_inverse_edge_collision_rings);
 
 #ifdef DEBUG_FIND_UNIQUE_RINGS
   cerr << "After uniqueness " << _inverse_edge_collision_rings.number_elements() << " inverse edge collision rings\n";
@@ -816,10 +798,10 @@ Rings_Found::process_new_rings(const Molecule & m)
   else if (global_setting_perceive_sssr_rings)
   {
     if (_sssr_rings_perceived.number_elements() < _expected_nrings)
-      _determine_uniqueness (_node_collision_rings);
+      _determine_uniqueness(_node_collision_rings);
   }
   else
-    _determine_uniqueness (_node_collision_rings);
+    _determine_uniqueness(_node_collision_rings);
 
 #ifdef DEBUG_FIND_UNIQUE_RINGS
   cerr << "After uniqueness determination, have " << _sssr_rings_perceived.number_elements() <<
@@ -827,12 +809,12 @@ Rings_Found::process_new_rings(const Molecule & m)
 
   for (int i = 0; i < _bonds_in_molecule; i++)
   {
-    cerr << " Row " << setw (2) << i << " ";
+    cerr << " Row " << setw(2) << i << " ";
     const Beep * b = _matrix_of_beeps[i];
     if (NULL == b)
       cerr << "NULL";
     else
-      b->printon (cerr);
+      b->printon(cerr);
     cerr << endl;
   }
 #endif       
@@ -845,10 +827,10 @@ Rings_Found::process_new_rings(const Molecule & m)
 //#define DEBUG_TNODES
 
 Tnode::Tnode (atom_number_t a, int acon, int pi, int bonds_in_molecule, int h) :
-                  _a(a), _acon (acon), 
+                  _a(a), _acon(acon), 
                   _bonds_in_molecule( bonds_in_molecule),
-                  _pi_electrons (pi),
-                  _atomic_number_score (h)
+                  _pi_electrons(pi),
+                  _atomic_number_score(h)
 {
   assert (_acon > 0 && _acon <= _bonds_in_molecule);
 
@@ -857,9 +839,9 @@ Tnode::Tnode (atom_number_t a, int acon, int pi, int bonds_in_molecule, int h) :
 
   _nsend = 0;
 
-  _receive_buffer.resize (bonds_in_molecule);
+  _receive_buffer.resize(bonds_in_molecule);
 
-  assert (ok());
+  assert(ok());
 }
 
 Tnode::~Tnode()
@@ -884,7 +866,7 @@ Molecule::_initialise_tnode (atom_number_t zatom,
 {
   Tnode * tn = tnodes[zatom];
 
-  assert (tn->acon() == _things[zatom]->ncon());
+  assert(tn->acon() == _things[zatom]->ncon());
 
   int start_atom_atomic_number_score = sac[zatom];
 
@@ -899,18 +881,18 @@ Molecule::_initialise_tnode (atom_number_t zatom,
   {
     const Bond * b = _bond_list[i];
 
-    if (! b->involves (zatom))
+    if (! b->involves(zatom))
       continue;
 
-    atom_number_t j = b->other (zatom);
+    atom_number_t j = b->other(zatom);
 
     if (id != process_these[j])
       continue;
 
-    tn->is_connected_to (rc, j, i);
+    tn->is_connected_to(rc, j, i);
 
-    Path_Message * tmp = new Path_Message (zatom, pi[zatom], start_atom_atomic_number_score, i, nb);
-    tnodes[j]->receive (tmp);
+    Path_Message * tmp = new Path_Message(zatom, pi[zatom], start_atom_atomic_number_score, i, nb);
+    tnodes[j]->receive(tmp);
     rc++;
 
 #ifdef DEBUG_TNODES
@@ -938,7 +920,7 @@ Tnode::ok() const
 }
 
 int
-Tnode::debug_print (ostream & os) const
+Tnode::debug_print (std::ostream & os) const
 {
   os << "Info on Tnode for atom " << _a << " acon = " << _acon << 
         ' ' << _pi_electrons << " pi electrons\n";
@@ -968,9 +950,9 @@ Tnode::is_connected_to (int ndx,
 }
 
 int
-Tnode::print_paths (ostream & os) const
+Tnode::print_paths (std::ostream & os) const
 {
-  assert (os.good());
+  assert(os.good());
 
   os << _receive_buffer.number_elements() << " paths currently at tnode for atom " << 
         _a << endl;
@@ -982,7 +964,7 @@ Tnode::print_paths (ostream & os) const
   {
     for (int i = 0; i < np; i++)
     {
-      _receive_buffer[i]->debug_print (os);
+      _receive_buffer[i]->debug_print(os);
     }
   }
 
@@ -993,7 +975,7 @@ Tnode::print_paths (ostream & os) const
   {
     for (int i = 0; i < np; i++)
     {
-      _send_buffer[i]->debug_print (os);
+      _send_buffer[i]->debug_print(os);
     }
   }
 
@@ -1034,23 +1016,23 @@ Tnode::send (Tnode ** tnodes)
     {
       atom_number_t k = _con[j];
 
-      assert (NULL != tnodes[k]);
+      assert(NULL != tnodes[k]);
 
-      if (k != p->last_atom() && ! p->is_set (_bond[j]))
+      if (k != p->last_atom() && ! p->is_set(_bond[j]))
       {
-        Path_Message * tmp = new Path_Message (p);
-        tmp->include_in_path (_a, _bond[j], _pi_electrons, _atomic_number_score);
+        Path_Message * tmp = new Path_Message(p);
+        tmp->include_in_path(_a, _bond[j], _pi_electrons, _atomic_number_score);
 #ifdef DEBUG_TNODES
         cerr << "  Sending message " << i << " to " << k << " bond " << _bond[j] << endl;
 #endif              
-        tnodes[k]->receive (tmp);
+        tnodes[k]->receive(tmp);
       }
     }
   }
 
-  _send_buffer.resize_keep_storage (0);    // Delete all the original Path_Message objects
+  _send_buffer.resize_keep_storage(0);    // Delete all the original Path_Message objects
 #ifdef USE_IWMALLOC
-  iwmalloc_check_all_malloced (stderr);
+  iwmalloc_check_all_malloced(stderr);
 #endif
 
   _nsend++;
@@ -1059,8 +1041,8 @@ Tnode::send (Tnode ** tnodes)
 }
 
 static void
-remove_beeps_which_started_here (resizable_array_p<Path_Message> & path_messages,
-                                 atom_number_t a)
+remove_beeps_which_started_here(resizable_array_p<Path_Message> & path_messages,
+                                atom_number_t a)
 {
   int np = path_messages.number_elements();
 
@@ -1072,7 +1054,7 @@ remove_beeps_which_started_here (resizable_array_p<Path_Message> & path_messages
 
     if (a == p->start_atom())
     {
-      path_messages.remove_item (i);
+      path_messages.remove_item(i);
       i--;
       np--;
     }
@@ -1096,7 +1078,7 @@ remove_beeps_which_started_here (resizable_array_p<Path_Message> & path_messages
 */
 
 void
-Tnode::_check_inverse_edge_collisions (Rings_Found & rings_found)
+Tnode::_check_inverse_edge_collisions(Rings_Found & rings_found)
 {
   int nm = _receive_buffer.number_elements();
 
@@ -1108,37 +1090,38 @@ Tnode::_check_inverse_edge_collisions (Rings_Found & rings_found)
     for (int j = i + 1; j < nm; j++)
     {
       Path_Message * pj = pm[j];
-      if (pi->inverse_edge_collision (pj))
+      if (pi->inverse_edge_collision(pj))
       {
-        pi->set_to_be_removed (1);
-        pj->set_to_be_removed (1);
+        pi->set_to_be_removed(1);
+        pj->set_to_be_removed(1);
   
 #ifdef  DEBUG_TNODES
         cerr << "Found inverse edge collision, score " << _atomic_number_score << " between\n";
-        pi->debug_print (cerr);
+        pi->debug_print(cerr);
         cerr << " AND\n";
-        pj->debug_print (cerr);
+        pj->debug_print(cerr);
         cerr << endl;
 #endif              
 
         Beep * b = new Beep;
         *b = *pi;
-        b->iwor (*pj);
+        b->iwor(*pj);
 
 //      These Path_Messages both end at the same atom. It's pi count is not yet added. Don't double count the two atoms that are shared between the two Path_Messages
 
-        b->set_pi_electrons (pi->pi_electrons() + pj->pi_electrons() + _pi_electrons - pi->pi_electrons_on_start_atom() - pj->pi_electrons_on_start_atom());
-        b->set_atomic_number_score (pi->atomic_number_score() + pj->atomic_number_score() + _atomic_number_score - pi->start_atom_atomic_number_score() - pj->start_atom_atomic_number_score());
-        assert (b->atomic_number_score() > 0);
+        b->set_pi_electrons(pi->pi_electrons() + pj->pi_electrons() + _pi_electrons - pi->pi_electrons_on_start_atom() - pj->pi_electrons_on_start_atom());
+        b->set_atomic_number_score(pi->atomic_number_score() + pj->atomic_number_score() + _atomic_number_score - pi->start_atom_atomic_number_score() - pj->start_atom_atomic_number_score());
+        assert(b->atomic_number_score() > 0);
 
 #ifdef DEBUG_TNODES
-        cerr << "Inverse edge collision: combining beeps with " << pi->pi_electrons() << " and " << pj->pi_electrons() << " pi electrons\n";
+        cerr << "Inverse edge collision: combining beeps with " << pi->pi_electrons() << " (" << pi->nset() << " bonds) and " << pj->pi_electrons() << " pi electrons\n";
+        cerr << pj->nset() << endl;
         cerr << "I " << pi->atomic_number_score() << " first " << pi->start_atom_atomic_number_score() << endl;
         cerr << "J " << pj->atomic_number_score() << " first " << pj->start_atom_atomic_number_score() << endl;
         cerr << "Resulting beep contains " << b->pi_electrons() << " pi electrons, score " << b->atomic_number_score() << endl;
 #endif
 
-        rings_found.inverse_edge_collision_ring (b);
+        rings_found.inverse_edge_collision_ring(b);
       }
     }
   }
@@ -1152,7 +1135,7 @@ Tnode::_check_inverse_edge_collisions (Rings_Found & rings_found)
 */
 
 void
-Tnode::_check_node_collisions (Rings_Found & rings_found)
+Tnode::_check_node_collisions(Rings_Found & rings_found)
 {
   int nm = _receive_buffer.number_elements();
 
@@ -1164,38 +1147,38 @@ Tnode::_check_node_collisions (Rings_Found & rings_found)
     for (int j = i + 1; j < nm; j++)
     {
       Path_Message * pj = pm[j];
-      if (pi->node_collision (pj))
+      if (pi->node_collision(pj))
       {
-        pi->set_to_be_removed (1);
-        pj->set_to_be_removed (1);
+        pi->set_to_be_removed(1);
+        pj->set_to_be_removed(1);
 
 #ifdef  DEBUG_TNODES
         cerr << "Found node collision, score " << _atomic_number_score << " between\n";
-        pi->debug_print (cerr);
+        pi->debug_print(cerr);
         cerr << " AND\n";
-        pj->debug_print (cerr);
+        pj->debug_print(cerr);
         cerr << endl;
 #endif              
   
         Beep * b = new Beep;
         *b = *pi;
-        b->iwor (*pj);
+        b->iwor(*pj);
 
 //      These Path_Messages started on the same atom, so subtract out it's pi electrons to avoid double counting
 
-        b->set_pi_electrons (pi->pi_electrons() + pj->pi_electrons() -
-                             pi->pi_electrons_on_start_atom() + _pi_electrons);
-        b->set_atomic_number_score (pi->atomic_number_score() + pj->atomic_number_score() + _atomic_number_score - pi->start_atom_atomic_number_score());
-        assert (b->atomic_number_score() > 0);
+        b->set_pi_electrons(pi->pi_electrons() + pj->pi_electrons() -
+                            pi->pi_electrons_on_start_atom() + _pi_electrons);
+        b->set_atomic_number_score(pi->atomic_number_score() + pj->atomic_number_score() + _atomic_number_score - pi->start_atom_atomic_number_score());
+        assert(b->atomic_number_score() > 0);
 
 #ifdef  DEBUG_TNODES
-        cerr << "Node collision: combining beeps with " << pi->pi_electrons() << " and " << pj->pi_electrons() << " pi electrons\n";
+        cerr << "Node collision: combining beeps with " << pi->pi_electrons() << " (" << pi->nset() << " bonds) and " << pj->pi_electrons() << " pi electrons (" << pj->nset() << " bonds)\n";
         cerr << "I " << pi->atomic_number_score() << " first " << pi->start_atom_atomic_number_score() << endl;
         cerr << "J " << pj->atomic_number_score() << " first " << pj->start_atom_atomic_number_score() << endl;
         cerr << "Resulting beep contains " << b->pi_electrons() << " pi electrons, score " << b->atomic_number_score() << endl;
 #endif
 
-        rings_found.node_collision_ring (b);
+        rings_found.node_collision_ring(b);
       }
     }
   }
@@ -1220,9 +1203,9 @@ Tnode::_check_direct_edge_collisions()
     for (int j = i + 1; j < nm; j++)
     {
       Path_Message * pj = pm[j];
-      if (pi->direct_edge_collision (pj))
+      if (pi->direct_edge_collision(pj))
       {
-        pi->set_to_be_removed (1);
+        pi->set_to_be_removed(1);
       }
     }
   }
@@ -1242,18 +1225,18 @@ Tnode::_check_direct_edge_collisions()
 */
 
 int
-Tnode::check_for_rings (Rings_Found & rings_found)
+Tnode::check_for_rings(Rings_Found & rings_found)
 {
-  assert (0 == _send_buffer.number_elements());
+  assert(0 == _send_buffer.number_elements());
 
-  remove_beeps_which_started_here (_receive_buffer, _a);
+  remove_beeps_which_started_here(_receive_buffer, _a);
 
 // Make sure inverse edge collisions are done first, as they
 // produce rings of smaller size
 
-  _check_inverse_edge_collisions (rings_found);
-  _check_node_collisions         (rings_found);
-  _check_direct_edge_collisions ();
+  _check_inverse_edge_collisions(rings_found);
+  _check_node_collisions        (rings_found);
+  _check_direct_edge_collisions();
 
   int nr = _receive_buffer.number_elements();
   Path_Message ** rb = _receive_buffer.rawdata();
@@ -1265,10 +1248,10 @@ Tnode::check_for_rings (Rings_Found & rings_found)
     if (mi->to_be_removed())
       delete mi;
     else
-      _send_buffer.add (mi);
+      _send_buffer.add(mi);
   }
 
-  _receive_buffer.resize_no_delete (0);
+  _receive_buffer.resize_no_delete(0);
 
   return 1;
 }
@@ -1279,7 +1262,7 @@ discern_fused_neighbours (const resizable_array_p<Beep> & beeps,
                           int fid)
 {
   int nr = beeps.number_elements();
-  assert (nr == rings.number_elements());
+  assert(nr == rings.number_elements());
 
   for (int i = 0; i < nr; i++)
   {
@@ -1290,13 +1273,13 @@ discern_fused_neighbours (const resizable_array_p<Beep> & beeps,
     for (int j = i + 1; j < nr; j++)
     {
       const Beep * bj = beeps[j];
-      int bic = bi->bits_in_common (*bj);
+      int bic = bi->bits_in_common(*bj);
 
       if (bic)
       {
         Ring * rj = rings[j];
-        ri->set_fused_to (rj, bic);
-        rj->set_fused_to (ri, bic);
+        ri->set_fused_to(rj, bic);
+        rj->set_fused_to(ri, bic);
       }
     }
   }
@@ -1314,7 +1297,7 @@ discern_fused_neighbours (const resizable_array_p<Beep> & beeps,
     if (0 == ri->fused_ring_neighbours())     // must be a spiro fusion
       continue;
 
-    rc += ri->propagate_fused_system_identifier (fid);
+    rc += ri->propagate_fused_system_identifier(fid);
     if (rc == nr)
       break;
 
@@ -1335,7 +1318,7 @@ Bond_list::assign_ring_membership_to_bonds (const resizable_array_p<Beep> & beep
     const Beep * b = beeps[i];
     for (int j = 0; j < _number_elements; j++)
     {
-      if (b->is_set (j))
+      if (b->is_set(j))
         _things[j]->in_another_ring();
     }
   }
@@ -1347,9 +1330,9 @@ Bond_list::assign_ring_membership_to_bonds (const resizable_array_p<Beep> & beep
 #endif
 
 int
-Molecule::_make_ring (const Beep * bp,
-                      Ring * r,
-                      int * atom_in_ring)
+Molecule::_make_ring(const Beep * bp,
+                     Ring * r,
+                     int * atom_in_ring)
 {
   assert (0 == r->number_elements());
 
@@ -1360,7 +1343,7 @@ Molecule::_make_ring (const Beep * bp,
   int nb = _bond_list.number_elements();
   for (int i = 0; i < nb; i++)
   {
-    if (bp->is_set (i))
+    if (bp->is_set(i))
     {
       Bond * b = _bond_list[i];
 
@@ -1370,9 +1353,9 @@ Molecule::_make_ring (const Beep * bp,
 
       if (0 == r->number_elements())
       {
-        r->add (b->a1());
-        r->add (b->a2());
-        r->set_fragment_membership (fragment_membership[b->a1()]);
+        r->add(b->a1());
+        r->add(b->a2());
+        r->set_fragment_membership(fragment_membership[b->a1()]);
       }
       else
       {
@@ -1383,14 +1366,14 @@ Molecule::_make_ring (const Beep * bp,
   }
 
   if (r->elements_allocated() < bonds_in_ring)
-    r->resize (bonds_in_ring);
+    r->resize(bonds_in_ring);
 
 // We need to build up the ring with the atoms in order
 
   bonds_in_ring--;
-  atom_number_t first_atom = r->item (1);
+  atom_number_t first_atom = r->item(1);
 
-  r->set_vector (atom_in_ring, 0);   // the first two atoms will have been set by other bonds
+  r->set_vector(atom_in_ring, 0);   // the first two atoms will have been set by other bonds
 
   while (bonds_in_ring--)
   {
@@ -1398,10 +1381,10 @@ Molecule::_make_ring (const Beep * bp,
     int acon = a->ncon();
     for (int j = 0; j < acon; j++)
     {
-      atom_number_t k = a->other (first_atom, j);
+      atom_number_t k = a->other(first_atom, j);
       if (atom_in_ring[k])
       {
-        r->add (k);
+        r->add(k);
         atom_in_ring[k] = 0;
         first_atom = k;
         break;
@@ -1412,41 +1395,45 @@ Molecule::_make_ring (const Beep * bp,
   return 1;
 }
 
+//#define DEBUG_MAKE_RINGS
+
 int
-Molecule::_make_rings (const resizable_array_p<Beep> & beeps,
-                       resizable_array_p<Ring> & rings,
-                       int * tmp)
+Molecule::_make_rings(const resizable_array_p<Beep> & beeps,
+                      resizable_array_p<Ring> & rings,
+                      int * tmp)
 {
   int nr = beeps.number_elements();
 
+#ifdef DEBUG_MAKE_RINGS
+  cerr << "Molecule::_make_rings:processing " << nr << " beeps\n";
+#endif
+
   if (rings.elements_allocated() < nr)
-    rings.resize (nr);
+    rings.resize(nr);
 
   for (int i = 0; i < nr; i++)
   {
     Ring * r = new Ring;
-    if (! _make_ring (beeps[i], r, tmp))
+    if (! _make_ring(beeps[i], r, tmp))
     {
       delete r;
       return 0;
     }
 
-    rings.add (r);
+    rings.add(r);
   }
 
   return nr;
 }
 
-//#define DEBUG_MAKE_RINGS
-
 int
-Molecule::_make_rings (Rings_Found & rings_found,
-                       resizable_array_p<Ring> & sssr_rings,
-                       resizable_array_p<Ring> & non_sssr_rings,
-                       int fid,
-                       int * tmp)
+Molecule::_make_rings(Rings_Found & rings_found,
+                      resizable_array_p<Ring> & sssr_rings,
+                      resizable_array_p<Ring> & non_sssr_rings,
+                      int fid,
+                      int * tmp)
 {
-  if (! _make_rings (rings_found.sssr_beeps(), sssr_rings, tmp))
+  if (! _make_rings(rings_found.sssr_beeps(), sssr_rings, tmp))
     return 0;
 
 // ring membership is based on sssr rings only
@@ -1465,23 +1452,23 @@ Molecule::_make_rings (Rings_Found & rings_found,
     cerr << "Ring " << i << " has " << ri->number_elements() << " members\n";
 #endif
 
-    int rs = ri->number_elements();
+    const int rs = ri->number_elements();
     for (int j = 0; j < rs; j++)
     {
-      atom_number_t k = ri->item (j);
+      atom_number_t k = ri->item(j);
 
       _ring_membership[k]++;
-      _things[k]->in_another_ring();
+//    _things[k]->in_another_ring();
     }
   }
 
   if (rings_found.non_sssr_beeps().number_elements())
   {
-    if (! _make_rings (rings_found.non_sssr_beeps(), non_sssr_rings, tmp))
+    if (! _make_rings(rings_found.non_sssr_beeps(), non_sssr_rings, tmp))
       return 0;
   }
 
-  discern_fused_neighbours (rings_found.sssr_beeps(), sssr_rings, fid);
+  discern_fused_neighbours(rings_found.sssr_beeps(), sssr_rings, fid);
 
   return 1;
 }
@@ -1516,15 +1503,15 @@ Molecule::_unused_fused_system_identifier() const
 */
 
 int
-Molecule::_make_rings (Rings_Found & rings_found,
-                       resizable_array_p<Ring> & sssr_rings,
-                       resizable_array_p<Ring> & non_sssr_rings)
+Molecule::_make_rings(Rings_Found & rings_found,
+                      resizable_array_p<Ring> & sssr_rings,
+                      resizable_array_p<Ring> & non_sssr_rings)
 {
   int fid = _unused_fused_system_identifier();
 
-  int * tmp = new_int (_number_elements); iw_auto_array<int> free_tmp (tmp);
+  int * tmp = new_int(_number_elements); std::unique_ptr<int[]> free_tmp(tmp);
 
-  return _make_rings (rings_found, sssr_rings, non_sssr_rings, fid, tmp);
+  return _make_rings(rings_found, sssr_rings, non_sssr_rings, fid, tmp);
 }
 
 /*
@@ -1535,17 +1522,17 @@ Molecule::_make_rings (Rings_Found & rings_found,
 #define RING_SORT_FN ( int (*) (Ring * const *, Ring * const *))
 
 int
-Molecule::_pearlman_sssr (const int * process_these, int id,
-                          Tnode ** tnodes, int expected_nrings)
+Molecule::_pearlman_sssr(const int * process_these, int id,
+                         Tnode ** tnodes, int expected_nrings)
 {
 // Although not necessary, we keep an iteration counter to guard against infinite loops
 
 //cerr << "Upon entry to _pearlman_sssr\n";
-//_bond_list.debug_print (cerr);
+//_bond_list.debug_print(cerr);
 
   int iterations = 0;
 
-  Rings_Found rings_found (expected_nrings, _bond_list.number_elements());
+  Rings_Found rings_found(expected_nrings, _bond_list.number_elements());
   if (expected_nrings > 2)
     rings_found.initialise_single_bond_count(*this);
 
@@ -1561,7 +1548,7 @@ Molecule::_pearlman_sssr (const int * process_these, int id,
       for (int i = 0; i < _number_elements; i++)
       {
         if (id == process_these[i])
-          tnodes[i]->send (tnodes);
+          tnodes[i]->send(tnodes);
       }
     }
     
@@ -1570,7 +1557,7 @@ Molecule::_pearlman_sssr (const int * process_these, int id,
     for (int i = 0; i < _number_elements; i++)
     {
       if (id == process_these[i])
-        tnodes[i]->print_paths (cerr);
+        tnodes[i]->print_paths(cerr);
     }
     cerr << "Now check for rings\n";
 #endif
@@ -1578,7 +1565,7 @@ Molecule::_pearlman_sssr (const int * process_these, int id,
     for (int i = 0; i < _number_elements; i++)
     {
       if (id == process_these[i])
-        tnodes[i]->check_for_rings (rings_found);
+        tnodes[i]->check_for_rings(rings_found);
     }
 
     rings_found.process_new_rings(*this);
@@ -1595,7 +1582,7 @@ Molecule::_pearlman_sssr (const int * process_these, int id,
     break;
   }
 
-  int rings_found_here = rings_found.rings_found();
+  const int rings_found_here = rings_found.rings_found();
 
 // Mark all these atoms as being in no rings - will increment later
 
@@ -1607,7 +1594,7 @@ Molecule::_pearlman_sssr (const int * process_these, int id,
  
 // We need to give make_rings a fused ring system identifier it can use
 
-  int ns = _sssr_rings.number_elements();
+  const int ns = _sssr_rings.number_elements();
   int fid = -99;
   for (int i = 0; i < ns; i++)
   {
@@ -1624,7 +1611,7 @@ Molecule::_pearlman_sssr (const int * process_these, int id,
   resizable_array_p<Ring> sssr_rings;
   resizable_array_p<Ring> non_sssr_rings;
 
-  if (! _make_rings (rings_found, sssr_rings, non_sssr_rings))
+  if (! _make_rings(rings_found, sssr_rings, non_sssr_rings))
     return 0;
 
 // If there was an incomplete determination, try to transfer in some random non sssr rings
@@ -1636,7 +1623,7 @@ Molecule::_pearlman_sssr (const int * process_these, int id,
 //  _sssr_rings.add(non_sssr_rings.pop());
   }
 
-  sssr_rings.sort (RING_SORT_FN path_length_comparitor_longer);
+  sssr_rings.sort(RING_SORT_FN path_length_comparitor_longer);
 
 #ifdef DEBUG_TNODES
   int nr = sssr_rings.number_elements();
@@ -1648,8 +1635,8 @@ Molecule::_pearlman_sssr (const int * process_these, int id,
   }
 #endif
 
-  _sssr_rings.transfer_in (sssr_rings);
-  _sssr_rings.sort (RING_SORT_FN path_length_comparitor_longer);
+  _sssr_rings.transfer_in(sssr_rings);
+  _sssr_rings.sort(RING_SORT_FN path_length_comparitor_longer);
 
   int nsr = _sssr_rings.number_elements();
   for (int i = 0; i < nsr; i++)
@@ -1659,18 +1646,18 @@ Molecule::_pearlman_sssr (const int * process_these, int id,
 
   if (file_scope_accumulate_non_sssr_rings && non_sssr_rings.number_elements())
   {
-    _non_sssr_rings.transfer_in (non_sssr_rings);
-    _non_sssr_rings.sort (RING_SORT_FN path_length_comparitor_longer);
+    _non_sssr_rings.transfer_in(non_sssr_rings);
+    _non_sssr_rings.sort(RING_SORT_FN path_length_comparitor_longer);
   }
 
   return 1;
 }
 
 int
-Molecule::_pearlman_sssr (const int * process_these, int id,
-                          Tnode ** tnodes,
-                          const int * pi,
-                          const int * sac)
+Molecule::_pearlman_sssr(const int * process_these, int id,
+                         Tnode ** tnodes,
+                         const int * pi,
+                         const int * sac)
 {
   int bonds_in_molecule = _bond_list.number_elements();
 
@@ -1682,7 +1669,7 @@ Molecule::_pearlman_sssr (const int * process_these, int id,
 
     const Atom * a = _things[i];
 
-    tnodes[i] = new Tnode (i, a->ncon(), pi[i], bonds_in_molecule, sac[i]);
+    tnodes[i] = new Tnode(i, a->ncon(), pi[i], bonds_in_molecule, sac[i]);
     atoms_being_processed++;
 
 //  cerr << "Atom " << i << " has " << pi[i] << " pi electrons\n";
@@ -1698,15 +1685,15 @@ Molecule::_pearlman_sssr (const int * process_these, int id,
   for (int i = 0; i < _number_elements; i++)
   {
     if (id == process_these[i])
-      bonds_being_processed += _initialise_tnode (i, process_these, id, tnodes, pi, sac);
+      bonds_being_processed += _initialise_tnode(i, process_these, id, tnodes, pi, sac);
   }
 
-  assert (0 == bonds_being_processed % 2);
+  assert(0 == bonds_being_processed % 2);
   bonds_being_processed = bonds_being_processed >> 1;    // divide by 2
 
   int expected_nrings = bonds_being_processed - atoms_being_processed + 1;
 
-  assert (expected_nrings >= 0);
+  assert(expected_nrings >= 0);
   if (0 == expected_nrings)
     return 1;
 
@@ -1714,7 +1701,7 @@ Molecule::_pearlman_sssr (const int * process_these, int id,
 //cerr << "Expecting to find " << expected_nrings << " rings\n";
 
 // Huge problems with 
-// ..........
+// [Au](I)P(C123C45C16C41C56C14C15C26C13C456)(CCP([Au]I)(C1CCCCC1)C1CCCCC1)CCP([Au]I)(C1CCCCC1)C1CCCCC1 7819571
 // where there are 11 SSSR rings in the large ring system. This just fails. Therefore
 // pre-emtively turn on accumulation of non_sssr_rings if the system looks too complex.
 // This is a massive kludge, but I'm not even sure what the right set of rings for that molecule
@@ -1728,39 +1715,81 @@ Molecule::_pearlman_sssr (const int * process_these, int id,
     cerr << "Temporarily perceiving non sssr rings\n";
   }
 
-  int rc = _pearlman_sssr (process_these, id, tnodes, expected_nrings);
+  int rc = _pearlman_sssr(process_these, id, tnodes, expected_nrings);
 
   file_scope_accumulate_non_sssr_rings = restore_file_scope_accumulate_non_sssr_rings;
 
   return rc;
 }
 
+/*
+  Complexity. Consider
+FC1=CN2C(O)N(C2=O)C1=O PBCHM68787938
+  there are two possible 6 membered rings. Which to choose? If we exclude pi electrons 
+  associated with exocyclic double bonds, these two rings are identical. 
+  
+  If bonded to an exocyclic double bond then it has zero pi electrons to share
+*/
+
 int
-Molecule::_pearlman_sssr (const int * process_these, int id,
-                          Tnode ** tnodes)
+Molecule::_pi_electrons_in_ring(const atom_number_t zatom, int & result) const
 {
-  int * tmp = new int[_number_elements]; iw_auto_array<int> free_tmp (tmp);
-  int * sac = new_int(_number_elements); iw_auto_array<int> free_sac(sac);
+  Atom * a = const_cast<Atom *>(_things[zatom]);
+//return a->pi_electrons(result);     can turn this on or off. Works slightly better turned off
+
+  const int acon = a->ncon();
+  if (2 == acon)
+    return a->pi_electrons(result);
+
+  if (acon == a->nbonds())
+    return a->pi_electrons(result);
+
+  if (6 != a->atomic_number())
+    return a->pi_electrons(result);
+
+  for (int i = 0; i < acon; ++i)
+  {
+    const Bond * b = a->item(i);
+    if (b->is_single_bond()) 
+      continue;
+
+    const atom_number_t j = b->other(zatom);
+
+    const Atom * aj = _things[j];
+    if (6 != aj->atomic_number() && 1 == aj->ncon())
+    {
+      result = 0;
+      return 1;
+    }
+  }
+
+  return a->pi_electrons(result);
+}
+
+int
+Molecule::_pearlman_sssr(const int * process_these, int id,
+                         Tnode ** tnodes)
+{
+  int * tmp = new int[_number_elements + _number_elements]; std::unique_ptr<int[]> free_tmp(tmp);
+  int * sac = tmp + _number_elements;
+  std::fill_n(sac, _number_elements, 0);
 
   for (int i = 0; i < _number_elements; i++)
   {
-    if (NULL != _aromaticity && AROMATIC == _aromaticity[i])   // oct 05
+    if (NULL != _aromaticity && AROMATIC == _aromaticity[i])   // oct 05. No this is wrong... 2017
       tmp[i] = 2;    // not really pi count, just to indicate favoured
-    else if (! _things[i]->pi_electrons (tmp[i]))
-      tmp[i] = 0;
-    else if (0 == tmp[i])
+    else if (! _pi_electrons_in_ring(i, tmp[i]))    // could not be computed
       ;
-    else if (1 == tmp[i])
-      ;
-    else
-      tmp[i] = 2;  // we don't differentiate multiple pi electrons
+    else if (tmp[i] > 2)
+      tmp[i] = 2;
 
-//  cerr << "Molecule::_pearlman_sssr:atom " << i << " has " << tmp[i] << " pi electrons\n";
+//  cerr << "atom " << i << " " << _things[i]->atomic_symbol() << " ncon " << _things[i]->ncon() << " nbonds " << _things[i]->nbonds() << " pi " << tmp[i] << endl;
 
-    const Atom * a = _things[i];
-    int acon = a->ncon();
+    Atom * a = const_cast<Atom *>(_things[i]);
+    const int acon = a->ncon();
 
-    sac[i] += 900 * a->atomic_symbol_hash_value() + 5 * acon + 1;
+    sac[i] += 900 * a->element()->unique_id() + 5 * acon + a->implicit_hydrogens();
+    assert (sac[i] > 0);
 
     if (acon < 4)
       ;
@@ -1769,28 +1798,11 @@ Molecule::_pearlman_sssr (const int * process_these, int id,
     else
       sac[i] = sac[i] / 2;
 
-    if (3 == acon)   // zorch pi electrons if =O or similar
-    {
-      for (int j = 0; j < acon; j++)
-      {
-        const Bond * b = a->item(j);
+    continue;
+    const atomic_number_t z = a->atomic_number();
 
-        if (! b->is_double_bond())
-          continue;
-
-        atom_number_t k = b->other(i);
-
-        if (1 == _things[k]->ncon() && 6 != _things[k]->atomic_number())
-          tmp[i] = 0;
-      }
-    }
-
-    atomic_number_t z = a->atomic_number();
-
-//  cerr << "Atom " << i << " atnum " << z << " has " << tmp[i] << " pi electrons\n";
-
-    if (6 == z || 1 == z)
-      continue;
+//  if (6 == z || 1 == z)
+//    continue;
 
     for (int j = 0; j < acon; j++)
     {
@@ -1799,25 +1811,28 @@ Molecule::_pearlman_sssr (const int * process_these, int id,
       sac[k]++;
     }
 
-    assert (sac[i] > 0);
+    assert(sac[i] > 0);
   }
 
-  return _pearlman_sssr (process_these, id, tnodes, tmp, sac);
+  return _pearlman_sssr(process_these, id, tnodes, tmp, sac);
 }
 
 int
-Molecule::_pearlman_sssr (const int * process_these, int id)
+Molecule::_pearlman_sssr(const int * process_these, int id)
 {
+//cerr << "Molecule::_pearlman_sssr\n";
+//debug_print(cerr);
+
   if (_number_elements <= 2)
     return 1;
 
-  assert (NULL != _ring_membership);
+  assert(NULL != _ring_membership);
 
 //debug_print(cerr);
 
-  Tnode ** tnodes = new Tnode * [_number_elements]; iw_auto_array<Tnode *> free_tnodes (tnodes);
+  Tnode ** tnodes = new Tnode * [_number_elements]; std::unique_ptr<Tnode *[]> free_tnodes(tnodes);
 
-  int rc = _pearlman_sssr (process_these, id, tnodes);
+  int rc = _pearlman_sssr(process_these, id, tnodes);
 
   for (int i = 0; i < _number_elements; i++)
   {

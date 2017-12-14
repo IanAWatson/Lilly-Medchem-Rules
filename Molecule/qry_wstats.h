@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef QRY_WITH_HIT_STATISTICS_H
 #define QRY_WITH_HIT_STATISTICS_H
 
@@ -66,6 +48,7 @@ class Substructure_Hit_Statistics : public Substructure_Query
     void set_use_vertical_bars_for_query_details (int s) { _use_vertical_bars_for_query_details = s;}
 
     int substructure_search (Molecule *);
+    int substructure_search (Molecule & m) { return substructure_search(&m);}
     int substructure_search (Molecule *, Substructure_Results &);
     int substructure_search (Molecule &, Substructure_Results &);
     int substructure_search (Molecule_to_Match &);
@@ -83,10 +66,10 @@ class Substructure_Hit_Statistics : public Substructure_Query
     void set_append_non_match_details_to_molecule_name (int ii)
       {_append_non_match_details_to_molecule_name = ii;}
 
-    int report (ostream & os, int verbose) const;
+    int report (std::ostream & os, int verbose) const;
 };
 
-extern ostream & operator << (ostream &, const Substructure_Hit_Statistics &);
+extern std::ostream & operator << (std::ostream &, const Substructure_Hit_Statistics &);
 
 
 #endif

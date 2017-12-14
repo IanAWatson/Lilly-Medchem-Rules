@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef IW_PATH_H
 #define IW_PATH_H 1
 
@@ -34,6 +16,8 @@ class Ring_Atom_Iterator;
 class Ring : public Set_of_Atoms
 {
   private:
+    int                _is_fused;
+
     int                _fused_system_identifier;
 
 //  Often had a need to keep track of which ring was which, so in Aug 97
@@ -64,9 +48,9 @@ class Ring : public Set_of_Atoms
                                   int lhs_ndx,
                                   int rhs_ndx) const;
   friend
-    ostream & operator << (ostream &, const Ring &);
+    std::ostream & operator << (std::ostream &, const Ring &);
   friend
-    ostream & operator << (ostream & os, const Ring * r) { return os << (*r);}
+    std::ostream & operator << (std::ostream & os, const Ring * r) { return os << (*r);}
 
   public:
     Ring ();
@@ -81,10 +65,11 @@ class Ring : public Set_of_Atoms
     void set_fragment_membership (int f) { _fragment_membership = f;};
 
     int  fused_system_identifier () const { return _fused_system_identifier;}
-    void set_fused_system_identifier (int i) { _fused_system_identifier = i;}
-    int  propagate_fused_system_identifier (int);
+    void set_fused_system_identifier (int i) { _fused_system_identifier = i;}    // not intended for public use
+    int  propagate_fused_system_identifier (int);                                // not intended for public use
 
-    int  is_fused () const { return _fused_system_identifier >= 0;}
+    int  is_fused () const { return _is_fused;}
+    void set_is_fused (int s) { _is_fused = s;}                                  // not intended for public use
 
     int set_aromaticity (aromaticity_type_t);
     int set_aromaticity_to_not_determined () {return _aromaticity = AROMATICITY_NOT_DETERMINED;};

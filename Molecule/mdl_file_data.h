@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef MDL_FILE_DATA_H
 #define MDL_FILE_DATA_H
 
@@ -32,19 +14,21 @@ class ISIS_Atom_List
   public:
     ISIS_Atom_List ();
 
-    int debug_print (ostream &) const;
+    int debug_print (std::ostream &) const;
 
     int active() const { return _element.number_elements();}
     int number_elements() const { return _element.number_elements();}
 
-    int write_M_ALS (atom_number_t, ostream &) const;
+    int write_M_ALS (atom_number_t, std::ostream &) const;
 
     int normal_list () const { return _normal_list;}
     void set_normal_list (int s) { _normal_list = s;}
 
     int create_from_ALS_record (const IWString &);
     int initialise_from_mdl_A_symbol ();
+    int initialise_from_mdl_AH_symbol ();
     int initialise_from_mdl_Q_symbol ();
+    int initialise_from_mdl_QH_symbol ();
     int initialise_atom_list_from_symbol (const const_IWSubstring &);
 
     int invert_to_normal_list_based_on_organics ();
@@ -87,8 +71,8 @@ class MDL_Atom_Data
 //  These come from M records
 
     int _unsaturated;
-    int _substitution;
-    int _ring_bond;
+    int _substitution;     // note that I extend this with the value -3, which means ignore. I should hvae done that with 0, but too late...
+    int _ring_bond;       // a value of -3 means ignore
 
     IWString _alias;
 
@@ -157,7 +141,7 @@ class MDL_Atom_Data
 
     MDL_Atom_Data & operator= (const MDL_Atom_Data &);
 
-    int write_M_ALS (atom_number_t, ostream &) const;
+    int write_M_ALS (atom_number_t, std::ostream &) const;
 
     void set_atom_number (atom_number_t a) { _atom_number = a;}
     atom_number_t atom_number () const { return _atom_number;}
@@ -171,6 +155,8 @@ class MDL_Atom_Data
     void set_alias (const const_IWSubstring & s) { _alias = s;}
     const IWString & alias () const { return _alias;}
 
+    void set_atom_map (const int s) { _atom_map = s;}    // dangerous
+
     const IWString & initial_atomic_symbol () const { return _initial_atomic_symbol;}
 
     int build_atom_list (const const_IWSubstring &);
@@ -179,12 +165,15 @@ class MDL_Atom_Data
     void set_unsaturation (int s) { _unsaturated = s;}
     void set_substitution (int s) { _substitution = s;}
     void set_ring_bond (int s) { _ring_bond = s;}
+    void set_exact_change (int s) { _exact_change = s;}
 
     void increment_connections_lost () { _connections_lost++;}
     void increment_min_hcount () { _min_hcount++;}
     void set_min_hcount (int s) { _min_hcount = s;}
     void increment_explicit_hydrogen_atoms_removed () { _explicit_hydrogen_atoms_removed++;}
     void decrement_substitution () { _substitution--;}
+
+    void set_hcount (int s) { _hcount = s;}
 
     int min_hcount () const { return _min_hcount;}
 
@@ -275,6 +264,8 @@ class MDL_File_Data
     MDL_File_Data(const MDL_File_Data &);
     ~MDL_File_Data();
 
+    MDL_File_Data & operator= (MDL_File_Data && rhs);
+
 //  We make things much easier if we allocate all the arrays the moment na and nb are known
 
     int allocate_arrays(int na, int nb);
@@ -289,15 +280,20 @@ class MDL_File_Data
     int arrays_allocated() const { return _mdl_atom.number_elements();}
     int active() const { return _mdl_atom.number_elements();}
 
+    void discard_atom_map ();
+
+    int number_atoms() const { return _mdl_atom.number_elements();}
+    int number_bonds() const { return _mdl_bond.number_elements();}
+
     const MDL_Atom_Data * mdl_atom_data(int i) const { return _mdl_atom[i];}
     MDL_Atom_Data * mdl_atom_data(int i) { return _mdl_atom[i];}
     const MDL_Atom_Data * mdl_atom(int i) const { return _mdl_atom[i];}
     MDL_Atom_Data * mdl_atom(int i) { return _mdl_atom[i];}
 
-    const MDL_Bond_Data * mdl_bond_data(int i) const { return _mdl_bond[i];}
-    MDL_Bond_Data * mdl_bond_data(int i) { return _mdl_bond[i];}
-    const MDL_Bond_Data * mdl_bond(int i) const { return _mdl_bond[i];}
-    MDL_Bond_Data * mdl_bond(int i) { return _mdl_bond[i];}
+    const MDL_Bond_Data * mdl_bond_data(int i) const;
+    MDL_Bond_Data * mdl_bond_data(int i);
+    const MDL_Bond_Data * mdl_bond(int i) const;
+    MDL_Bond_Data * mdl_bond(int i);
 
 //  Do any of the bonds involve an aromatic bond in an OR operation
 
@@ -313,6 +309,8 @@ class MDL_File_Data
     int transfer_link_atoms (resizable_array_p<Link_Atom> & s) { return s.transfer_in(_link_atom);}
 
     int swap_atoms (atom_number_t, atom_number_t);
+
+    int add (const Element * e);
 };
 
 /*

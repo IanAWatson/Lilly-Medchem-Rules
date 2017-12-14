@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
 
 #include "iwrcb.h"
@@ -25,11 +7,14 @@
 #include "tbb/scalable_allocator.h"
 #endif
 
+using std::cerr;
+using std::endl;
+
 /*
   The _present array is used to keep track of which pairs are present.
 */
 
-Ring_Closure_Bonds::Ring_Closure_Bonds ()
+Ring_Closure_Bonds::Ring_Closure_Bonds()
 {
   _atoms_in_molecule = 0;
 
@@ -38,7 +23,7 @@ Ring_Closure_Bonds::Ring_Closure_Bonds ()
   return;
 }
 
-Ring_Closure_Bonds::Ring_Closure_Bonds (const Ring_Closure_Bonds & rhs) : _atoms_in_molecule (rhs._atoms_in_molecule)
+Ring_Closure_Bonds::Ring_Closure_Bonds (const Ring_Closure_Bonds & rhs) : _atoms_in_molecule(rhs._atoms_in_molecule)
 {
   _atoms_in_molecule = rhs._atoms_in_molecule;
 
@@ -50,7 +35,7 @@ Ring_Closure_Bonds::Ring_Closure_Bonds (const Ring_Closure_Bonds & rhs) : _atoms
 
   _present = new int[_atoms_in_molecule];
 
-  copy_vector (_present, rhs._present, _atoms_in_molecule);
+  copy_vector(_present, rhs._present, _atoms_in_molecule);
 
   if (rhs._number_elements > 0)
     resizable_array<int>::operator = (rhs);
@@ -58,7 +43,7 @@ Ring_Closure_Bonds::Ring_Closure_Bonds (const Ring_Closure_Bonds & rhs) : _atoms
   return;
 }
 
-Ring_Closure_Bonds::~Ring_Closure_Bonds ()
+Ring_Closure_Bonds::~Ring_Closure_Bonds()
 {
   if (NULL != _present)
     delete [] _present;
@@ -67,7 +52,7 @@ Ring_Closure_Bonds::~Ring_Closure_Bonds ()
 }
 
 int
-Ring_Closure_Bonds::ok () const
+Ring_Closure_Bonds::ok() const
 {
   if (_atoms_in_molecule < 0)
     return 0;
@@ -87,7 +72,7 @@ Ring_Closure_Bonds::ok () const
 Ring_Closure_Bonds &
 Ring_Closure_Bonds::operator= (const Ring_Closure_Bonds & rhs)
 {
-  assert (rhs.ok ());
+  assert (rhs.ok());
 
   if (NULL != _present)
   {
@@ -98,22 +83,22 @@ Ring_Closure_Bonds::operator= (const Ring_Closure_Bonds & rhs)
   if (NULL == rhs._present)
   {
     _atoms_in_molecule = 0;
-    resizable_array<int>::resize (0);
+    resizable_array<int>::resize(0);
     return *this;
   }
 
-  activate (rhs._atoms_in_molecule);
+  activate(rhs._atoms_in_molecule);
 
   for (int i = 0; i < rhs._number_elements; i++)
   {
-    resizable_array<int>::add (rhs._things[i]);
+    resizable_array<int>::add(rhs._things[i]);
   }
 
   return *this;
 }
 
 int 
-Ring_Closure_Bonds::write_bonds (ostream & output) const
+Ring_Closure_Bonds::write_bonds (std::ostream & output) const
 {
   output << "Ring_Closure_Bonds::write_bonds:molecule has " << _atoms_in_molecule << " atoms\n";
 
@@ -139,7 +124,7 @@ Ring_Closure_Bonds::write_bonds (ostream & output) const
     output << "  ring closure bond between " << a1 << " and " << a2 << endl;
   }
 
-  return output.good ();
+  return output.good();
 }
 
 int
@@ -150,31 +135,31 @@ Ring_Closure_Bonds::activate (int s)
   if (NULL != _present)
     delete [] _present;
 
-  _present = new_int (_atoms_in_molecule, -1);
+  _present = new_int(_atoms_in_molecule, -1);
 
-  resizable_array<int>::resize_keep_storage (0);
+  resizable_array<int>::resize_keep_storage(0);
 
   return 1;
 }
 
 int
-Ring_Closure_Bonds::reset ()
+Ring_Closure_Bonds::reset()
 {
-  set_vector (_present, _atoms_in_molecule, -1);
+  set_vector(_present, _atoms_in_molecule, -1);
 
-  resizable_array<int>::resize_keep_storage (0);
+  resizable_array<int>::resize_keep_storage(0);
 
   return 1;
 }
 
 void 
-Ring_Closure_Bonds::invalidate ()
+Ring_Closure_Bonds::invalidate()
 {
-  DELETE_IF_NOT_NULL (_present);
+  DELETE_IF_NOT_NULL(_present);
 
   _atoms_in_molecule = -9;
 
-  resizable_array<int>::resize_keep_storage (0);
+  resizable_array<int>::resize_keep_storage(0);
 
   return;
 }
@@ -210,9 +195,9 @@ Ring_Closure_Bonds::add (atom_number_t a1, atom_number_t a2)
   else if (-1 == _present[a2])
     _present[a2] = -2;
 
-  int b = _form_corresponding_integer (a1, a2);
+  int b = _form_corresponding_integer(a1, a2);
 
-  resizable_array<int>::add (b);
+  resizable_array<int>::add(b);
 
   return _number_elements;
 }
@@ -230,9 +215,9 @@ Ring_Closure_Bonds::contains (atom_number_t a1, atom_number_t a2) const
 
 // Need to go look in the bond list
 
-  int b = _form_corresponding_integer (a1, a2);
+  int b = _form_corresponding_integer(a1, a2);
 
-  return resizable_array<int>::contains (b);
+  return resizable_array<int>::contains(b);
 }
 
 int
@@ -261,7 +246,7 @@ Ring_Closure_Bonds::is_the_same (const Ring_Closure_Bonds & rhs) const
 
   for (int i = 0; i < _number_elements; i++)
   {
-    if (! rhs.resizable_array<int>::contains (_things[i]))
+    if (! rhs.resizable_array<int>::contains(_things[i]))
       return 0;
   }
 
@@ -270,10 +255,10 @@ Ring_Closure_Bonds::is_the_same (const Ring_Closure_Bonds & rhs) const
 
 int
 Ring_Closure_Bonds::report_differences (const Ring_Closure_Bonds & rhs,
-                                        ostream & output) const
+                                        std::ostream & output) const
 {
   if (NULL == _present || NULL == rhs._present)
-    return output.good ();
+    return output.good();
 
   output << "Ring_Closure_Bonds::report_differences:comparing items for " << _atoms_in_molecule << " atoms\n";
 
@@ -309,7 +294,7 @@ Ring_Closure_Bonds::report_differences (const Ring_Closure_Bonds & rhs,
   {
     int j = _things[i];
 
-    if (rhs.resizable_array<int>::contains (j))
+    if (rhs.resizable_array<int>::contains(j))
       continue;
 
     atom_number_t a1 = j / _atoms_in_molecule;
@@ -322,7 +307,7 @@ Ring_Closure_Bonds::report_differences (const Ring_Closure_Bonds & rhs,
   {
     int j = rhs._things[i];
 
-    if (resizable_array<int>::contains (j))
+    if (resizable_array<int>::contains(j))
       continue;
 
     atom_number_t a1 = j / _atoms_in_molecule;
@@ -331,7 +316,7 @@ Ring_Closure_Bonds::report_differences (const Ring_Closure_Bonds & rhs,
     output << "Atoms " << a1 << " to " << a2 << " not in LHS\n";
   }
 
-  return output.good ();
+  return output.good();
 }
 
 /*
@@ -360,7 +345,7 @@ Ring_Closure_Bonds::is_subset_of (const Ring_Closure_Bonds & parent) const
     if (a2 < a1)    // don't check things twice
       continue;
 
-    if (parent.contains (a1, a2))
+    if (parent.contains(a1, a2))
       continue;
 
     cerr << "Ring_Closure_Bonds::is_subset_of:pair " << a1 << " to " << a2 << " not part of parent\n";
@@ -371,7 +356,7 @@ Ring_Closure_Bonds::is_subset_of (const Ring_Closure_Bonds & parent) const
   {
     int j = _things[i];
 
-    if (parent.resizable_array<int>::contains (j))
+    if (parent.resizable_array<int>::contains(j))
       continue;
 
     atom_number_t a1 = j / _atoms_in_molecule;

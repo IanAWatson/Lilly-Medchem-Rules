@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
 #include <memory>
 using namespace std;
@@ -23,7 +5,6 @@ using namespace std;
 #define COMPILING_CAREFUL_FRAG
 
 #include "misc.h"
-#include "iw_auto_array.h"
 
 #include "molecule.h"
 
@@ -185,7 +166,7 @@ Molecule::identify_largest_organic_fragment (Set_of_Atoms & atoms_to_be_removed,
   const int * fragment_membership = _fragment_information.fragment_membership();
   const resizable_array<int> & atoms_in_fragment = _fragment_information.atoms_in_fragment();
 
-  int * exclude = new_int(_number_elements); iw_auto_array<int> free_exclude(exclude);
+  int * exclude = new_int(_number_elements); std::unique_ptr<int[]> free_exclude(exclude);
 
   _identify_fragment_undesirable_groups (exclude);
 
@@ -389,9 +370,9 @@ Molecule::reduce_to_largest_fragment_carefully()
 // Now the more difficult case of multiple organic fragments with the
 // same number of atoms.
 
-  Fragment_Data * fd = new Fragment_Data[nf]; iw_auto_array<Fragment_Data> free_fd(fd);
+  Fragment_Data * fd = new Fragment_Data[nf]; std::unique_ptr<Fragment_Data[]> free_fd(fd);
 
-  int * already_counted = new_int (_number_elements); iw_auto_array<int> free_already_counted (already_counted);
+  int * already_counted = new_int (_number_elements); std::unique_ptr<int[]> free_already_counted (already_counted);
 
 #ifdef DEBUG_CAREFUL_FRAG
   cerr << _molecule_name << " has " << number_instances_of_largest_fragment << " instances of largest fragment\n";

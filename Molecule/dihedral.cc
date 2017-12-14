@@ -1,33 +1,15 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 /*
   Fucntions for the Dihedral_Atoms class.
 */
 
-#include <stdlib.h>
+#include <iostream>
 #include <iostream>
 #include <assert.h>
 #include <memory>
-using namespace std;
+using std::cerr;
+using std::endl;
 
 #include "misc.h"
-#include "iw_auto_array.h"
 
 #include "molecule.h"
 
@@ -35,13 +17,13 @@ angle_t
 Molecule::dihedral_angle (atom_number_t a1, atom_number_t a2, atom_number_t a3, atom_number_t a4,
                           int not_bonded_ok) const
 {
-  assert (ok_4_atoms (a1, a2, a3, a4));
+  assert (ok_4_atoms(a1, a2, a3, a4));
 
   if (! not_bonded_ok)
   {
-    assert (are_bonded (a1, a2));
-    assert (are_bonded (a2, a3));
-    assert (are_bonded (a3, a4));
+    assert (are_bonded(a1, a2));
+    assert (are_bonded(a2, a3));
+    assert (are_bonded(a3, a4));
   }
 
   const Atom * aa1 = _things[a1];
@@ -49,24 +31,24 @@ Molecule::dihedral_angle (atom_number_t a1, atom_number_t a2, atom_number_t a3, 
   const Atom * aa3 = _things[a3];
   const Atom * aa4 = _things[a4];
 
-  return angle_between_atoms (*aa1, *aa2, *aa3, *aa4);
+  return angle_between_atoms(*aa1, *aa2, *aa3, *aa4);
 }
 
 //#define DEBUG_SET_DIHEDRAL
 
 int
-Molecule::set_dihedral (atom_number_t a1, 
-                        atom_number_t a2,
-                        atom_number_t a3,
-                        atom_number_t a4,
-                        angle_t theta)
+Molecule::set_dihedral(atom_number_t a1, 
+                       atom_number_t a2,
+                       atom_number_t a3,
+                       atom_number_t a4,
+                       angle_t theta)
 {
   assert (ok());
   assert (natoms() >= 4);
 
-  assert (ok_4_atoms (a1, a2, a3, a4));
+  assert (ok_4_atoms(a1, a2, a3, a4));
 
-  angle_t current_angle = dihedral_angle (a1, a2, a3, a4, 1);
+  angle_t current_angle = dihedral_angle(a1, a2, a3, a4, 1);
 
   if (current_angle == theta)     // nothing to do
     return 1;
@@ -76,23 +58,35 @@ Molecule::set_dihedral (atom_number_t a1,
   cerr << "current value " << current_angle << " (" << (current_angle * RAD2DEG) << " deg)\n";
 #endif
 
-  int * atoms_to_move = new_int (_number_elements); iw_auto_array<int> free_atoms_to_move (atoms_to_move);
+  int * atoms_to_move = new_int(_number_elements); std::unique_ptr<int[]> free_atoms_to_move(atoms_to_move);
 
-  atoms_to_move[a4] = 1;
+  atoms_to_move[a2] = 2;
   atoms_to_move[a3] = 1;
 
-  if (1 == _things[a4]->ncon())
-    ;
-  else if (! _identify_side_of_bond (atoms_to_move, a3, 1, a2))
-  {
-    cerr << "Molecule::set_dihedral:cannot identify atoms to move, atoms " << a1 << ',' << a2 << ',' << a3 << ',' << a4 << endl;
-    return 0;
-  }
+  const Atom * aa3 = _things[a3];
 
-  if (atoms_to_move[a1] || atoms_to_move[a2])
+  const int acon = aa3->ncon();
+
+#ifdef DEBUG_SET_DIHEDRAL
+  cerr << "A3 has " << acon << " connections\n";
+#endif
+
+  for (int i = 0; i < acon; ++i)
   {
-    cerr << "Molecule::set_dihedral:possible ring structure\n";
-    return 0;
+    const atom_number_t j = aa3->other(a3, i);
+
+#ifdef DEBUG_SET_DIHEDRAL
+    cerr << " bonded to " << j << ' ' << smarts_equivalent_for_atom(j) << endl;
+#endif
+
+    if (j == a2)
+      continue;
+
+    if (0 == _determine_moving_atoms(j, atoms_to_move))
+    {
+      cerr << "Molecule::set_dihedral:possible ring structure, a1 " << a2 << " a2 " << a2 << " a3 " << a3 << " a4 " << a4 << endl;
+      return 0;
+    }
   }
 
   atoms_to_move[a3] = 0;
@@ -103,7 +97,7 @@ Molecule::set_dihedral (atom_number_t a1,
   cerr << "Rotating " << rot << " (" << (rot * RAD2DEG) << " deg)\n";
 #endif
 
-  double r = _things[a2]->distance (*(_things[a3]));
+  double r = _things[a2]->distance(*(_things[a3]));
   if (0.0 == r)
   {
 #ifdef DEBUG_SET_DIHEDRAL
@@ -153,13 +147,13 @@ Molecule::set_dihedral (atom_number_t a1,
     double ynew = rotmat21 * xx + rotmat22 * yy + rotmat23 * zz + y0;
     double znew = rotmat31 * xx + rotmat32 * yy + rotmat33 * zz + z0;
 
-    a->setxyz ( static_cast<coord_t> (xnew), static_cast<coord_t> (ynew), static_cast<coord_t> (znew) );
+    a->setxyz( static_cast<coord_t>(xnew), static_cast<coord_t>(ynew), static_cast<coord_t>(znew) );
 
 //  cerr << i << " from (" << xold << ',' << yold << ',' << zold << ") to (" << a->x() << ',' << a->y() << ',' << a->z() << ")\n";
   }
 
 #ifdef DEBUG_SET_DIHEDRAL
-  angle_t tmp = dihedral_angle (a1, a2, a3, a4);
+  angle_t tmp = dihedral_angle(a1, a2, a3, a4);
   cerr << "Molecule::set_dihedral:after moving " << tmp << " (" << (tmp * RAD2DEG) << " deg)\n";
 #endif
   
@@ -173,9 +167,9 @@ Molecule::bump_check (atom_number_t a1,
                       atom_number_t a4,
                       distance_t d) const
 {
-  int * either_side = new int[_number_elements]; iw_auto_array<int> free_either_side (either_side);
+  int * either_side = new int[_number_elements]; std::unique_ptr<int[]> free_either_side(either_side);
 
-  return _bump_check (a1, a2, a3, a4, d, either_side);
+  return _bump_check(a1, a2, a3, a4, d, either_side);
 }
 
 int
@@ -185,7 +179,7 @@ Molecule::_bump_check (atom_number_t a1,
                        atom_number_t a4,
                        distance_t too_close, int * either_side) const
 {
-  if (! _determine_either_side_of_bond (a2, a3, either_side))
+  if (! _determine_either_side_of_bond(a2, a3, either_side))
     return 0;
 
   for (int i = 0; i < _number_elements; i++)
@@ -203,7 +197,7 @@ Molecule::_bump_check (atom_number_t a1,
       if (0 == either_side[j])     // one of the atoms forming the bond
         continue;
 
-      distance_t dij = ai->distance (*(_things[j]));
+      distance_t dij = ai->distance(*(_things[j]));
 
       if (dij <= too_close)
       {
@@ -225,9 +219,9 @@ Molecule::_determine_either_side_of_bond (atom_number_t a1,
   cerr << "_determine_either_side_of_bond with atoms " << a1 << " and " << a2 << endl;
 #endif
 
-  set_vector (either_side, _number_elements, -9);
+  set_vector(either_side, _number_elements, -9);
 
-  _identify_side_of_bond (either_side, a1, -1, a2);
+  identify_side_of_bond(either_side, a1, -1, a2);
 
 #ifdef DEBUG_DETERMINE_EITHER_SIDE_OF_BOND
   cerr << "Ring? " << (-1 == either_side[a2]) << endl;
@@ -236,7 +230,7 @@ Molecule::_determine_either_side_of_bond (atom_number_t a1,
   if (-1 == either_side[a2])      // bond must be in a ring
     return 0;
 
-  _identify_side_of_bond (either_side, a2, 1, a1);    // will definitely work
+  identify_side_of_bond(either_side, a2, 1, a1);    // will definitely work
 
   either_side[a1] = 0;
   either_side[a2] = 0;
@@ -245,17 +239,17 @@ Molecule::_determine_either_side_of_bond (atom_number_t a1,
 }
 
 /*
-  There are two _identify_side_of_bond functions. One is called at the
+  There are two identify_side_of_bond functions. One is called at the
   top level, and here is it OK if it encounters the atom at the end of
   the initial bond. In the second instance, it is a fatal error to 
   encounter that atom.
 */
 
 int
-Molecule::_identify_side_of_bond (int * either_side,
-                                  atom_number_t astart,
-                                  int flag,
-                                  atom_number_t avoid) const
+Molecule::identify_side_of_bond (int * either_side,
+                                 atom_number_t astart,
+                                 int flag,
+                                 atom_number_t avoid) const
 {
   int rc = 0;
 
@@ -263,11 +257,11 @@ Molecule::_identify_side_of_bond (int * either_side,
 
   either_side[astart] = flag;
 
-  int acon = a->ncon();
+  const int acon = a->ncon();
 
   for (int i = 0; i < acon; i++)
   {
-    atom_number_t j = a->other (astart, i);
+    atom_number_t j = a->other(astart, i);
 
     if (j == avoid)     // just looking at the other end of our starting bond
       continue;
@@ -276,7 +270,7 @@ Molecule::_identify_side_of_bond (int * either_side,
     cerr << "Top level, astart " << astart << " to " << j << " must avoid " << avoid << ", flag " << flag << endl;
 #endif
 
-    int tmp = __identify_side_of_bond (either_side, j, flag, avoid);
+    int tmp = __identify_side_of_bond(either_side, j, flag, avoid);
     if (0 == tmp)
       return 0;
 
@@ -308,7 +302,7 @@ Molecule::__identify_side_of_bond (int * either_side,
 
   for (int i = 0; i < a->ncon(); i++)
   {
-    atom_number_t j = a->other (astart, i);
+    atom_number_t j = a->other(astart, i);
 
 //  cerr << "Molecule::__identify_side_of_bond:how about atom " << j << endl;
 
@@ -318,7 +312,7 @@ Molecule::__identify_side_of_bond (int * either_side,
     if (avoid == j)      // we have doubled back to the other end of the initial bond - must have been in a ring
       return 0;
 
-    int tmp = __identify_side_of_bond (either_side, j, flag, avoid);
+    int tmp = __identify_side_of_bond(either_side, j, flag, avoid);
     if (0 == tmp)
       return 0;
 
@@ -328,9 +322,37 @@ Molecule::__identify_side_of_bond (int * either_side,
   return rc;
 }
 
+/*
+  This determines whether or not it is possible to perform a 
+  conformational search around a given bond. If either of the
+  two atoms which define the twisting bond have only one connection,
+  then a conformational search will not be possible.
+*/
+
+/*int
+Molecule::conf_search_possible (const Dihedral_Atoms & dihedral) const
+{
+  assert (ok());
+  if (! valid_dihedral(dihedral))
+    return 0;
+
+  atom_number_t a2 = dihedral.a2();
+  atom_number_t a3 = dihedral.a3();
+
+  const Atom *aa2 = atomi(a2);
+  const Atom *aa3 = atomi(a3);
+
+  if (1 == aa2->ncon())
+    return 0;
+  if (1 == aa3->ncon())
+    return 0;
+
+  return 1;
+}*/
+
 int
-Molecule::bump_check (const int * tmp,
-                      distance_t tolerance) const
+Molecule::bump_check(const int * tmp,
+                     distance_t tolerance) const
 {
   int rc = 1;
 
@@ -341,7 +363,7 @@ Molecule::bump_check (const int * tmp,
       if (tmp[i] == tmp[j])    // same grouping, don't compare them
         continue;
 
-      if (_things[i]->distance (*(_things[j])) < tolerance)
+      if (_things[i]->distance(*(_things[j])) < tolerance)
         rc = 0;
     }
   }
@@ -398,25 +420,25 @@ Molecule::set_bond_angle (atom_number_t a1,
                           atom_number_t a3,
                           angle_t theta)
 {
-  assert (ok_3_atoms (a1, a2, a3));
+  assert (ok_3_atoms(a1, a2, a3));
 
   const Atom * aa1 = _things[a1];
   const Atom * aa2 = _things[a2];
   const Atom * aa3 = _things[a3];
 
-  if (! aa1->is_bonded_to (a2))
+  if (! aa1->is_bonded_to(a2))
   {
     cerr << "Molecule::set_bond_angle:atom " << a1 << " not bonded to " << a2 << endl;
     return 0;
   }
 
-  if (! aa2->is_bonded_to (a3))
+  if (! aa2->is_bonded_to(a3))
   {
     cerr << "Molecule::set_bond_angle:atom " << a2 << " not bonded to " << a3 << endl;
     return 0;
   }
 
-  if (aa1->is_bonded_to (a3))    // /yipes a 3 membered ring
+  if (aa1->is_bonded_to(a3))    // /yipes a 3 membered ring
   {
     cerr << "Molecule::set_bond_angle:atom " << a2 << " bonded to " << a3 << " 3 membered ring!\n";
     return 0;
@@ -424,21 +446,31 @@ Molecule::set_bond_angle (atom_number_t a1,
 
 // If ring info is available use it. Don't force a ring determination.
 
-  if (_sssr_rings.number_elements() && in_same_ring (a1, a3))
+  if (_sssr_rings.number_elements() && in_same_ring(a1, a3))
   {
     cerr << "Molecule::set_bond_angle:cannot change ring bond, atoms " << a2 << " and " << a3 << endl;
     return 0;
   }
 
-  int * moving_atoms = new_int (_number_elements); iw_auto_array<int> free_moving_atoms (moving_atoms);
+  int * moving_atoms = new_int(_number_elements); std::unique_ptr<int[]> free_moving_atoms(moving_atoms);
 
   moving_atoms[a1] = 2;    // special flag - if this value is encountered, in _determine_moving_atoms, we abort
   moving_atoms[a2] = 1;
 
-  if (! _determine_moving_atoms(a3, moving_atoms))
+  const int acon = aa2->ncon();
+
+  for (int i = 0; i < acon; ++i)
   {
-    cerr << "Molecule::set_bond_angle:cannot identify atoms to move, atoms " << a1 << ',' << a2 << ',' << a3 << "\n";
-    return 0;
+    const atom_number_t j = aa2->other(a2, i);
+
+    if (a1 == j)
+      continue;
+
+    if (! _determine_moving_atoms(j, moving_atoms))
+    {
+      cerr << "Molecule::set_bond_angle:cannot identify atoms to move, atoms " << a1 << ',' << a2 << ',' << a3 << "\n";
+      return 0;
+    }
   }
 
   moving_atoms[a1] = 0;    // atom a1 does not move
@@ -447,17 +479,18 @@ Molecule::set_bond_angle (atom_number_t a1,
 #ifdef DEBUG_SET_BOND_ANGLE
   for (int i = 0; i < _number_elements; i++)
   {
-    cerr << "Atom " << i << " moving_atoms " << moving_atoms[i] << endl;
+    if (moving_atoms[i])
+      cerr << "Atom " << i << " moving_atoms " << moving_atoms[i] << ' ' << smarts_equivalent_for_atom(i) << endl;
   }
 #endif
 
-  Space_Vector<double> v12 (aa1->x() - aa2->x(), aa1->y() - aa2->y(), aa1->z() - aa2->z()); //  = *aa1 - *aa2;
+  Space_Vector<double> v12(aa1->x() - aa2->x(), aa1->y() - aa2->y(), aa1->z() - aa2->z()); //  = *aa1 - *aa2;
   v12.normalise();
 
-  Space_Vector<double> v32 (aa3->x() - aa2->x(), aa3->y() - aa2->y(), aa3->z() - aa2->z()); // *aa3 - *aa2;
+  Space_Vector<double> v32(aa3->x() - aa2->x(), aa3->y() - aa2->y(), aa3->z() - aa2->z()); // *aa3 - *aa2;
   v32.normalise();
 
-  double current_angle = v12.angle_between_unit_vectors (v32);
+  double current_angle = v12.angle_between_unit_vectors(v32);
 
 #ifdef DEBUG_SET_BOND_ANGLE
   cerr << "Angle currently " << current_angle << " (" << (current_angle * RAD2DEG) << " deg), desired angle " << theta << " (" << (theta * RAD2DEG) << " deg)\n";
@@ -466,12 +499,12 @@ Molecule::set_bond_angle (atom_number_t a1,
 
 // We'll use v32 as the axis
 
-  if (fabs (current_angle - M_PI) < 0.01)    // yipes almost a straight line, V12 can be anything
-    v12.setxyz (v32.y(), v32.z(), v32.x());
+  if (fabs(current_angle - M_PI) < 0.01)    // yipes almost a straight line, V12 can be anything
+    v12.setxyz(v32.y(), v32.z(), v32.x());
 
 // The cross product should be normal to the plane.
 
-  v32.cross_product (v12);
+  v32.cross_product(v12);
 
 // But if there was a 90 degree angle between the two vectors, the
 // cross product will be zero
@@ -495,12 +528,12 @@ Molecule::set_bond_angle (atom_number_t a1,
 #endif
 
   Set_of_Atoms atoms_to_move;
-  atoms_to_move.resize (_number_elements);
+  atoms_to_move.resize(_number_elements);
 
   for (int i = 0; i < _number_elements; i++)
   {
     if (1 == moving_atoms[i])
-      atoms_to_move.add (i);
+      atoms_to_move.add(i);
   }
 
   if (0 == atoms_to_move.size())
@@ -520,14 +553,14 @@ Molecule::set_bond_angle (atom_number_t a1,
   coord_t a2y = _things[a2]->y();
   coord_t a2z = _things[a2]->z();
 
-  translate_atoms (-a2x, -a2y, -a2z, atoms_to_move);
+  translate_atoms(-a2x, -a2y, -a2z, atoms_to_move);
 
-  int rc = rotate_atoms (v32, rot, atoms_to_move);
+  int rc = rotate_atoms(v32, rot, atoms_to_move);
 
-  translate_atoms (a2x, a2y, a2z, atoms_to_move);
+  translate_atoms(a2x, a2y, a2z, atoms_to_move);
 
 #ifdef DEBUG_SET_BOND_ANGLE
-  angle_t tmp = bond_angle (a1, a2, a3);
+  angle_t tmp = bond_angle(a1, a2, a3);
   cerr << "After moving angle is " << tmp << " or " << (RAD2DEG * tmp) << " degrees\n";
 #endif
 

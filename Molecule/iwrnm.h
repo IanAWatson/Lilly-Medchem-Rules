@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef IW_RING_NUMBER_MANAGER_H
 #define IW_RING_NUMBER_MANAGER_H
 
@@ -56,6 +38,9 @@ class Ring_Number_Manager
     int _append_ring_closures_for_chiral_atom (IWString & smiles,
                     atom_number_t a,
                     const resizable_array<atom_number_t> & ring_closures_found);
+    int _generate_ring_opening_chars (IWString & ring_opening_chars,
+                                                  const resizable_array<const Bond *> & ring_opening_bonds,
+                                                  atom_number_t ato);
 
     void _default_values ();
 
@@ -64,13 +49,14 @@ class Ring_Number_Manager
     Ring_Number_Manager (int);
     ~Ring_Number_Manager ();
 
-    int debug_print (ostream &) const;
+    int debug_print (std::ostream &) const;
 
     int ok () const;
 
     int activate (int);
 
-    int store_ring (IWString &, const Bond *, atom_number_t);
+//  int store_ring (IWString &, const Bond *, atom_number_t);
+    int append_ring_closing_and_opening_digits (IWString & smiles, atom_number_t zatom, const resizable_array<atom_number_t> & ring_closures_found, const resizable_array<const Bond *> & ring_opening_bonds, const Chiral_Centre *);
 
     int append_ring_closures_for_atom (IWString &,
                 atom_number_t, 

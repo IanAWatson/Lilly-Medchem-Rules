@@ -1,74 +1,36 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef IW_ACCUMULATOR_H
 #define IW_ACCUMULATOR_H
 
 #include <iostream>
 
-using namespace std;
+using std::cerr;
+using std::endl;
 
 #include "iwstring.h"
 
 #include "kahan_sum.h"
 
-template <typename T>
-class Accumulator
+template <typename T, typename SUMMER>
+class Accumulator_Base
 {
-  private:
+  protected:
     unsigned int _n;
-//  double _xsum;
-//  double _x2sum;
-    KahanSum _xsum;
-    KahanSum _x2sum;
     T _minval;
     T _maxval;
+    SUMMER _xsum;
+    SUMMER _x2sum;
 
-//  private functions
+//  protected functions
 
+    void _reset();
     void _default_values ();
 
   public:
-    Accumulator ();
-    ~Accumulator ();
+    Accumulator_Base ();
 
     int ok () const;
 
-    Accumulator<T> & operator = (const Accumulator<T> &);
-    void operator += (const Accumulator<T> & rhs) { extra (rhs);}
-
-    void operator () (T e) { (void) extra(e);}
-
-    unsigned int extra (T);
-    unsigned int extra (T, int);       // add N copies of a value
-    unsigned int extra (const T *, int);       // add an array of values
-    unsigned int extra (const Accumulator<T> &);
-
     unsigned int n () const { return _n;}
-
-    double sum () const { return _xsum;}
-    double sum_of_squares () const { return _x2sum;}
-
-    double average () const;
-    int    average (double &);
-    double variance ();
-    double variance () const;
-    int    variance (double &);
 
     T minval () const { return _minval;}
     T maxval () const { return _maxval;}
@@ -76,13 +38,75 @@ class Accumulator
 
     void reset ();
 
+    T sum () const { return _xsum;}
+    T sum_of_squares () const { return _x2sum;}
+
+    unsigned int extra (T);
+    unsigned int extra (T, int);       // add N copies of a value
+    Accumulator_Base<T, SUMMER> & operator = (const Accumulator_Base<T, SUMMER> &);
+    void operator += (const Accumulator_Base<T, SUMMER> & rhs) { extra (rhs);}
+
+    unsigned int extra (const T *, int);       // add an array of values
+    unsigned int extra (const Accumulator_Base<T, SUMMER> &);
+
+    void operator () (T e) { (void) extra(e);}
+
+    int subtract_data (const Accumulator_Base<T, SUMMER> &, Accumulator_Base<T, SUMMER> &) const;
+
+    double average () const;
+    int    average (double &);
+
     double average_if_available_minval_if_not () const;
 
-    int subtract_data (const Accumulator<T> &, Accumulator<T> &) const;
+    double variance () const;
+    int    variance (double &);
 };
 
 template <typename T>
-ostream & operator << (ostream &, const Accumulator<T> &);
+class Accumulator : public Accumulator_Base<T, KahanSum>
+{
+#ifdef IW_TWO_PHASE_TEMPLATES
+  protected:
+    using Accumulator_Base<T, KahanSum>::_n;
+    using Accumulator_Base<T, KahanSum>::_minval;
+    using Accumulator_Base<T, KahanSum>::_maxval;
+    using Accumulator_Base<T, KahanSum>::_xsum;
+    using Accumulator_Base<T, KahanSum>::_x2sum;
+#endif
+
+  private:
+//  double _xsum;
+//  double _x2sum;
+
+//  private functions
+
+    void _default_values ();
+
+  public:
+
+};
+
+template <typename T>
+class Accumulator_Int : public Accumulator_Base<T, T>
+{
+#ifdef IW_TWO_PHASE_TEMPLATES
+  protected:
+    using Accumulator_Base<T, T>::_n;
+    using Accumulator_Base<T, T>::_minval;
+    using Accumulator_Base<T, T>::_maxval;
+    using Accumulator_Base<T, T>::_xsum;
+    using Accumulator_Base<T, T>::_x2sum;
+#endif
+
+  private:
+
+  public:
+};
+
+template <typename T>
+std::ostream & operator << (std::ostream &, const Accumulator<T> &);
+template <typename T>
+std::ostream & operator << (std::ostream &, const Accumulator_Int<T> &);
 
 template <typename T>
 class Accumulator_with_Missing_Values : public Accumulator<T>
@@ -100,7 +124,7 @@ class Accumulator_with_Missing_Values : public Accumulator<T>
     void reset ();
 };
 
-#if (IW_IMPLEMENTATIONS_EXPOSED) || defined(ACCUMULATOR_IMPLEMENTATION)
+#if defined(ACCUMULATOR_IMPLEMENTATION) || defined(IW_IMPLEMENTATIONS_EXPOSED)
 
 #include <stdlib.h>
 #include <ctype.h>
@@ -109,50 +133,56 @@ class Accumulator_with_Missing_Values : public Accumulator<T>
 #include <iostream>
 #include <iomanip>
 
+template <typename T, typename SUMMER>
+void
+Accumulator_Base<T, SUMMER>::_default_values ()
+{
+  _n = 0;
+  _minval = static_cast<T>(0);
+  _maxval = static_cast<T>(0);
+
+  _xsum = static_cast<T>(0);
+  _x2sum = static_cast<T>(0);
+
+  return;
+}
+
+template <typename T, typename SUMMER>
+Accumulator_Base<T, SUMMER>::Accumulator_Base ()
+{
+  _default_values();
+
+  return;
+}
+
 template <typename T>
 void
 Accumulator<T>::_default_values ()
 {
-  _n = 0;
-  _xsum = 0.0;
-  _x2sum = 0.0;
-  _minval = 0;
-  _maxval = 0;
-}
-
-template <typename T>
-Accumulator<T>::Accumulator ()
-{
-  _default_values ();
+  Accumulator_Base<T, KahanSum>::_default_values();
 
   return;
 }
 
-template <typename T>
-Accumulator<T>::~Accumulator ()
-{
-  return;
-}
-
-template <typename T>
+template <typename T, typename SUMMER>
 int
-Accumulator<T>::ok () const
+Accumulator_Base<T, SUMMER>::ok() const
 {
   return 1;
 }
 
-template <typename T>
+template <typename T, typename SUMMER>
 void
-Accumulator<T>::reset ()
+Accumulator_Base<T, SUMMER>::reset ()
 {
-  _default_values ();
+  _default_values();
 
   return;
 }
 
-template <typename T>
+template <typename T, typename SUMMER>
 unsigned int
-Accumulator<T>::extra (T x)
+Accumulator_Base<T, SUMMER>::extra (T x)
 {
   _n++;
   _xsum += x;
@@ -179,15 +209,11 @@ Accumulator<T>::extra (T x)
   Add N copies of a value
 */
 
-template <typename T>
+template <typename T, typename SUMMER>
 unsigned int
-Accumulator<T>::extra (T x, int n)
+Accumulator_Base<T, SUMMER>::extra (T x, int n)
 {
-  _n += n;
-  _xsum += n * x;
-  _x2sum += n * (x * x);
-
-  if (1 == _n)
+  if (0 == _n)
   {
     _minval = x;
     _maxval = x;
@@ -201,12 +227,16 @@ Accumulator<T>::extra (T x, int n)
     _maxval = x;
   }
 
+  _n += n;
+  _xsum += n * x;
+  _x2sum += n * (x * x);
+
   return _n;
 }
 
-template <typename T>
+template <typename T, typename SUMMER>
 unsigned int
-Accumulator<T>::extra (const T * x, int n)
+Accumulator_Base<T, SUMMER>::extra (const T * x, int n)
 {
   if (0 == _n)
   {
@@ -230,9 +260,9 @@ Accumulator<T>::extra (const T * x, int n)
   return _n;
 }
 
-template <typename T>
+template <typename T, typename SUMMER>
 unsigned int
-Accumulator<T>::extra (const Accumulator<T> & rhs)
+Accumulator_Base<T, SUMMER>::extra (const Accumulator_Base<T, SUMMER> & rhs)
 {
   if (0 == rhs._n)
     return _n;
@@ -264,10 +294,10 @@ Accumulator<T>::extra (const Accumulator<T> & rhs)
   Strictly speaking, _minval and _maxval are unknown, but we lie...
 */
 
-template <typename T>
+template <typename T, typename SUMMER>
 int
-Accumulator<T>::subtract_data (const Accumulator<T> & rhs,
-                               Accumulator<T> & zresult) const
+Accumulator_Base<T, SUMMER>::subtract_data (const Accumulator_Base<T, SUMMER> & rhs,
+                                            Accumulator_Base<T, SUMMER> & zresult) const
 {
   assert (_n >= rhs._n);
 
@@ -301,20 +331,20 @@ Accumulator<T>::subtract_data (const Accumulator<T> & rhs,
   return 1;
 }
 
-template <typename T>
+template <typename T, typename SUMMER>
 double
-Accumulator<T>::average () const
+Accumulator_Base<T, SUMMER>::average () const
 {
-  return static_cast<double> (_xsum) / static_cast<double> (_n);
+  return static_cast<double>(_xsum) / static_cast<double>(_n);
 }
 
-template <typename T>
+/*template <typename T>
 double
 Accumulator<T>::variance ()
 {       
   assert (_n > 1);
 
-  double tave = average ();
+  double tave = Accumulator_Base<T, KahanSum>::average ();
   double rc = _x2sum - _n * tave * tave;
 
   if (rc < 0.0)   // presumably some roundoff
@@ -324,18 +354,18 @@ Accumulator<T>::variance ()
     return 0.0;
   }
 
-  rc = rc / static_cast<double> (_n - 1);
+  rc = rc / static_cast<double>(_n - 1);
 
   return rc;
-}       
+}*/
 
-template <typename T>
+template <typename T, typename SUMMER>
 double
-Accumulator<T>::variance () const
+Accumulator_Base<T, SUMMER>::variance () const
 {       
   assert (_n > 1);
 
-  double tave = average ();
+  double tave = Accumulator_Base<T, SUMMER>::average();
   double rc = _x2sum - _n * tave * tave;
 
   if (rc < 0.0)   // presumably some roundoff
@@ -345,39 +375,54 @@ Accumulator<T>::variance () const
     return 0.0;
   }
 
-  rc = rc / static_cast<double> (_n - 1);
+  rc = rc / static_cast<double>(_n - 1);
 
   return rc;
 }       
 
-template <typename T>
+template <typename T, typename SUMMER>
 int
-Accumulator<T>::variance (double & v)
+Accumulator_Base<T, SUMMER>::variance (double & v)
 {
   if (_n < 2)
     return 0;
 
-  v = variance ();
+  v = variance();
 
   return 1;
 }
 
 template <typename T>
-ostream &
-operator << (ostream & os, const Accumulator<T> & ac)
+std::ostream &
+operator << (std::ostream & os, const Accumulator<T> & ac)
 {
-  assert (ac.n () > 0);
+  assert (ac.n() > 0);
 
-  os << "Accumulator " << ac.n () << " values, average " << setw(8) << ac.average ();
+  os << "Accumulator " << ac.n() << " values, average " << std::setw(8) << ac.average();
   if (ac.n() > 1)
-    os << ", variance " << setw (8) << ac.variance ();
+    os << ", variance " << std::setw(8) << ac.variance();
   os << "\n";
-  return os << "min = " << ac.minval () << " max = " << ac.maxval ();
+
+  return os << "min = " << ac.minval() << " max = " << ac.maxval();
 }
 
 template <typename T>
-Accumulator<T> &
-Accumulator<T>::operator = (const Accumulator<T> & rhs)
+std::ostream &
+operator << (std::ostream & os, const Accumulator_Int<T> & ac)
+{
+  assert (ac.n() > 0);
+
+  os << "Accumulator_Int " << ac.n() << " values, average " << ac.average();
+  if (ac.n() > 1)
+    os << ", variance " << ac.variance();
+  os << "\n";
+
+  return os << "min = " << ac.minval() << " max = " << ac.maxval();
+}
+
+template <typename T, typename SUMMER>
+Accumulator_Base<T, SUMMER> &
+Accumulator_Base<T, SUMMER>::operator = (const Accumulator_Base<T, SUMMER> & rhs)
 {
   _n = rhs._n;
 
@@ -389,17 +434,17 @@ Accumulator<T>::operator = (const Accumulator<T> & rhs)
   return *this;
 }
 
-template <typename T>
+template <typename T, typename SUMMER>
 double
-Accumulator<T>::average_if_available_minval_if_not () const
+Accumulator_Base<T, SUMMER>::average_if_available_minval_if_not () const
 {
   if (_n > 1)
-    return average ();
+    return average();
 
   if (_n > 0)
     return _minval;
 
-  cerr << "Accumulator::average_if_available_minval_if_not: no data!\n";
+  cerr << "Accumulator_Base::average_if_available_minval_if_not: no data!\n";
   return 0.0;
 }
 
@@ -419,13 +464,16 @@ template <typename T>
 void
 Accumulator_with_Missing_Values<T>::reset ()
 {
-  Accumulator<T>::reset ();
+  Accumulator<T>::reset();
 
   _nmissing = 0;
 
   return;
 }
 
+#endif
+
+#ifdef ACCUMULATOR_INT_IMPLEMENTATION
 #endif
 
 #endif

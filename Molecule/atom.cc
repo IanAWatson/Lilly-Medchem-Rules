@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 /*
   Implementations of atom object functions.
 */
@@ -32,7 +14,8 @@
 #include "tbb/scalable_allocator.h"
 #endif
 
-using namespace std;
+using std::cerr;
+using std::endl;
 
 #include <stdlib.h>
 #include <assert.h>
@@ -41,19 +24,6 @@ using namespace std;
 #include "atom.h"
 #include "misc2.h"
 #include "iwrandom.h"
-
-/*
-  This is a count of the number of atoms created - the number
-  freed.
-*/
-
-static int current_atoms = 0;
-
-int
-how_many_atoms()
-{
-  return current_atoms;
-}
 
 static int copy_implicit_hydrogen_count_in_atom_copy_constructor = 1;
 
@@ -87,16 +57,13 @@ reasonable_formal_charge_value (formal_charge_t c)
   return 1;
 }
 
-static int alternate_valences_give_hcount = 1;
+static int reset_implicit_hydrogens_known_on_bond_removal = 0;
 
 void 
-set_alternate_valences_give_hcount(const int s)
+set_reset_implicit_hydrogens_known_on_bond_removal(int s)
 {
-  alternate_valences_give_hcount = s;
-
-  return;
+  reset_implicit_hydrogens_known_on_bond_removal = s;
 }
-
 
 static int file_scope_four_connected_neutral_nitrogen_has_h = 0;
 
@@ -106,12 +73,20 @@ set_four_connected_neutral_nitrogen_has_h(const int s)
   file_scope_four_connected_neutral_nitrogen_has_h = s;
 }
 
+static int alternate_valences_give_hcount = 0;
+
+void 
+set_alternate_valences_give_hcount(const int s)
+{
+  alternate_valences_give_hcount = s;
+
+  return;
+}
+
 void
 Atom::_default_values (const Element * zelement)
 {
-  assert (OK_ELEMENT (zelement));
-
-//current_atoms++;
+  assert (OK_ELEMENT(zelement));
 
   _element = zelement;
 
@@ -121,7 +96,7 @@ Atom::_default_values (const Element * zelement)
 
   _implicit_hydrogens_known = 0;
 
-  _nrings = ATOM_PROPERTY_UNKNOWN;
+  _radical = 0;
 
   _nbonds = ATOM_PROPERTY_UNKNOWN;
 
@@ -130,6 +105,8 @@ Atom::_default_values (const Element * zelement)
   _isotope = 0;
 
   _user_specified_void_ptr = NULL;
+
+  _atom_map = 0;
 
   resize(3);   // waste some space for efficiency. In general, this is good
 
@@ -186,8 +163,6 @@ Atom::~Atom()
 
 //_x = _y = _z = coord_t(0.0);
 
-//current_atoms--;
-
   return;
 }
 
@@ -200,7 +175,8 @@ Atom::_constructor_copy_atom_attributes (const Atom & other_atom)
 {
   assert(other_atom.ok());
 
-  _default_values(other_atom._element);
+//_default_values(other_atom._element);    // do we really need this?
+  _element = other_atom._element;
 
   _x = other_atom._x;
   _y = other_atom._y;
@@ -221,6 +197,14 @@ Atom::_constructor_copy_atom_attributes (const Atom & other_atom)
 
   _user_specified_void_ptr = other_atom._user_specified_void_ptr;
 
+  _permanent_aromatic = other_atom._permanent_aromatic;
+
+  _atom_map = other_atom._atom_map;
+
+  _nbonds = ATOM_PROPERTY_UNKNOWN;
+
+  _radical = other_atom._radical;
+
   resize(other_atom._elements_allocated);
 
   return;
@@ -235,13 +219,13 @@ Atom::Atom (const Atom & other_atom)
 
 Atom::Atom (const Atom * other_atom)
 {
-  _constructor_copy_atom_attributes(*other_atom);
+ _constructor_copy_atom_attributes(*other_atom);
 
   return;
 }
 
 int
-Atom::debug_print (ostream & os) const
+Atom::debug_print (std::ostream & os) const
 {
   assert (os.good());
   
@@ -255,9 +239,12 @@ Atom::debug_print (ostream & os) const
   os << "Ncon = " << number_elements() << endl;
   for (int i = 0; i < number_elements(); i++)
   {
-    item (i)->debug_print (os);
+    item (i)->debug_print(os);
     os << endl;
   }
+
+  if (ATOM_PROPERTY_UNKNOWN != _nbonds)
+    os << "nb " << _nbonds << endl;
 
   if (ATOM_PROPERTY_UNKNOWN != _implicit_hydrogens)
   {
@@ -287,13 +274,40 @@ Atom::add (Bond * b)
   return 1;
 }
 
+/*int
+Atom::is_hydrogen() const
+{
+  assert (ok());
 
+  return (1 == _element->atomic_number());
+}*/
 
+/*int
+Atom::is_carbon() const
+{
+  assert (ok());
 
+  return (6 == _element->atomic_number());
+}*/
 
+/*int
+Atom::is_asterisk() const
+{
+  assert (ok());
 
+  return (0 == _element->atomic_number());
+}*/
 
+/*int
+Atom::is_hydrogen_or_asterisk() const
+{
+  assert (ok());
 
+  if (is_hydrogen())
+    return 1;
+
+  return is_asterisk();
+}*/
 
 int
 Atom::nbonds()
@@ -336,14 +350,14 @@ Atom::nbonds() const
 int
 Atom::fully_saturated() const
 {
-  equal_to<int> c;
+  std::equal_to<int> c;
   return _common_saturation(c);
 }
 
 int
 Atom::unsaturated() const
 {
-  less<int> l;
+  std::less<int> l;
   return _common_saturation(l);
 }
 
@@ -365,8 +379,8 @@ Atom::_common_saturation(const T & comparitor) const
   return comparitor(_nbonds, _number_elements);
 }
 
-template int Atom::_common_saturation(const equal_to<int> &) const;
-template int Atom::_common_saturation(const less<int> &) const;
+template int Atom::_common_saturation(const std::equal_to<int> &) const;
+template int Atom::_common_saturation(const std::less<int> &) const;
 
 int
 Atom::recompute_nbonds()
@@ -413,21 +427,21 @@ Atom::exact_mass (exact_mass_t & zresult) const
   return 1;
 }
 
-const Element *
+/*const Element *
 Atom::element() const
 {
   assert (ok());
 
   return _element;
-}
+}*/
 
-const Element &
+/*const Element &
 Atom::elementq() const
 {
   assert (ok());
 
   return *_element;
-}
+}*/
 
 void
 Atom::set_element (const Element * new_element)
@@ -450,6 +464,38 @@ Atom::set_element (const Element * new_element)
   return;
 }
 
+/*
+  Function to return the distance between two atoms
+*/
+
+/*distance_t
+distance_between_atoms (const Atom & a1, const Atom & a2)
+{
+  assert (a1.ok());
+  assert (a2.ok());
+
+  return a1.distance(a2);
+
+  return (distance_t) sqrt ((a1._x - a2._x) * (a1._x - a2._x) +
+                            (a1._y - a2._y) * (a1._y - a2._y) +
+                            (a1._z - a2._z) * (a1._z - a2._z));
+}*/
+
+//The bond angle defined by three atoms
+
+/*angle_t
+angle_between_atoms (const Atom & end1, const Atom & middle, const Atom & end2)
+{
+  assert (end1.ok());
+  assert (middle.ok());
+  assert (end2.ok());
+
+  distance_t dm1 = middle.distance (end1);
+  distance_t dm2 = middle.distance (end2);
+  distance_t d12 = end1.distance (end2);
+
+  return acos ( (dm1 * dm1 + dm2 + dm2 - d12 * d12) / (2.0 * dm1 * dm2));
+}*/
 
 angle_t
 angle_between_atoms (const Atom & a1, const Atom & a2, const Atom & a3, const Atom & a4)
@@ -459,19 +505,19 @@ angle_between_atoms (const Atom & a1, const Atom & a2, const Atom & a3, const At
   assert (a3.ok());
   assert (a4.ok());
 
-  Coordinates v21 (a1.x() - a2.x(), a1.y() - a2.y(), a1.z() - a2.z());
-  Coordinates v32 (a2.x() - a3.x(), a2.y() - a3.y(), a2.z() - a3.z());
-  Coordinates v43 (a3.x() - a4.x(), a3.y() - a4.y(), a3.z() - a4.z());
+  Coordinates v21(a1.x() - a2.x(), a1.y() - a2.y(), a1.z() - a2.z());
+  Coordinates v32(a2.x() - a3.x(), a2.y() - a3.y(), a2.z() - a3.z());
+  Coordinates v43(a3.x() - a4.x(), a3.y() - a4.y(), a3.z() - a4.z());
 
   v21.normalise();
   v32.normalise();
   v43.normalise();
 
-  v21.cross_product (v32);
-  v43.cross_product (v32);
-  v43 *= static_cast<coord_t> (-1.0);
+  v21.cross_product(v32);
+  v43.cross_product(v32);
+  v43 *= static_cast<coord_t>(-1.0);
 
-  angle_t rc = v21.angle_between (v43);
+  angle_t rc = v21.angle_between(v43);
 
 // Now we need to work out the directionality of the angle
 // The cross product of v21 and v43 will be in the same or opposite
@@ -585,7 +631,7 @@ Atom::other_and_type (atom_number_t my_atom_number,
                       int i, atom_number_t & a, bond_type_t & bt) const
 {
   assert (ok());
-  assert (ok_index (i));
+  assert (ok_index(i));
 
   const Bond * b = _things[i];
 
@@ -601,14 +647,23 @@ Atom::connections (atom_number_t my_atom_number,
 {
   assert (ok());
 
-  for (int i = 0; i < _number_elements; i++)
+  if (NULL == bt)
   {
-    const Bond * b = _things[i];
+    for (int i = 0; i < _number_elements; i++)
+    {
+      others[i] = _things[i]->other(my_atom_number);
+    }
+  }
+  else
+  {
+    for (int i = 0; i < _number_elements; i++)
+    {
+      const Bond * b = _things[i];
 
-    others[i] = b->other(my_atom_number);
+      others[i] = b->other(my_atom_number);
 
-    if (NULL != bt)
       bt[i] = b->btype();
+    }
   }
 
   return _number_elements;
@@ -683,7 +738,7 @@ Atom::bond_types (resizable_array<bond_type_t> & bt) const
 
   for (int i = 0; i < _number_elements; i++)
   {
-    bt.add (_things[i]->btype());
+    bt.add(_things[i]->btype());
   }
 
   return _number_elements;
@@ -715,7 +770,7 @@ form_unit_vector (const Atom & a1, const Atom & a2)
 Coordinates &
 form_vector (const Atom * a)
 {
-  assert (OK_ATOM (a));
+  assert (OK_ATOM(a));
   Coordinates * result = new Coordinates(a->x(), a->y(), a->z());
 
   return * result;
@@ -735,7 +790,7 @@ Atom::remove_bonds_to_atom (atom_number_t zatom, int adjust_atom_numbers)
     Bond * b = _things[i];
     if (b->involves(zatom))
     {
-      remove_item (i);
+      remove_item(i);
       if (0 == adjust_atom_numbers)
         break;
     }
@@ -743,12 +798,19 @@ Atom::remove_bonds_to_atom (atom_number_t zatom, int adjust_atom_numbers)
       b->adjust_for_loss_of_atom(zatom);
   }
 
+// Aug 2015. Kind of unclear what SHOULD happen to the implicit hydrogens known attribute.
+// Make it user controllable, because this has implications for dicer
+
+  if (reset_implicit_hydrogens_known_on_bond_removal)
+    _implicit_hydrogens_known = 0;
+
   _implicit_hydrogens = ATOM_PROPERTY_UNKNOWN;
-  _implicit_hydrogens_known = 0;
 
   set_modified();
 
-  return 0;     // atom not found bonded
+//cerr << "Atom::remove_bonds_to_atom:_implicit_hydrogens_known " << _implicit_hydrogens_known << endl;
+
+  return 1;
 }
 
 int
@@ -759,6 +821,17 @@ Atom::is_isotope() const
   return _isotope;
 }
 
+/*void
+Atom::translate (coord_t x, coord_t y, coord_t z)
+{
+  assert (ok());
+
+  _x += x;
+  _y += y;
+  _z += z;
+
+  return;
+}*/
 
 int
 Atom::is_bonded_to (atom_number_t a1) const
@@ -767,7 +840,7 @@ Atom::is_bonded_to (atom_number_t a1) const
 
   for (int i = 0; i < _number_elements; i++)
   {
-    if (_things[i]->involves (a1))
+    if (_things[i]->involves(a1))
       return 1;
   }
 
@@ -798,8 +871,6 @@ Atom::is_bonded_to (atom_number_t a1, bond_type_t & bt) const
 void
 Atom::set_modified()
 {
-  _nrings = ATOM_PROPERTY_UNKNOWN;
-
   if (! _implicit_hydrogens_known)
     _implicit_hydrogens = ATOM_PROPERTY_UNKNOWN;
 
@@ -855,12 +926,15 @@ Atom::set_implicit_hydrogens_known (int i)
     return;
   }
 
+//cerr << "Atom::set_implicit_hydrogens_known: existing vlaue " << _implicit_hydrogens << " type " << _element->symbol() << endl;
   if (ATOM_PROPERTY_UNKNOWN == _implicit_hydrogens)
     _implicit_hydrogens = 0;
 
   _implicit_hydrogens_known = i;
 
   _nbonds = ATOM_PROPERTY_UNKNOWN;
+
+//cerr << "set_implicit_hydrogens_known:new value " << _implicit_hydrogens_known << " curreht H " << _implicit_hydrogens << endl;
 
   return;
 }
@@ -889,24 +963,18 @@ Atom::unset_all_implicit_hydrogen_information ()
   return;
 }
 
-static int display_abnormal_valence_messages = 1;
+static int File_Scope_display_abnormal_valence_messages = 1;
 
 void
 set_display_abnormal_valence_messages (int d)
 {
-  display_abnormal_valence_messages = d;
+  File_Scope_display_abnormal_valence_messages = d;
 }
 
-static int
-possible_hypervalent_hcount(const int v)
+int
+display_abnormal_valence_messages ()
 {
-  if (alternate_valences_give_hcount)
-  {
-    assert (v >= 0);
-    return v;
-  }
-
-  return 0;
+  return File_Scope_display_abnormal_valence_messages;
 }
 
 //#define DEBUG_COMPUTE_IMPLICIT_HYDROGENS
@@ -914,28 +982,52 @@ possible_hypervalent_hcount(const int v)
 int
 Atom::compute_implicit_hydrogens (int & result)
 {
+  result = 0;
+
+  if ( _compute_implicit_hydrogens(result))   // worked, great
+    return 1;
+
+  if (File_Scope_display_abnormal_valence_messages)
+  {
+    cerr << "Atom::compute_implicit_hydrogens: strange chemistry: " << _element->symbol() << endl;
+    int ose;
+    if (_element->outer_shell_electrons(ose))
+      cerr << "Element has " << ose << " outer shell electrons, and normal valence of " << _element->normal_valence() << endl;
+    cerr << "Atom has " << _nbonds << " bonds";
+    if (_formal_charge)
+      cerr << ", and " << _formal_charge << " formal_charge";
+    cerr << endl;
+  }
+
+  return 0;
+}
+
+#define IW_SP3 3
+#define IW_SP2 2
+#define IW_SP  1
+
+int
+Atom::_compute_implicit_hydrogens (int & result)
+{
   if (ATOM_PROPERTY_UNKNOWN == _nbonds)
     (void) nbonds();
 
-  int ivalence = _element->normal_valence();
+//int ivalence = _element->normal_valence();
 
 #ifdef DEBUG_COMPUTE_IMPLICIT_HYDROGENS
-  cerr << "Computing implicit hydrogens for (" << _element->symbol();
+  cerr << "Computing implicit hydrogens for [" << _element->symbol();
   if (_formal_charge > 0)
-    cerr << '+';
-  else if (_formal_charge < 0)
-    cerr << '-';
-  cerr << ") ncon " << _number_elements << " bonds = " << _nbonds <<
-          " valence = " << ivalence << endl;
-#endif
-
-  if (VALENCE_NOT_DEFINED == ivalence)
   {
-    result = 0;
-    return 1;
+    for (int i = 0; i < _formal_charge; i++)
+      cerr << '+';
   }
-
-  int adjusted_valence = ivalence + _formal_charge;
+  else if (_formal_charge < 0)
+  {
+    for (int i = 0; i > _formal_charge; i--)
+      cerr << '-';
+  }
+  cerr << "] ncon " << _number_elements << " bonds = " << _nbonds << endl;
+#endif
 
 // Consider C+. It starts with 4 unpaired electrons. Removing an
 // electron leaves just 3 unpaired electrons, whereas the computed
@@ -943,140 +1035,154 @@ Atom::compute_implicit_hydrogens (int & result)
 
   int ose;
 
-  if (_element->outer_shell_electrons(ose) && adjusted_valence > ose)
+  if (! _element->outer_shell_electrons(ose))    // nothing we can do
+    return 1;
+
+  if (_radical)    // too hard    // too hard
   {
-    int tmp = ose - _formal_charge - _nbonds;
-
-    if (tmp > 3)     // The case of Cl=N-
-    {
-      if (display_abnormal_valence_messages)
-        cerr << "Atom::compute_implicit_hydrogens: " << tmp << " Hydrogens, impossible " << _element->symbol() << " ncon " << _number_elements << endl;
-      result = 0;
-      return 1;
-    }
-
-    if (tmp >= 0)
-    {
-      result = static_cast<unsigned int>(tmp);
-      return 1;
-    }
-
-    if (display_abnormal_valence_messages)
-    {
-      cerr << "Atom::compute_implicit_hydrogens: strange chemistry: " << _element->symbol() << endl;
-      cerr << "Element has " << ose << " outer shell electrons, and normal valence of " <<
-              _element->normal_valence() << endl;
-      cerr << "Atom has " << _nbonds << " bonds";
-      if (_formal_charge)
-        cerr << ", and " << _formal_charge << " formal_charge";
-      cerr << endl;
-    }
-
     result = 0;
-    return 0;
-  }
-
-  if (_formal_charge <= 0)
-  {
-    if (_nbonds - _formal_charge <= ivalence)
-    {
-      result = ivalence - (_nbonds - _formal_charge);
-      return 1;
-    }
-  }
-  else if (_nbonds - _formal_charge <= ivalence)
-  {
-    result = ivalence - (_nbonds - _formal_charge);
     return 1;
   }
 
 #ifdef DEBUG_COMPUTE_IMPLICIT_HYDROGENS
-  cerr << "Looking for alternate valence states\n";
+  cerr << "ose " << ose << endl;
 #endif
 
-// July 2002, ran into some Cl=N- molecules.
+  if (ose - _formal_charge <= 0)   // formal charge has removed all outer shell electrons (maybe even more)
+    return 1;
 
-  if (17 == _element->atomic_number() && 1 == _number_elements && 0 == _formal_charge && 2 == _nbonds)
+  if (ose - _formal_charge >= 8)    // we only consider elements with at most tetrahedral bonding
+    return 1;
+
+  if (_number_elements >= 4)   // already 4 connections, no room for Hydrogen atoms
   {
-    result = 0;    
-    return 0;      // return 0 so it will be known as a valence error
-  }
+    const atomic_number_t z = _element->atomic_number();
 
-// 4 connected neutral Nitrogen is an optional behaviour
+    if (15 == z && 4 == _number_elements && 0 == _formal_charge && 4 == _nbonds)
+    {
+      result = 1;
+      return 1;
+    }
 
-  if (7 == _element->atomic_number() && 4 == _number_elements && 0 == _formal_charge && 4 == nbonds())
-  {
-    result = file_scope_four_connected_neutral_nitrogen_has_h;
+    if (16 == z && 4 == _number_elements && 0 == _formal_charge && 5 == _nbonds)
+    {
+      result = 1;
+      return 1;
+    }
+
+    if (7 == z && 4 ==_number_elements && 0 == _formal_charge && 4 == _nbonds)
+    {
+      result = file_scope_four_connected_neutral_nitrogen_has_h;
+      return 1;
+    }
+
     return 1;
   }
 
-// Look for an alternate valences
+//if (_nbonds >= 4)    // max tetrahedral type bonding
+//  return 1;
 
-  int highest_available_valence = ivalence;
+  int tmp = ose - _formal_charge - _nbonds;     // number of electrons not in a bond
 
-  for (int j = 0; j < _element->number_alternate_valences(); j++)
+#ifdef DEBUG_COMPUTE_IMPLICIT_HYDROGENS
+  cerr << tmp << " electrons not in bonds\n";
+#endif
+
+  if (tmp <= 0)     // all electrons already participating in a bond
+    return 1;
+
+  int hybridisation = IW_SP3;
+  int max_h = 4 - _number_elements;
+
+  if (_nbonds == _number_elements)     // fully saturated, hopefully the most common
+    ;
+  else if (_number_elements + 1 == _nbonds)   // single unsaturation, sp2 hybrid, max 3 connections
   {
-    int ivalence = _element->alternate_valence(j);
-    if (ivalence > highest_available_valence)
-      highest_available_valence = ivalence;
+    atomic_number_t z = _element->atomic_number();
 
-    if (_formal_charge <= 0)
+    if ((15 == z || 37 == z || 53 == z) && 3 == _number_elements && 0 == _formal_charge)
     {
-      if (_nbonds <= ivalence - _formal_charge)
-      {
-        if (7 == _element->atomic_number() && 0 == _formal_charge && 4 == _nbonds && 3 == _number_elements)      // those horrible *-N(=*)-* molecules
-          result = 0;
-        else if (16 == _element->atomic_number() && -1 == _formal_charge && 2 == _number_elements)
-          result = 1;
-        else
-          result = possible_hypervalent_hcount(ivalence - _formal_charge - _nbonds);
-        return 1;
-      }
+      result = 1;
+      return 1;
     }
-    else if (ivalence - _formal_charge - _nbonds >= 0)
+
+    if (16 == z && 2 == _number_elements && 0 == _formal_charge)    // sulfoxide
     {
-      result = possible_hypervalent_hcount(ivalence - _formal_charge - _nbonds);
+      result = 1;
+      return 1;
+    }
+
+    if (_number_elements > 2)    // no room for any extra H atoms
+      return 1;
+
+    hybridisation = IW_SP2;
+    max_h = 3 - _number_elements;
+  }
+  else if (_number_elements + 2 == _nbonds) // either =C= or a triple bond, 2 connections max
+  {
+    atomic_number_t z = _element->atomic_number();
+    if (16 == z && 3 == _number_elements && 0 == _formal_charge)    // *-SO2
+    {
+      result = 1;
+      return 1;
+    }
+    if ( 7 == z && 2 == _number_elements && 0 == _formal_charge)   // -NO2 fragment 
+    {
+      result = 1;
+      return 1;
+    }
+
+    if (_number_elements > 1)      // no hydrogens possible
+      return 1;
+
+    hybridisation = IW_SP;
+    max_h = 2 - _number_elements;
+  }
+  else          // what is this?
+    return 1;
+
+//cerr << "max_h " <<  max_h << endl;
+//if (0 == max_h)
+//  return 1;
+
+  while (max_h + ose - _formal_charge - _nbonds > 8)   // cannot have more than 8 electrons
+    max_h--;
+
+// If we are aiming to fill 4 orbitals, we find the number of available orbitals
+
+  int unpaired_orbitals = 4 - _nbonds;
+  if (max_h > unpaired_orbitals)
+    max_h = unpaired_orbitals;
+
+// we put electrons into available orbitals
+
+  int electrons = ose - _formal_charge - _nbonds;    // distribute these across the unpaired orbitals
+
+#ifdef DEBUG_COMPUTE_IMPLICIT_HYDROGENS
+  cerr << "ose " << ose << " fc " << _formal_charge << " nb " << _nbonds << " start with " << electrons << " electrons and " << unpaired_orbitals << " unpaired orbitals\n";
+#endif
+
+  while (electrons > unpaired_orbitals && unpaired_orbitals > 0 && electrons > 0)
+  {
+    electrons -= 2;
+    unpaired_orbitals--;
+    if (electrons == unpaired_orbitals)
+    {
+      result = unpaired_orbitals;
       return 1;
     }
   }
 
-// This next case comes from seeing a [P-]F6. Jan 2010, now handled properly above
+#ifdef DEBUG_COMPUTE_IMPLICIT_HYDROGENS
+  cerr << "Finally have " << electrons << " electrons and " << unpaired_orbitals << " unpaired orbitals\n";
+#endif
+  
+  if (electrons < unpaired_orbitals)
+    result = electrons;
+  else
+    result = unpaired_orbitals;
 
-/*if (_formal_charge < 0 && highest_available_valence - _formal_charge == _nbonds)
-  {
-    result = 0;
-    return 1;
-  }*/
-
-  if (! _element->organic())
-  {
-    result = 0;
-    return 1;
-  }
-
-// Nov 98. the case -C#O fails all the other tests.
-
-  if (8 == _element->atomic_number() && 1 == _number_elements && 3 == _nbonds)
-  {
-    result = 0;
-    return 1;
-  }
-
-// If we come to here, the atom truly does seem to have an abnormally high valence.
-
-  if (display_abnormal_valence_messages)
-  {
-    cerr << "Atom '" << _element->symbol() << "', has " << _nbonds << " bonds";
-    if (_formal_charge)
-      cerr << ", and charge " << _formal_charge;
-    if (_element->number_alternate_valences())
-      cerr << ", but highest valence is " << highest_available_valence << endl;
-    else
-      cerr << ", but valence " << ivalence << endl;
-  }
-
-  result = 0;
-  return 0;
+  return 1;
 }
 
 void
@@ -1155,10 +1261,12 @@ Atom::lone_pair_count (int & result)
 }
 
 int
-Atom::pi_electrons (int & pe)
+Atom::pi_electrons(int & pe)
 {
   if (ATOM_PROPERTY_UNKNOWN == _implicit_hydrogens)
     (void) implicit_hydrogens();
+
+//cerr << "Atom::pi_electrons:atom type " << _element->symbol() << " has " << _implicit_hydrogens << " implicit hydrogens\n";
 
   return _element->pi_electrons(_number_elements + _implicit_hydrogens,   // total number of connections
                                 _formal_charge, pe);
@@ -1180,6 +1288,9 @@ Atom::valence_ok()
   if (! compute_implicit_hydrogens(ih))
     return 0;
 
+  if (_radical)    // too hard
+    return 1;
+
 #ifdef DEBUG_ATOM_VALENCE_OK
     cerr << "IH " << ih << " ncon " << _number_elements << endl;
 #endif
@@ -1187,6 +1298,10 @@ Atom::valence_ok()
   {
     if (15 == _element->atomic_number() && 6 == (_number_elements + ih))
       ;
+    else if (16 == _element->atomic_number() && 0 == _formal_charge && 6 == (_number_elements + ih))
+      ;
+    else if (16 == _element->atomic_number() && 0 == _formal_charge && 3 == _number_elements && 3 == nbonds())
+      return 0;
     else
       return 0;
   }
@@ -1241,23 +1356,16 @@ Atom::valence_ok()
   if (_element->is_halogen() && _formal_charge > 0)
     return 0;
 
+//cerr << "Halogen? " << _element->is_halogen() << " nel " << _number_elements << " nb " << nbonds() << endl;
+  if (_element->is_halogen() && 1 == _number_elements && 1 != nbonds())
+    return 0;
+
 // Get PF6-
 
   if (6 == _number_elements && 6 == nbonds() && -1 == _formal_charge && 0 == ih)
     return 1;
 
   return 0;
-}
-
-int
-Atom::in_another_ring()
-{
-  if (ATOM_PROPERTY_UNKNOWN == _nrings)
-    _nrings = 1;
-  else
-    _nrings++;
-
-  return _nrings;
 }
 
 static int
@@ -1320,7 +1428,7 @@ Atom::multiple_bonds_first()
     return;
   }
 
-  sort (bond_order_comparitor);
+  sort(bond_order_comparitor);
 
   return;
 }
@@ -1433,6 +1541,7 @@ Atom::next_atom_for_unique_smiles (atom_number_t my_atom_number,
   return 0;
 }
 
+#ifdef RANDOM_SMILES_NOW_IN_SMILES_SOURCE_FILE
 static Random_Number_Working_Storage smiles_random_number_stream;
 
 int
@@ -1481,6 +1590,7 @@ Atom::next_atom_for_random_smiles (atom_number_t my_atom_number,
 
   return 0;
 }
+#endif
 
 int
 Atom::set_bond_type_to_atom (atom_number_t zatom, bond_type_t bt)
@@ -1517,28 +1627,28 @@ Atom::is_halogen() const
 */
 
 int
-Atom::write_coordinates (ostream & os, 
+Atom::write_coordinates (std::ostream & os, 
                          int include_space) const
 {
 #if defined(__GNUG__) || defined (IW_INTEL_COMPILER)
-  ios::fmtflags old_flags = os.flags(ios::fixed);
+  std::ios::fmtflags old_flags = os.flags(std::ios::fixed);
 #else
-  long old_flags = os.flags(ios::fixed);
+  long old_flags = os.flags(std::ios::fixed);
 #endif
 
   int old_precision  = os.precision(4);
 
   if (include_space)
-    os << setw(10) << _x << ' ' << setw(10) << _y << ' ';
+    os << std::setw(10) << _x << ' ' << std::setw(10) << _y << ' ';
   else
-    os << setw(10) << _x << setw(10) << _y;
+    os << std::setw(10) << _x << std::setw(10) << _y;
 
 // Writing 0.0 Z coordinates is common when writing 2d files
 
   if (static_cast<coord_t>(0.0) == _z)
     os << "    0.0000 ";
   else
-    os << setw(10) << _z << ' ';
+    os << std::setw(10) << _z << ' ';
   
   os.precision(old_precision);
   os.flags(old_flags);
@@ -1606,10 +1716,28 @@ Atom::number_directional_bonds_attached() const
 
   return rc;
 }
+
 void reset_atom_file_scope_variables()
 {
-  current_atoms=0;
   copy_implicit_hydrogen_count_in_atom_copy_constructor = 1;
-  formal_charge_t _min_reasonble_atomic_formal_charge_value = -5;
-  formal_charge_t _max_reasonble_atomic_formal_charge_value =  5;
+  _min_reasonble_atomic_formal_charge_value = -5;
+  _max_reasonble_atomic_formal_charge_value =  5;
+}
+
+
+int
+Atom::remove_connections_to_any_of_these_atoms (const int * r)
+{
+  int rc = 0;
+
+  for (auto i = _number_elements - 1; i >= 0; --i)
+  {
+    if (_things[i]->either_atom_set_in_array(r))
+    {
+      remove_item(i);
+      rc++;
+    }
+  }
+
+  return rc;
 }

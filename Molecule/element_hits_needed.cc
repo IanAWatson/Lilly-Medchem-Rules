@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
 
 #include "substructure.h"
@@ -40,7 +22,7 @@ Elements_Needed::ok () const
 }
 
 int
-Elements_Needed::debug_print (ostream & os, const IWString & ind) const
+Elements_Needed::debug_print (std::ostream & os, const IWString & ind) const
 {
 //os << ind << "Elements_Needed: z = " << _z << ' ';
   return Min_Max_Specifier<int>::debug_print (os);
@@ -64,9 +46,16 @@ Elements_Needed::matches (Query_Atoms_Matched & qam) const
   {
     const Substructure_Atom * a = qam[i];
 
+    if (! a->include_in_embedding())
+      continue;
+
     if (_z == a->current_hold_atom ()->atomic_number ())
       hits++;
   }
+
+#ifdef DEBUG_ELEMENTS_NEEDED_MATCHES
+  cerr << "Searched through " << esize << " matched atoms, found " << hits << " matching atomic number, returning " << Min_Max_Specifier<int>::matches (hits) << endl;
+#endif
 
   return Min_Max_Specifier<int>::matches (hits);
 }

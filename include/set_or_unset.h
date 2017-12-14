@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef IWSET_OR_UNSET_H
 #define IWSET_OR_UNSET_H
 
@@ -27,8 +9,8 @@ template <typename T>
 class Set_or_Unset
 {
   protected:
-    T _value;
     int _is_set;
+    T _value;
 
   public:
     Set_or_Unset () {_is_set = 0;}
@@ -48,10 +30,10 @@ class Set_or_Unset
     Set_or_Unset<T> & operator = (const T & v) { set (v); return *this;}
 };
 
-extern ostream & operator<< (ostream &, const Set_or_Unset<int> &);
-extern ostream & operator<< (ostream &, const Set_or_Unset<float> &);
-extern ostream & operator<< (ostream &, const Set_or_Unset<double> &);
-extern ostream & operator<< (ostream &, const Set_or_Unset<long> &);
+extern std::ostream & operator<< (std::ostream &, const Set_or_Unset<int> &);
+extern std::ostream & operator<< (std::ostream &, const Set_or_Unset<float> &);
+extern std::ostream & operator<< (std::ostream &, const Set_or_Unset<double> &);
+extern std::ostream & operator<< (std::ostream &, const Set_or_Unset<long> &);
 
 #if (IW_IMPLEMENTATIONS_EXPOSED) || defined(SET_OR_UNSET_IMPLEMENTATION)
 
@@ -79,8 +61,8 @@ Set_or_Unset<T>::matches (const T v) const
 }
 
 template <typename T>
-ostream &
-operator << (ostream & os, const Set_or_Unset<T> & qq)
+std::ostream &
+operator << (std::ostream & os, const Set_or_Unset<T> & qq)
 {
   assert (os.good ());
 

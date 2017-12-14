@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2012  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
 #include <iomanip>
 #include <memory>
@@ -26,7 +8,6 @@ using namespace std;
 #define COMPILING_CTB
 
 #include "misc.h"
-#include "iw_auto_array.h"
 
 #include "molecule.h"
 #include "smiles.h"
@@ -61,7 +42,7 @@ Molecule::revert_all_directional_bonds_to_non_directional()
       rc++;
     }
     else if (b->part_of_cis_trans_grouping())
-      b->set_part_of_cis_trans_grouping (0);
+      b->set_part_of_cis_trans_grouping(0);
   }
 
   return rc;
@@ -107,14 +88,14 @@ Molecule::_atom_being_unbonded_check_directional_bonds (atom_number_t zatom,
     if (b->is_single_bond())
     {
       if (b->is_directional())
-        directional_bonds_found.add (const_cast<Bond *> (b));
+        directional_bonds_found.add(const_cast<Bond *>(b));
     }
     else if (b->is_double_bond() && b->part_of_cis_trans_grouping())
-      part_of_cis_trans_grouping = const_cast<Bond *> (b);
+      part_of_cis_trans_grouping = const_cast<Bond *>(b);
   }
 
   if (NULL != part_of_cis_trans_grouping)      // breaking up the central part of the cis-trans grouping
-    return _invalidate_directional_double_bond (*part_of_cis_trans_grouping);
+    return _invalidate_directional_double_bond(*part_of_cis_trans_grouping);
 
   if (0 == directional_bonds_found.number_elements())
     return 1;
@@ -183,10 +164,10 @@ Molecule::_invalidate_directional_double_bond (Bond & b)
 {
   assert (b.is_double_bond());
 
-  b.set_part_of_cis_trans_grouping (0);
+  b.set_part_of_cis_trans_grouping(0);
 
-  _invalidate_directional_bonds_at_end_of_double_bond (b.a1());
-  _invalidate_directional_bonds_at_end_of_double_bond (b.a2());
+  _invalidate_directional_bonds_at_end_of_double_bond(b.a1());
+  _invalidate_directional_bonds_at_end_of_double_bond(b.a2());
 
   return 1;
 }
@@ -200,7 +181,7 @@ Molecule::_invalidate_directional_bonds_at_end_of_double_bond (atom_number_t zat
 
   for (int i = 0; i < acon; i++)
   {
-    Bond * b = const_cast<Bond *> (a->item(i));
+    Bond * b = const_cast<Bond *>(a->item(i));
 
     if (b->is_double_bond())
       continue;
@@ -211,7 +192,7 @@ Molecule::_invalidate_directional_bonds_at_end_of_double_bond (atom_number_t zat
       continue;
     }
 
-    atom_number_t j = b->other (zatom);
+    atom_number_t j = b->other(zatom);
 
     if (_things[j]->is_centre_of_cis_trans_bond())
       continue;
@@ -239,10 +220,10 @@ Molecule::_remove_directionality_from_bonds_not_actually_directional()
     if (! b->part_of_cis_trans_grouping())
       continue;
 
-    if (_adjacent_directional_bonds_ok (*b))
+    if (_adjacent_directional_bonds_ok(*b))
       continue;
 
-    _invalidate_directional_double_bond (*b);
+    _invalidate_directional_double_bond(*b);
   }
 
 // Now look for any directional bonds that may be un-attached to anything
@@ -310,10 +291,10 @@ Molecule::_adjacent_directional_bonds_ok (const Bond & b) const
 {
   assert (b.is_double_bond());
 
-  if (! _adjacent_directional_bonds_ok (b.a1()))
+  if (! _adjacent_directional_bonds_ok(b.a1()))
     return 0;
 
-  if (! _adjacent_directional_bonds_ok (b.a2()))
+  if (! _adjacent_directional_bonds_ok(b.a2()))
     return 0;
 
   return 1;
@@ -429,7 +410,7 @@ Molecule::__finished_reading_smiles_assign_and_check_directional_bonds()
   {
     const Bond * b = directional_bonds[i];
 
-    if (! _identify_directional_bonds_across_double_bonds (b, coupled))
+    if (! _identify_directional_bonds_across_double_bonds(b, coupled))
     {
 #ifdef DEBUG_CIS_TRANS_BOND_X
       if (display_smiles_interpretation_error_messages())
@@ -461,7 +442,7 @@ Molecule::__finished_reading_smiles_assign_and_check_directional_bonds()
     atom_number_t a1 = b->a1();
     atom_number_t a2 = b->a2();
 
-    if (in_same_ring (a1, a2))
+    if (in_same_ring(a1, a2))
       continue;
 
     int valid_cis_trans_form_found = 0;
@@ -646,7 +627,7 @@ Molecule::_process_directional_system (atom_number_t lhs1,
     }
   }
   else if (lhs1_direction < 0)
-    const_cast<Bond *>(lhsb2)->set_directional_up  (db1, lhsb2->other(db1));
+    const_cast<Bond *>(lhsb2)->set_directional_up (db1, lhsb2->other(db1));
   else
     const_cast<Bond *>(lhsb2)->set_directional_down(db1, lhsb2->other(db1));
 
@@ -671,7 +652,7 @@ Molecule::_process_directional_system (atom_number_t lhs1,
     }
   }
   else if (rhsb1_direction < 0)
-    const_cast<Bond *>(rhsb2)->set_directional_up  (db2, rhsb2->other(db2));
+    const_cast<Bond *>(rhsb2)->set_directional_up (db2, rhsb2->other(db2));
   else if (rhsb1_direction > 0)
     const_cast<Bond *>(rhsb2)->set_directional_down(db2, rhsb2->other(db2));
 
@@ -916,7 +897,7 @@ Molecule::_mark_adjacent_double_bond_with_directional_atoms_at_other_end (atom_n
 
     if (b->is_double_bond())
     {
-      doubly_bonded = const_cast<Bond *> (b);
+      doubly_bonded = const_cast<Bond *>(b);
       break;
     }
   }
@@ -934,15 +915,15 @@ Molecule::_mark_adjacent_double_bond_with_directional_atoms_at_other_end (atom_n
   if (doubly_bonded->part_of_cis_trans_grouping())    // already processed
     return 1;
 
-  atom_number_t a4 = doubly_bonded->other (a3);
+  atom_number_t a4 = doubly_bonded->other(a3);
 
   if (0 == _things[a4]->number_directional_bonds_attached())
     return 0;
 
-  if (in_same_ring (a3, a4))
+  if (in_same_ring(a3, a4))
     return 0;
 
-  doubly_bonded->set_part_of_cis_trans_grouping (1);
+  doubly_bonded->set_part_of_cis_trans_grouping(1);
 
   process_these_atoms[a4] = 1;
 
@@ -1144,7 +1125,7 @@ Molecule::flip_cis_trans_bond_and_all_related_directional_bonds(const Bond * b)
 
   _bond_list.assign_bond_numbers_to_bonds_if_needed();
 
-  int * bond_already_done = new_int(_bond_list.number_elements()); iw_auto_array<int> free_bond_already_done(bond_already_done);
+  int * bond_already_done = new_int(_bond_list.number_elements()); std::unique_ptr<int[]> free_bond_already_done(bond_already_done);
 
   resizable_array<const Bond *> bonds_to_be_flipped;
 
@@ -1177,7 +1158,7 @@ Molecule::_adjust_cis_trans_bonds_to_canonical_form(const int * canonical_rank)
   if (0 == nb)
     return 1;
 
-  int * bond_already_done = new_int(nb); iw_auto_array<int> free_bond_already_done(bond_already_done);
+  int * bond_already_done = new_int(nb); std::unique_ptr<int[]> free_bond_already_done(bond_already_done);
 
   for (int i = 0; i < nb; i++)
   {

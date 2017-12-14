@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
 
 #ifdef IW_USE_TBB_SCALABLE_ALLOCATOR
@@ -23,10 +5,11 @@
 #endif
 
 #include "temp_detach_atoms.h"
+#include "chiral_centre.h"
 
 #include "molecule.h"
 
-Temp_Detach_Atoms::Temp_Detach_Atoms ()
+Temp_Detach_Atoms::Temp_Detach_Atoms()
 {
   _active = 1;
 
@@ -41,7 +24,7 @@ Temp_Detach_Atoms::Temp_Detach_Atoms ()
   return;
 }
 
-Temp_Detach_Atoms::~Temp_Detach_Atoms ()
+Temp_Detach_Atoms::~Temp_Detach_Atoms()
 {
   if (NULL != _connection)
     delete [] _connection;
@@ -50,7 +33,7 @@ Temp_Detach_Atoms::~Temp_Detach_Atoms ()
 }
 
 int
-Temp_Detach_Atoms::recognised_directive (const const_IWSubstring & token)
+Temp_Detach_Atoms::recognised_directive(const const_IWSubstring & token)
 {
   if ("noremove" == token)
   {
@@ -68,7 +51,7 @@ Temp_Detach_Atoms::recognised_directive (const const_IWSubstring & token)
 }
 
 void
-Temp_Detach_Atoms::do_not_reattach_to_atom (atom_number_t a)
+Temp_Detach_Atoms::do_not_reattach_to_atom(atom_number_t a)
 {
   assert (a >= 0 && a < _matoms);
   assert (NULL != _connection );
@@ -84,19 +67,21 @@ Temp_Detach_Atoms::do_not_reattach_to_atom (atom_number_t a)
 */
 
 int
-Temp_Detach_Atoms::detach_atoms (Molecule & m, atomic_number_t z)
+Temp_Detach_Atoms::detach_atoms(Molecule & m, atomic_number_t z)
 {
-  int matoms = m.natoms ();
+  int matoms = m.natoms();
 
   if (0 == matoms)
     return 0;
+
+  _chiral_centre.resize_keep_storage(0);
 
   if (matoms > _matoms)
   {
     if (NULL != _connection)
       delete [] _connection;
 
-    _connection = new int[matoms];
+    _connection = new int[matoms + matoms];     // just a little easier if we have two arrays
   }
 
   _matoms = matoms;
@@ -105,15 +90,21 @@ Temp_Detach_Atoms::detach_atoms (Molecule & m, atomic_number_t z)
 
   for (int i = 0; i < matoms; i++)
   {
-    if (z == m.atomic_number (i) && 1 == m.ncon (i))
+    if (z == m.atomic_number(i) && 1 == m.ncon(i))
     {
-      atom_number_t o = m.other (i, 0);
+      atom_number_t o = m.other(i, 0);
 
       _connection[i] = o;
 
-      m.remove_bond_between_atoms (i, o);
-
       rc++;
+
+//    m.remove_bond_between_atoms(i, o);
+
+      const Chiral_Centre * c = m.chiral_centre_at_atom(o);
+      if (NULL == c)
+        continue;
+
+      _chiral_centre.add(m.remove_no_delete_chiral_centre_at_atom(o));
     }
     else
       _connection[i] = INVALID_ATOM_NUMBER;
@@ -121,19 +112,34 @@ Temp_Detach_Atoms::detach_atoms (Molecule & m, atomic_number_t z)
 
   _need_to_reattach = rc;
 
+  if (0 == rc)
+    return rc;
+
+  int * rmb = _connection + matoms;     // remember, we over-allocated it
+
+  for (int i = 0; i < matoms; ++i)
+  {
+    if (INVALID_ATOM_NUMBER != _connection[i])
+      rmb[i] = 1;
+    else
+      rmb[i] = 0;
+  }
+
+  m.remove_bonds_involving_these_atoms(rmb);
+
   return rc;
 }
 
 int
-Temp_Detach_Atoms::reattach_atoms (Molecule & m)
+Temp_Detach_Atoms::reattach_atoms(Molecule & m)
 {
-  assert (_matoms == m.natoms ());
+  assert (_matoms == m.natoms());
 
   if (0 == _need_to_reattach)
     return 1;      // don't need to do anything
 
   Set_of_Atoms atoms_to_be_removed;
-  atoms_to_be_removed.resize (_matoms);
+  atoms_to_be_removed.resize(_matoms);
 
   for (int i = 0; i < _matoms; i++)
   {
@@ -142,14 +148,36 @@ Temp_Detach_Atoms::reattach_atoms (Molecule & m)
     if (o < 0)
       continue;
 
-    if (m.implicit_hydrogens (o))
-      m.add_bond (i, o, _bt);
+    int known;
+
+    if (m.implicit_hydrogens(o, known))
+    {
+      m.add_bond(i, o, _bt);
+      if (known)
+      {
+        m.set_implicit_hydrogens_known(o, 0);
+        m.unset_all_implicit_hydrogen_information(o);
+      }
+    }
     else
-      atoms_to_be_removed.add (i);
+      atoms_to_be_removed.add(i);
   }
 
+//cerr << "Temp_Detach_Atoms::reattach_atoms:replacing " << _chiral_centre.number_elements() << " chiral centres\n";
+
+  for (int i = 0; i < _chiral_centre.number_elements(); ++i)
+  {
+    Chiral_Centre * c = _chiral_centre[i];
+    if (! m.valid_chiral_centre(c))
+      delete c;
+    else
+      m.add_chiral_centre(c, 1);
+  }
+
+  _chiral_centre.resize_keep_storage(0);
+
   if (_remove_hydrogens_no_longer_needed)
-    m.remove_atoms (atoms_to_be_removed);
+    m.remove_atoms(atoms_to_be_removed);
 
   return 1;
 }

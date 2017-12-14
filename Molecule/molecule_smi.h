@@ -1,28 +1,7 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef COMPILING_SMILES_CC
   YIPES! THIS FILE IS ONLY SUPPOSED TO BE INCLUDED IN SMILES.CC
 #else
   private:
-    int _ring_bond_in_subset (const int * include_atom,
-                                atom_number_t a1,
-                                atom_number_t a2);
 
     int _smiles_add_bond (atom_number_t previous_atom,
                             atom_number_t current_atom,
@@ -51,6 +30,8 @@
     int _smiles_choose_unique_first_atom (const int * zorder, atom_number_t & first_atom, const int * include_atom);
     int _smiles_choose_random_first_atom (const int * zorder, atom_number_t & first_atom, const int * include_atom);
 
+    template <typename F> int _smiles_choose_first_atom_fctr (F chooser, const int * zorder, atom_number_t & first_atom, const int * include_atom);
+
 //  Various functions for building smiles
 
     const Bond * _identify_first_smiles_bond (atom_number_t zatom,
@@ -60,6 +41,17 @@
     int _construct_smiles (const int *, int *, Smiles_Information &, const int *);
     int _construct_smiles (const Fragment_Information &, Smiles_Information &, const int * include_atom);
 
+    template <typename N> int _build_smiles_ordering_fctr (N next_atom_selector,
+                                       const int * include_atom,
+                                       Smiles_Information & smi_info);
+    template <typename N> int _build_smiles_ordering_fctr (N next_atom_selector,
+                                  atom_number_t previous_atom,
+                                  atom_number_t zatom,
+                                  int & icounter,
+                                  const int * include_atom,
+                                  Smiles_Information & smi_info);
+
+#ifdef OLD_WAY_WITH_POINTER_TO_MEMBER_FUNCTION
     int _build_smiles_ordering (int (Molecule::*identify_next_atom) (const int * zorder, atom_number_t, atom_number_t &, const int *),
                                 const atom_number_t previous_atom,
                                 const atom_number_t a,
@@ -70,12 +62,13 @@
                                 int (Molecule::* identify_next_atom) (const int * zorder, atom_number_t, atom_number_t &, const int *),
                                 const int * include_atom,
                                 Smiles_Information & smi_info);
-
     int _include_atom_in_smiles (atom_number_t) const;
+
     int _mark_atoms_not_in_smiles (int * zorder);
+    void _find_smiles_start_atoms (const int * zorder, resizable_array<int> & start_atom) const;
+#endif
     int _build_smiles_ordering (Smiles_Information & smi_info, const int * include_atom);
 
-    void _find_smiles_start_atoms (const int * zorder, resizable_array<int> & start_atom) const;
 
     int _append_smarts_equivalent (Smiles_Formation_Info & smi_info, IWString & s);
 
@@ -112,6 +105,8 @@
 
 //  in frag.cc
 
+    int _compute_fragment_information_subset(Fragment_Information & fragment_information,
+                                               const int * include_atom) const;
     int _create_bond_subset_starting_with (Molecule & subset,
                                              atom_number_t zatom,
                                              int * bond_lookup_table,
@@ -135,4 +130,11 @@
                                                    const Bond * b) const;
     int _transfer_wedge_bond_info (Molecule & subset, const int * xref) const;
 
+    int _assign_fsid_values_to_isolated_rings ();
+
+    int _common_fragment_extraction(int * tmp,
+                                      const int initial_natoms,
+                                      const int atoms_in_residual,
+                                      const int atoms_in_fragment,
+                                      Molecule & f);
 #endif

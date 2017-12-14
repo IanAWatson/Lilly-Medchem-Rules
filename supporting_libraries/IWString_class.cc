@@ -1,26 +1,15 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include "iwconfig.h"
+#ifdef _WIN32
+#undef __STRICT_ANSI_
 #include <stdlib.h>
+#else
+#include <stdlib.h>
+#endif
 #ifdef sun
 #include <sys/time.h>
 #endif
+#include <iostream>
+#include <utility>
 #include <iomanip>
 #include <limits>
 #include <ctype.h>
@@ -37,9 +26,9 @@
 #include <bstring.h>
 #endif
 
-using namespace std;
+using std::cerr;
+using std::endl;
 
-#include "iwconfig.h"
 #include "iwstring.h"
 
 /*
@@ -48,69 +37,69 @@ using namespace std;
 */
 
 void
-IWString::_default_values ()
+IWString::_default_values()
 {
 }
 
-IWString::IWString ()
+IWString::IWString()
 {
-  _default_values ();
+  _default_values();
 
   return;
 }
 
-IWString::IWString (const char * s)
+IWString::IWString(const char * s)
 {
-  _default_values ();
+  _default_values();
 
   if (NULL == s)
     return;
 
-  IWString::strncpy (s, static_cast<int>(::strlen (s)));
+  IWString::strncpy(s, static_cast<int>(::strlen(s)));
 
   return;
 }
 
-IWString::IWString (const IWString & s)
+IWString::IWString(const IWString & s)
 {
-  _default_values ();
+  _default_values();
 
-  IWString::strncpy (s._things, s._number_elements);
+  IWString::strncpy(s._things, s._number_elements);
 
   return;
 }
 
-IWString::IWString (const const_IWSubstring & s)
+IWString::IWString(const const_IWSubstring & s)
 {
-  _default_values ();
+  _default_values();
 
-  IWString::strncpy (s._data, s._nchars);
+  IWString::strncpy(s._data, s._nchars);
 
   return;
 }
 
-IWString::IWString (char c)
+IWString::IWString(char c)
 {
-  _default_values ();
+  _default_values();
 
-  resizable_array<char>::add (c);
+  resizable_array<char>::add(c);
 
   return;
 }
 
-IWString::IWString (const char * s, int n)
+IWString::IWString(const char * s, int n)
 {
-  _default_values ();
+  _default_values();
 
-  IWString::strncpy (s, n);
+  IWString::strncpy(s, n);
 
   return;
 }
 
 int
-IWString::ok () const
+IWString::ok() const
 {
-  if (! resizable_array<char>::ok ())
+  if (! resizable_array<char>::ok())
     return 0;
 
   return 1;
@@ -122,19 +111,19 @@ IWString::ok () const
 */
 
 int 
-IWString::set (const char * s, int n)
+IWString::set(const char * s, int n)
 {
-  return IWString::strncpy (s, n);
+  return IWString::strncpy(s, n);
 }
 
 int 
-IWString::set (const char * s, size_t n)
+IWString::set(const char * s, size_t n)
 {
   return IWString::strncpy(s, static_cast<int>(n));
 }
 
 int
-IWString::set_and_assume_ownership (char * s, int n)
+IWString::set_and_assume_ownership(char * s, int n)
 {
   if (_things)
     delete [] _things;
@@ -143,18 +132,18 @@ IWString::set_and_assume_ownership (char * s, int n)
   _elements_allocated = n;
   _number_elements = n;
 
-  assert (ok ());
+  assert(ok());
 
   return 1;
 }
 
 void
-IWString::strip_leading_blanks ()
+IWString::strip_leading_blanks()
 {
   int i;
   for (i = 0; i < _number_elements; i++)
   {
-    if (! isspace (_things[i]))
+    if (! isspace(_things[i]))
       break;
   }
 
@@ -174,17 +163,17 @@ IWString::strip_leading_blanks ()
 }
 
 int
-const_IWSubstring::debug_print (ostream & os) const
+const_IWSubstring::debug_print(std::ostream & os) const
 {
-  os << "const_IWSubstring::debug_print: " << _nchars << " at " << hex << &(_data[0]) << " " << _data << endl;
+  os << "const_IWSubstring::debug_print: " << _nchars << " at " << std::hex << &(_data[0]) << " " << _data << endl;
 
-  return os.good ();
+  return os.good();
 }
 
 void
-const_IWSubstring::strip_leading_blanks ()
+const_IWSubstring::strip_leading_blanks()
 {
-  while (_nchars && isspace (_data[0]))
+  while (_nchars && isspace(_data[0]))
   {
     _data++;
     _nchars--;
@@ -197,14 +186,14 @@ const_IWSubstring::strip_leading_blanks ()
 }
 
 void
-IWString::strip_trailing_blanks ()
+IWString::strip_trailing_blanks()
 {
   if (0 == _number_elements)
     return;
 
   for (int i = _number_elements - 1; i >= 0; i--)
   {
-    if (! isspace (_things[i]))
+    if (! isspace(_things[i]))
     {
       _number_elements = i + 1;
       if (_number_elements < _elements_allocated)
@@ -221,9 +210,9 @@ IWString::strip_trailing_blanks ()
 }
 
 void
-const_IWSubstring::strip_trailing_blanks ()
+const_IWSubstring::strip_trailing_blanks()
 {
-  while (_nchars && isspace (_data[_nchars - 1]))
+  while (_nchars && isspace(_data[_nchars - 1]))
   {
     _nchars--;
   }
@@ -236,17 +225,17 @@ const_IWSubstring::strip_trailing_blanks ()
 
 /*
   Note that we don't increase the number of elements. This is really
-  just so that callers can safely use rawchars ().
+  just so that callers can safely use rawchars().
 */
 
 int
-IWString::null_terminate ()
+IWString::null_terminate()
 {
   if (_number_elements == _elements_allocated)
     resize(_elements_allocated + 1);
 
-  if ('\0' == _things[_number_elements])
-    return 0;
+//if ('\0' == _things[_number_elements])     drives valgrind NUTS
+//  return 0;
 
   _things[_number_elements] = '\0';
 
@@ -258,9 +247,9 @@ IWString::null_terminate ()
 */
 
 void
-IWString::_const_appearing_null_terminate () const
+IWString::_const_appearing_null_terminate() const
 {
-  ((IWString *)this)->null_terminate ();
+  ((IWString *)this)->null_terminate();
 
   return;
 }
@@ -271,7 +260,7 @@ IWString::_const_appearing_null_terminate () const
 */
 
 /*void
-IWString::_recompute_length ()
+IWString::_recompute_length()
 {
   for (int i = 0; i < _number_elements; i++)
   {
@@ -288,26 +277,26 @@ IWString::_recompute_length ()
 }*/
 
 const char *
-IWString::chars ()
+IWString::chars()
 {
-  assert (ok ());
+  assert(ok());
 
-  null_terminate ();
+  null_terminate();
 
   return _things;
 }
 
 const char *
-IWString::null_terminated_chars ()
+IWString::null_terminated_chars()
 {
-  assert (ok ());
+  assert(ok());
 
-  null_terminate ();
+  null_terminate();
 
   return _things;
 }
 void
-IWString::chop (int nchars)
+IWString::chop(int nchars)
 {
   assert (nchars >= 0 && nchars <= _number_elements);
   if (0 == nchars)
@@ -321,7 +310,7 @@ IWString::chop (int nchars)
 }
 
 void
-IWString::iwtruncate (int nchars)
+IWString::iwtruncate(int nchars)
 {
   assert (nchars >= 0 && nchars <= _number_elements);
   if (nchars == _number_elements)    // already the appropriate length
@@ -335,7 +324,7 @@ IWString::iwtruncate (int nchars)
 }
 
 static int
-common_truncate_at_first (const char * s, int & nchars, char c)
+common_truncate_at_first(const char * s, int & nchars, char c)
 {
   for (int i = 0; i < nchars; i++)
   {
@@ -350,19 +339,19 @@ common_truncate_at_first (const char * s, int & nchars, char c)
 }
 
 int
-IWString::truncate_at_first (char c)
+IWString::truncate_at_first(char c)
 {
-  return common_truncate_at_first (_things, _number_elements, c);
+  return common_truncate_at_first(_things, _number_elements, c);
 }
 
 int
-const_IWSubstring::truncate_at_first (char c)
+const_IWSubstring::truncate_at_first(char c)
 {
-  return common_truncate_at_first (_data, _nchars, c);
+  return common_truncate_at_first(_data, _nchars, c);
 }
 
 static int 
-common_truncate_at_last (const char * s, int & nchars, char c)
+common_truncate_at_last(const char * s, int & nchars, char c)
 {
   for (int i = nchars - 1; i >= 0; i--)
   {
@@ -377,19 +366,19 @@ common_truncate_at_last (const char * s, int & nchars, char c)
 }
 
 int
-IWString::truncate_at_last (char c)
+IWString::truncate_at_last(char c)
 {
-  return common_truncate_at_last (_things, _number_elements, c);
+  return common_truncate_at_last(_things, _number_elements, c);
 }
 
 int
-const_IWSubstring::truncate_at_last (char c)
+const_IWSubstring::truncate_at_last(char c)
 {        
-  return common_truncate_at_last (_data, _nchars, c);
+  return common_truncate_at_last(_data, _nchars, c);
 }
 
 void
-IWString::remove_leading_chars (int nremove)
+IWString::remove_leading_chars(int nremove)
 {
   assert (nremove >= 0 && nremove <= _number_elements);
 
@@ -408,7 +397,7 @@ IWString::remove_leading_chars (int nremove)
 */
 
 void
-IWString::remove_leading_chars (int nremove, char pad)
+IWString::remove_leading_chars(int nremove, char pad)
 {
   assert (nremove >= 0 && nremove <= _number_elements);
 
@@ -426,7 +415,7 @@ IWString::remove_leading_chars (int nremove, char pad)
 }
 
 static int
-common_count_leading_chars (const char * s, int nchars, char toremove)
+common_count_leading_chars(const char * s, int nchars, char toremove)
 {
   int rc = 0;
 
@@ -442,11 +431,11 @@ common_count_leading_chars (const char * s, int nchars, char toremove)
 }
 
 int
-IWString::remove_leading_chars (char toremove)
+IWString::remove_leading_chars(char toremove)
 {
-  assert (ok ());
+  assert (ok());
 
-  int chars_removed = common_count_leading_chars (_things, _number_elements, toremove);
+  int chars_removed = common_count_leading_chars(_things, _number_elements, toremove);
 
   if (0 == chars_removed)
     return 0;
@@ -462,9 +451,9 @@ IWString::remove_leading_chars (char toremove)
 }
 
 int
-const_IWSubstring::remove_leading_chars (char toremove)
+const_IWSubstring::remove_leading_chars(char toremove)
 {
-  int chars_removed = common_count_leading_chars (_data, _nchars, toremove);
+  int chars_removed = common_count_leading_chars(_data, _nchars, toremove);
 
   if (0 == chars_removed)
     return 0;
@@ -477,11 +466,11 @@ const_IWSubstring::remove_leading_chars (char toremove)
 }
 
 int
-IWString::shift (int nshift, char pad)
+IWString::shift(int nshift, char pad)
 {
   if (nshift < 0)
   {
-    remove_leading_chars (-nshift, pad);
+    remove_leading_chars(-nshift, pad);
     return 1;
   }
 
@@ -489,7 +478,7 @@ IWString::shift (int nshift, char pad)
     return 0;
 
   if (_number_elements + nshift > _elements_allocated)
-    resize (_number_elements + nshift + 1);      // +1 just in case a null termination follows
+    resize(_number_elements + nshift + 1);      // +1 just in case a null termination follows
 
   for (int i = _number_elements + nshift - 1; i >= nshift; i--)
   {
@@ -507,14 +496,14 @@ IWString::shift (int nshift, char pad)
 }
 
 int
-IWString::remove_all_these (const char * remove_these)
+IWString::remove_all_these(const char * remove_these)
 {
   int rc = 0;
   int j = 0;
   for (int i = 0; i < _number_elements; i++)
   {
     char c = _things[i];
-    if (NULL == ::strchr (remove_these, c))
+    if (NULL == ::strchr(remove_these, c))
     {
       _things[j] = c;
       j++;
@@ -532,7 +521,7 @@ IWString::remove_all_these (const char * remove_these)
 }
 
 int
-IWString::compress_blanks ()
+IWString::compress_blanks()
 {
   int istop = _number_elements;
 
@@ -542,7 +531,7 @@ IWString::compress_blanks ()
     _things[_number_elements] = _things[i];
     _number_elements++;
 
-    if (! isspace (_things[i]))
+    if (! isspace(_things[i]))
       continue;
 
 //  We found a space. Skip over any other spaces which follow
@@ -554,7 +543,7 @@ IWString::compress_blanks ()
       if (i == istop)
         return 1;
     }
-    while (isspace (_things[i]));
+    while (isspace(_things[i]));
 
     _things[_number_elements] = _things[i];
     _number_elements++;
@@ -564,29 +553,29 @@ IWString::compress_blanks ()
 }
 
 IWString &
-IWString::operator= (const char * rhs)
+IWString::operator=(const char * rhs)
 {
-  int nchars = static_cast<int>(::strlen (rhs));
+  int nchars = static_cast<int>(::strlen(rhs));
 
   if (0 == nchars)
   {
-    resize (0);
+    resize(0);
     return *this;
   }
 
-  resize (nchars + 1);
-  assert (_things);
+  resize(nchars + 1);
+  assert(_things);
 
-  IW_STRCPY (_things, rhs);
+  IW_STRCPY(_things, rhs);
   _number_elements = nchars;
 
-  assert (ok ());
+  assert(ok());
 
   return *this;
 }
 
 const_IWSubstring &
-const_IWSubstring::operator= (const char & rhs)
+const_IWSubstring::operator=(const char & rhs)
 {
   _data = & rhs;
 
@@ -596,79 +585,79 @@ const_IWSubstring::operator= (const char & rhs)
 }
 
 const_IWSubstring &
-const_IWSubstring::operator= (const char * rhs)
+const_IWSubstring::operator=(const char * rhs)
 {
   _data = rhs;
 
   if (NULL == rhs)
     _nchars = 0;
   else
-    _nchars = static_cast<int>(::strlen (rhs));
+    _nchars = static_cast<int>(::strlen(rhs));
 
   return *this;
 }
 
 const_IWSubstring &
-const_IWSubstring::operator= (const IWString & rhs)
+const_IWSubstring::operator=(const IWString & rhs)
 {
-  _nchars = rhs.length ();
+  _nchars = rhs.length();
 
-  _data = rhs.rawchars ();
+  _data = rhs.rawchars();
 
   return *this;
 }
 
 void
-IWString::operator += (const char * rhs)
+IWString::operator +=(const char * rhs)
 {
-  int nchars = static_cast<int>(::strlen (rhs));
+  int nchars = static_cast<int>(::strlen(rhs));
   if (0 == nchars)
     return;
 
-  (void) add (rhs, nchars);
+  (void) add(rhs, nchars);
 
   return;
 }
 
 void
-IWString::operator += (const IWString & rhs)
+IWString::operator +=(const IWString & rhs)
 {
   if (0 == rhs._number_elements)
     return;
 
-  add (rhs._things, rhs._number_elements);
+  add(rhs._things, rhs._number_elements);
   
   return;
 }
 
 void
-IWString::operator += (const const_IWSubstring & rhs)
+IWString::operator +=(const const_IWSubstring & rhs)
 {
-  if (0 == rhs.nchars ())
+  if (0 == rhs.nchars())
     return;
 
-  (void) add (rhs.rawchars (), rhs.nchars ());
+  (void) add(rhs.rawchars(), rhs.nchars());
 
   return;
 }
 
 void
-IWString::to_lowercase ()
+IWString::to_lowercase()
 {
   for (int i = 0; i < _number_elements; i++)
   {
-    _things[i] = tolower (_things[i]);
+    _things[i] = tolower(_things[i]);
   }
 
   return;
 }
 
 void
-IWString::to_uppercase ()
+IWString::to_uppercase()
 {
   for (int i = 0; i < _number_elements; i++)
   {
-    _things[i] = toupper (_things[i]);
+    _things[i] = toupper(_things[i]);
   }
 
   return;
@@ -686,7 +675,7 @@ _strcmp (const char * s1, int l1, const char * s2, int l2)
   if (l2 < l1)
     ncomp = l2;
 
-  return strncmp (s1, s2, ncomp);
+  return strncmp(s1, s2, ncomp);
 }
 
 static int
@@ -716,21 +705,21 @@ _strcasecmp(const char * s1,
 }
 
 int
-IWString::strcmp (const IWString & rhs) const
+IWString::strcmp(const IWString & rhs) const
 {
-  return _strcmp (_things, _number_elements, rhs._things, rhs._number_elements);
+  return _strcmp(_things, _number_elements, rhs._things, rhs._number_elements);
 }
 
 int
-IWString::strcmp (const char * rhs) const
+IWString::strcmp(const char * rhs) const
 {
-  return _strcmp (_things, _number_elements, rhs, static_cast<int>(::strlen(rhs)));
+  return _strcmp(_things, _number_elements, rhs, static_cast<int>(::strlen(rhs)));
 }
 
 int
-const_IWSubstring::strcmp (const const_IWSubstring & rhs) const
+const_IWSubstring::strcmp(const const_IWSubstring & rhs) const
 {
-  return _strcmp (_data, _nchars, rhs._data, rhs._nchars);
+  return _strcmp(_data, _nchars, rhs._data, rhs._nchars);
 }       
 
 int
@@ -740,15 +729,15 @@ IWString::strcasecmp(const IWString & rhs) const
 }
 
 int
-IWString::strcasecmp (const char * rhs) const
+IWString::strcasecmp(const char * rhs) const
 {
-  return _strcasecmp (_things, _number_elements, rhs, static_cast<int>(strlen(rhs)));
+  return _strcasecmp(_things, _number_elements, rhs, static_cast<int>(strlen(rhs)));
 }
 
 int
-const_IWSubstring::strcasecmp (const const_IWSubstring & rhs) const
+const_IWSubstring::strcasecmp(const const_IWSubstring & rhs) const
 {
-  return _strcasecmp (_data, _nchars, rhs._data, rhs._nchars);
+  return _strcasecmp(_data, _nchars, rhs._data, rhs._nchars);
 }       
 
 /*
@@ -757,34 +746,50 @@ const_IWSubstring::strcasecmp (const const_IWSubstring & rhs) const
 */
 
 static int
-_strncmp (const char * s1, int l1, const char * s2, int l2,
+_strncmp (const char * s1, int len1, const char * s2, int len2,
           int chars_to_compare)
 {
-  int ncomp = chars_to_compare;
-  if (l1 < ncomp)
-    ncomp = l1;
-  if (l2 < ncomp)
-    ncomp = l2;
+#ifdef DEBUG_STRNCMP_Q
+  cerr << "_strncmp '";
+  cerr.write(s1, len1);
+  cerr << "' " << len1 << " with '";
+  cerr.write(s2, len2);
+  cerr << "' " << len2 << endl;
+#endif
 
-  return strncmp (s1, s2, ncomp);
+  if (len1 < len2)
+    return -1;
+
+  if (len1 > len2)
+    return 1;
+
+// lengths are equal
+
+  if (chars_to_compare > len1)    // 
+  {
+    cerr << "_strncmp:comparison length " << chars_to_compare << " longer than string length " << len1 << " impossible\n";
+    return -1;    // an arbitrary choice
+  }
+
+  return strncmp(s1, s2, chars_to_compare);
 }
 
 int
-IWString::strncmp (const IWString & rhs, int chars_to_compare) const
+IWString::strncmp(const IWString & rhs, int chars_to_compare) const
 {
-  return _strncmp (_things, _number_elements, rhs._things, rhs._number_elements, chars_to_compare);
+  return _strncmp(_things, _number_elements, rhs._things, rhs._number_elements, chars_to_compare);
 }
 
 int
-IWString::strncmp (const char * rhs, int chars_to_compare) const
+IWString::strncmp(const char * rhs, int chars_to_compare) const
 {
-  return _strncmp (_things, _number_elements, rhs, static_cast<int>(::strlen (rhs)), chars_to_compare);
+  return _strncmp(_things, _number_elements, rhs, chars_to_compare, chars_to_compare);
 }
 
 int
-const_IWSubstring::strncmp (const char * rhs, int chars_to_compare) const
+const_IWSubstring::strncmp(const char * rhs, int chars_to_compare) const
 {
-  return _strncmp (_data, _nchars, rhs, static_cast<int>(::strlen (rhs)), chars_to_compare);
+  return _strncmp(_data, _nchars, rhs, chars_to_compare, chars_to_compare);
 }
 
 static int
@@ -797,30 +802,30 @@ _common_matches_ignore_case (const char * needle,
   if (offset + len_needle > len_haystack)
     return 0;
 
-  return 0 == iwstrncasecmp (haystack + offset, needle, static_cast<int>(len_needle));
+  return 0 == iwstrncasecmp(haystack + offset, needle, static_cast<int>(len_needle));
 }
 
 int
-IWString::matches_ignore_case (const char * s,
+IWString::matches_ignore_case(const char * s,
                                size_t lens,
                                int offset) const
 {
-  return _common_matches_ignore_case (s, lens, _things, _number_elements, offset);
+  return _common_matches_ignore_case(s, lens, _things, _number_elements, offset);
 }
 
 int
-IWString::matches_ignore_case (const IWString & s,
+IWString::matches_ignore_case(const IWString & s,
                                int offset) const
 {
-  return _common_matches_ignore_case (s._things, s._number_elements, _things, _number_elements, offset);
+  return _common_matches_ignore_case(s._things, s._number_elements, _things, _number_elements, offset);
 }
 
 int
-const_IWSubstring::matches_ignore_case (const char * s,
+const_IWSubstring::matches_ignore_case(const char * s,
                        size_t lens,
                        int offset) const
 {
-  return _common_matches_ignore_case (s, lens, _data, _nchars, offset);
+  return _common_matches_ignore_case(s, lens, _data, _nchars, offset);
 }
 
 static int
@@ -832,25 +837,25 @@ common_equals_ignore_case (const char * s1,
   if (lens1 != lens2)
     return 0;
 
-  return 0 == iwstrncasecmp (s1, s2, static_cast<int>(lens1));
+  return 0 == iwstrncasecmp(s1, s2, static_cast<int>(lens1));
 }
 
 int
-const_IWSubstring::equals_ignore_case (const char * s, size_t lens) const
+const_IWSubstring::equals_ignore_case(const char * s, size_t lens) const
 {
-  return common_equals_ignore_case (_data, _nchars, s, lens);
+  return common_equals_ignore_case(_data, _nchars, s, lens);
 }
 
 int
-IWString::equals_ignore_case (const char * s, size_t lens) const
+IWString::equals_ignore_case(const char * s, size_t lens) const
 {
-  return common_equals_ignore_case (_things, _number_elements, s, lens);
+  return common_equals_ignore_case(_things, _number_elements, s, lens);
 }
 
 int
-const_IWSubstring::equals_ignore_case (const IWString & s) const
+const_IWSubstring::equals_ignore_case(const IWString & s) const
 {
-  return common_equals_ignore_case (s.rawchars (), s.length (), _data, _nchars);
+  return common_equals_ignore_case(s.rawchars(), s.length(), _data, _nchars);
 }
 
 static int
@@ -872,7 +877,7 @@ do_find (const char * haystack, int size_of_haystack,
     if (haystack[i] != needle[0])
       continue;
 
-    if (0 == ::strncmp (haystack + i, needle, size_of_needle))
+    if (0 == ::strncmp(haystack + i, needle, size_of_needle))
       return i;
 /*  int found_match = 1;
     for (int j = 1; j < size_of_needle; j++)
@@ -892,75 +897,140 @@ do_find (const char * haystack, int size_of_haystack,
 }
 
 int
-IWString::find (const char * needle) const
+IWString::find(const char * needle) const
 {
-  return do_find (_things, _number_elements, needle, static_cast<int>(::strlen (needle)));
+  return do_find(_things, _number_elements, needle, static_cast<int>(::strlen(needle)));
 }
 
 int
-const_IWSubstring::find (const char * needle) const
+const_IWSubstring::find(const char * needle) const
 {
-  return do_find (_data, _nchars, needle, static_cast<int>(::strlen (needle)));
+  return do_find(_data, _nchars, needle, static_cast<int>(::strlen(needle)));
 }
 
 int
-IWString::find (const IWString & needle) const
+IWString::find(const IWString & needle) const
 {
-  return do_find (_things, _number_elements, needle._things, needle._number_elements);
+  return do_find(_things, _number_elements, needle._things, needle._number_elements);
 }
 
 int
-const_IWSubstring::find (const IWString & needle) const
+const_IWSubstring::find(const IWString & needle) const
 {
-  return do_find (_data, _nchars, needle.rawchars (), needle.nchars ());
+  return do_find(_data, _nchars, needle.rawchars(), needle.nchars());
 }
 
 int
-IWString::find (const const_IWSubstring & needle) const
+IWString::find(const const_IWSubstring & needle) const
 {
-  return do_find (_things, _number_elements, needle._data, needle._nchars);
+  return do_find(_things, _number_elements, needle._data, needle._nchars);
 }
 
 int
-const_IWSubstring::find (const const_IWSubstring & needle) const
+const_IWSubstring::find(const const_IWSubstring & needle) const
 {
-  return do_find (_data, _nchars, needle._data, needle._nchars);
+  return do_find(_data, _nchars, needle._data, needle._nchars);
 }
 
 /*
   Unsigned int conversion
-#   define UINT_MAX	4294967295U
+  This is not robust
 */
 
 template <typename T>
 int
-string_class_is_unsigned_int (const char * s, int nchars, T & result)
+string_class_is_unsigned_int_4 (const char * s, int nchars, T & result)
 {
   if (nchars < 10)
     ;
   else if (nchars > 10)
     return 0;
-  else if (s[0] > '4')
+  else if (s[0] > '4')    // very rough check, fix this mess sometime
+    return 0;
+
+  if (nchars < 10)
+  {
+    result = 0;
+    for (int i = 0; i < nchars; i++)
+    {
+      int j = s[i] - '0';
+      if (j < 0)
+        return 0;
+      if (j > 9)
+        return 0;
+  
+      result = 10 * result + j;
+    }
+
+    return 1;
+  }
+
+  T tmp;
+  if (! string_class_is_unsigned_int_4(s, nchars - 1, tmp))
+    return 0;
+
+  result = tmp * 10 + s[9] - '0';
+
+  if (result > tmp)
+    return 1;
+
+  return 0;
+}
+
+/*
+  max unsigned long is 18446744073709551615
+*/
+
+template <typename T>
+int
+string_class_is_unsigned_int_8 (const char * s, int nchars, T & result)
+{
+  if (nchars > 20)
+    return 0;
+
+  if (nchars < 20)
+    ;
+  else if (s[0] > '1')    // very rough check, fix this mess sometime
     return 0;
 
   result = 0;
-  for (int i = 0; i < nchars; i++)
+  if (nchars < 20)
   {
-    int j = s[i] - '0';
-    if (j < 0)
-      return 0;
-    if (j > 9)
-      return 0;
+    for (int i = 0; i < nchars; i++)
+    {
+      int j = s[i] - '0';
+      if (j < 0)
+        return 0;
+      if (j > 9)
+        return 0;
 
-    result = 10 * result + j;
+      result = 10 * result + j;
+    }
+
+    return 1;
   }
 
-  return 1;
+  T tmp;
+  if (! string_class_is_unsigned_int_8(s, nchars - 1, tmp))
+    return 0;
+
+  result = tmp * 10 + s[19] - '0';
+
+  if (result > tmp)
+    return 1;
+
+//cerr << "Overflowed int 8\n";
+
+  return 0;
 }
 
 //#ifdef __GNUG__
-template int string_class_is_unsigned_int (const char *, int, unsigned int &);
+template int string_class_is_unsigned_int_4 (const char *, int, unsigned int &);
+template int string_class_is_unsigned_int_8 (const char *, int, unsigned long int &);
+template int string_class_is_unsigned_int_8 (const char *, int, unsigned long long int &);
+template int string_class_is_unsigned_int_4<unsigned long>(char const*, int, unsigned long&);
 //#endif
+
 /*
   Pretty dumb int conversion. Note that this does not deal adequately with
   large negative values and such.
@@ -968,7 +1038,7 @@ template int string_class_is_unsigned_int (const char *, int, unsigned int &);
 
 template <typename T>
 int
-string_class_is_int (const char * s, int nchars, T & result)
+string_class_is_int_4 (const char * s, int nchars, T & result)
 {
   if (0 == nchars)
     return 0;
@@ -986,7 +1056,10 @@ string_class_is_int (const char * s, int nchars, T & result)
     nchars--;
   }
 
-  if (0 == nchars || nchars > 10)    // must be erroneous
+  if (0 == nchars)
+    return 0;
+
+  if (nchars > 10) // must be erroneous
     return 0;
 
   if (nchars < 10)    // the most common case
@@ -1011,6 +1084,26 @@ string_class_is_int (const char * s, int nchars, T & result)
   if (*s > '3')     // int max is 2147483647, so any 10 digit number starting with 3 is invalid
     return 0;
 
+//cerr << "Converting long string\n";
+
+  unsigned int tmp;
+  if (! string_class_is_unsigned_int_4(s, nchars, tmp))
+    return 0;
+
+  if (0 == sign)
+  {
+    if (tmp > static_cast<unsigned int>(std::numeric_limits<T>::max()))
+      return 0;
+    result = static_cast<T>(tmp);
+  }
+  else if (tmp > 2147483648u)
+    return 0;
+  else
+    result = - tmp;
+
+  return 1;
+
+#ifdef OLD_STUFFQ
 // Strings must be null terminated for the system functions
 
   char buffer[13];
@@ -1031,12 +1124,86 @@ string_class_is_int (const char * s, int nchars, T & result)
     result = -result;
 
   return 1;
+#endif
+}
+
+/*
+  This is not robust, should be fixed sometime.
+  Highest 8 byte signed int is 9223372036854775807
+*/
+
+template <typename T>
+int
+string_class_is_int_8 (const char * s, int nchars, T & result)
+{
+  if (0 == nchars)
+    return 0;
+
+  int sign = 0;
+  if ('-' == *s)
+  {
+    sign = 1;
+    s++;
+    nchars--;
+  }
+  else if ('+' == *s)
+  {
+    s++;
+    nchars--;
+  }
+
+  if (0 == nchars)
+    return 0;
+
+  if (nchars > 19) // must be erroneous
+    return 0;
+
+  if (nchars < 19)    // the most common case
+  {
+    result = 0;
+    for (int i = 0; i < nchars; i++)
+    {
+      if (s[i] >= '0' && s[i] <= '9')
+        result = 10 * result + (s[i] - '0');
+      else
+        return 0;
+    }
+
+    if (sign)
+      result = - result;
+
+    return 1;
+  }
+
+// Now the case of 19 digits. just need to be careful. Use an unsigned value to get the number
+// then check to see if it is OK
+  
+  unsigned long int tmp;
+  if (! string_class_is_unsigned_int_8(s, nchars, tmp))
+    return 0;
+
+  if (0 == sign)
+  {
+    if (tmp > static_cast<unsigned long int>(std::numeric_limits<long int>::max()))
+      return 0;
+  }
+  else if (tmp > 9223372036854775808U)
+    return 0;
+  
+  result = static_cast<T>(tmp);
+  if (sign)
+    result = - result;
+
+  return 1;
 }
 
 //#if defined (__GNUG__) || defined (__SUNPRO_CC)
-template int string_class_is_int (const char *, int, int &);
-template int string_class_is_int (const char *, int, long &);
-template int string_class_is_int (const char *, int, long long &);
+template int string_class_is_int_4 (const char *, int, int &);
+template int string_class_is_int_8 (const char *, int, long &);
+template int string_class_is_int_8 (const char *, int, long long &);
+template int string_class_is_int_4<long>(char const*, int, long&);
+template int string_class_is_unsigned_int_8<unsigned int>(char const*, int, unsigned int&);
+template int string_class_is_int_8<int>(char const*, int, int&);
 //#endif
 
 #define MAX_FRACTIONAL_DIGITS 15
@@ -1092,7 +1259,7 @@ iw_parse_numeric_pos (const char * s, int nchars, double & result)
     return 0;
   }
 
-  while (isdigit (*s) && nchars)
+  while (nchars && isdigit (*s))
   {
     result = 10.0 * result + static_cast<double>(*s - '0');
     s++;
@@ -1187,7 +1354,7 @@ iw_parse_numeric_pos (const char * s, int nchars, double & result)
 
   int exponent = 0;
 
-  while (isdigit(*s) && nchars)
+  while (nchars && isdigit(*s))
   {
     exponent = 10 * exponent + (*s - '0');
     s++;
@@ -1250,16 +1417,16 @@ iw_parse_numeric(const char * s, int nchars, double & result)
 }
 
 int
-IWString::is_int (int & result) const
+IWString::is_int(int & result) const
 {
-  return string_class_is_int(_things, _number_elements, result);
+  return string_class_is_int_4(_things, _number_elements, result);
 }
 
 int
-IWString::numeric_value (unsigned char & result) const
+IWString::numeric_value(unsigned char & result) const
 {
   int tmp;
-  if (! string_class_is_int(_things, _number_elements, tmp))
+  if (! string_class_is_int_4(_things, _number_elements, tmp))
     return 0;
 
   if (tmp < 0 || tmp > std::numeric_limits<unsigned char>::max())
@@ -1271,10 +1438,10 @@ IWString::numeric_value (unsigned char & result) const
 }
 
 int
-IWString::numeric_value (unsigned short & result) const
+IWString::numeric_value(unsigned short & result) const
 {
   int tmp;
-  if (! string_class_is_int(_things, _number_elements, tmp))
+  if (! string_class_is_int_4(_things, _number_elements, tmp))
     return 0;
 
   if (tmp < 0 || tmp > std::numeric_limits<unsigned short>::max())
@@ -1286,27 +1453,45 @@ IWString::numeric_value (unsigned short & result) const
 }
 
 int
-IWString::numeric_value (int & result) const
+IWString::numeric_value(int & result) const
 {
-  return string_class_is_int(_things, _number_elements, result);
+  if (4 == sizeof(result))
+    return string_class_is_int_4(_things, _number_elements, result);
+  else
+    return string_class_is_int_8(_things, _number_elements, result);
 }
 
 int
-IWString::numeric_value (long & result) const
+IWString::numeric_value(long & result) const
 {
-  return string_class_is_int(_things, _number_elements, result);
+  if (4 == sizeof(result))
+    return string_class_is_int_4(_things, _number_elements, result);
+  else
+    return string_class_is_int_8(_things, _number_elements, result);
 }
 
 int
-IWString::numeric_value (long long & result) const
+IWString::numeric_value(long long & result) const
 {
-  return string_class_is_int(_things, _number_elements, result);
+  return string_class_is_int_8(_things, _number_elements, result);
 }
 
 int
-IWString::numeric_value (unsigned int & result) const
+IWString::numeric_value(unsigned int & result) const
 {
-  return string_class_is_unsigned_int(_things, _number_elements, result);
+  if (4 == sizeof(result))
+    return string_class_is_unsigned_int_4(_things, _number_elements, result);
+  else
+    return string_class_is_unsigned_int_8(_things, _number_elements, result);
+}
+
+int
+IWString::numeric_value(unsigned long & result) const
+{
+  if (4 == sizeof(result))
+    return string_class_is_unsigned_int_4(_things, _number_elements, result);
+  else
+    return string_class_is_unsigned_int_8(_things, _number_elements, result);
 }
 
 /*
@@ -1314,7 +1499,7 @@ IWString::numeric_value (unsigned int & result) const
 */
 
 int
-IWString::is_hex (unsigned int & result) const
+IWString::is_hex(unsigned int & result) const
 {
   if (_number_elements < 3)
     return 0;
@@ -1339,7 +1524,7 @@ IWString::is_hex (unsigned int & result) const
 }
 
 int
-IWString::is_double (double & result) const
+IWString::is_double(double & result) const
 {
   _const_appearing_null_terminate();
 
@@ -1347,11 +1532,16 @@ IWString::is_double (double & result) const
 }
 
 int
-IWString::numeric_value (float & result) const
+IWString::numeric_value(float & result) const
 {
   double tmp;
 
   if (! numeric_value(tmp))
+    return 0;
+
+  static const double maxfloat = static_cast<double>(std::numeric_limits<float>::max());
+
+  if (fabs(tmp) > maxfloat)
     return 0;
 
   result = static_cast<float>(tmp);    // check for overflow!!!
@@ -1360,7 +1550,7 @@ IWString::numeric_value (float & result) const
 }
 
 int
-IWString::numeric_value (double & result) const
+IWString::numeric_value(double & result) const
 {
   return iw_parse_numeric(_things, _number_elements, result);
 }
@@ -1392,13 +1582,13 @@ common_nwords (const char * s,
 }
 
 int
-IWString::nwords () const
+IWString::nwords() const
 {
   return common_nwords (_things, _number_elements);
 }
 
 int
-const_IWSubstring::nwords () const
+const_IWSubstring::nwords() const
 {
   return common_nwords (_data, _nchars);
 }
@@ -1435,13 +1625,13 @@ common_nwords_with_separator (const char * s,
 }
 
 int
-IWString::nwords (char word_separator) const
+IWString::nwords(char word_separator) const
 {
   return common_nwords_with_separator (_things, _number_elements, word_separator);
 }
 
 int
-const_IWSubstring::nwords (char word_separator) const
+const_IWSubstring::nwords(char word_separator) const
 {
   return common_nwords_with_separator (_data, _nchars, word_separator);
 }
@@ -1550,10 +1740,10 @@ common_locate_word_boundaries_rev (const char * s, int nchars,
 }
 
 static int
-common_locate_word_boundaries (const char * s, int nchars,
-                               int which_word,
-                               char word_separator,
-                               int & word_start, int & word_stop)
+common_locate_word_boundaries(const char * s, int nchars,
+                              int which_word,
+                              char word_separator,
+                              int & word_start, int & word_stop)
 {
   if (which_word < 0)
     return common_locate_word_boundaries_rev(s, nchars, which_word, word_separator, word_start, word_stop);
@@ -1599,7 +1789,7 @@ common_locate_word_boundaries (const char * s, int nchars,
 }
 
 int
-IWString::_locate_word_boundaries (int which_word, char word_separator,
+IWString::_locate_word_boundaries(int which_word, char word_separator,
                                    int & word_start, int & word_stop) const
 {
   int in_word = 0;
@@ -1643,7 +1833,7 @@ IWString::_locate_word_boundaries (int which_word, char word_separator,
 }
 
 const_IWSubstring
-IWString::word (int which_word, char word_separator) const
+IWString::word(int which_word, char word_separator) const
 {
   int word_start, word_stop;
 
@@ -1655,7 +1845,7 @@ IWString::word (int which_word, char word_separator) const
 }
 
 int
-IWString::word (int which_word, IWString & result, char word_separator) const
+IWString::word(int which_word, IWString & result, char word_separator) const
 {
   int word_start, word_stop;
 
@@ -1672,7 +1862,7 @@ IWString::word (int which_word, IWString & result, char word_separator) const
 }
 
 int
-IWString::word (int which_word, const_IWSubstring & result, char word_separator) const
+IWString::word(int which_word, const_IWSubstring & result, char word_separator) const
 {
   int word_start, word_stop;
 
@@ -1689,7 +1879,7 @@ IWString::word (int which_word, const_IWSubstring & result, char word_separator)
 }
 
 int
-IWString::wordindex (int which_word, char word_separator) const
+IWString::wordindex(int which_word, char word_separator) const
 {
   int word_start, word_stop;
 
@@ -1701,7 +1891,7 @@ IWString::wordindex (int which_word, char word_separator) const
 }
 
 const_IWSubstring
-const_IWSubstring::word (int which_word, char word_separator) const
+const_IWSubstring::word(int which_word, char word_separator) const
 {
   int word_start, word_stop;
 
@@ -1713,7 +1903,7 @@ const_IWSubstring::word (int which_word, char word_separator) const
 }
 
 int
-const_IWSubstring::word (int which_word, IWString & result, char word_separator) const
+const_IWSubstring::word(int which_word, IWString & result, char word_separator) const
 {
   int word_start, word_stop;
 
@@ -1724,13 +1914,14 @@ const_IWSubstring::word (int which_word, IWString & result, char word_separator)
     return 0;
   }
 
+//from_to(word_start, word_stop, result);
   result = from_to (word_start, word_stop);
 
   return 1;
 }
 
 int
-const_IWSubstring::word (int which_word, const_IWSubstring & result, char word_separator) const
+const_IWSubstring::word(int which_word, const_IWSubstring & result, char word_separator) const
 {
   int word_start, word_stop;
 
@@ -1747,7 +1938,7 @@ const_IWSubstring::word (int which_word, const_IWSubstring & result, char word_s
 }
 
 int
-const_IWSubstring::whitespace_delimited_word (int which_word, IWString & result) const
+const_IWSubstring::whitespace_delimited_word(int which_word, IWString & result) const
 {
   int word_start, word_stop;
 
@@ -1764,7 +1955,7 @@ const_IWSubstring::whitespace_delimited_word (int which_word, IWString & result)
 }
 
 int
-const_IWSubstring::wordindex (int which_word, char word_separator) const
+const_IWSubstring::wordindex(int which_word, char word_separator) const
 {
   int word_start, word_stop;
 
@@ -1805,17 +1996,17 @@ _locate_word_beginnings (const char * s,
 }
 
 int
-const_IWSubstring::locate_word_beginnings (resizable_array<int> & word_beginnings,
+const_IWSubstring::locate_word_beginnings(resizable_array<int> & word_beginnings,
                                            char separator) const
 {
-  return _locate_word_beginnings (_data, _nchars, word_beginnings, separator);
+  return _locate_word_beginnings(_data, _nchars, word_beginnings, separator);
 }
 
 int
-IWString::locate_word_beginnings (resizable_array<int> & word_beginnings,
+IWString::locate_word_beginnings(resizable_array<int> & word_beginnings,
                                            char separator) const
 {
-  return _locate_word_beginnings (_things, _number_elements, word_beginnings, separator);
+  return _locate_word_beginnings(_things, _number_elements, word_beginnings, separator);
 }
 
 static int
@@ -1831,7 +2022,7 @@ common_locate_word_beginnings_single_delimiter(const char * s,
 
   word_beginnings.add(0);   // always
 
-  for (int i = 1; i < nchars; i++)
+  for (int i = 0; i < nchars; i++)
   {
     if (separator != s[i])
       continue;
@@ -1878,22 +2069,22 @@ internal_nextword (const char * s, int nchars, int & i,
       return 0;
   }
 
+// We are in a 'word'
+
   istart = i;
-  istop = i;
 
-  while (i < nchars)
+  i++;
+
+  for ( ; i < nchars; ++i)
   {
-    i++;
     if (separator == s[i])
+    {
+      istop = i-1;
       return 1;
-
-    istop++;
+    }
   }
 
-// If we ran off the end of the string, decrement istop
-
-  istop--;
-
+  istop = nchars - 1;
   return 1;
 }
   
@@ -1969,15 +2160,17 @@ internal_prevword (IWString & result, int & i,
   int end_of_word = i;
   int start_of_word = 0;
 
-  while (i >= 0)
+  i--;
+
+  for ( ; i >= 0; --i)
   {
-    i--;
     if (separator == s[i])
     {
       start_of_word = i + 1;
       break;
     }
   }
+
 
 // Now build the word from i to end_of_word
 
@@ -1990,57 +2183,57 @@ internal_prevword (IWString & result, int & i,
 }
 
 int
-IWString::nextword (IWString & result, int & i, char separator) const
+IWString::nextword(IWString & result, int & i, char separator) const
 {
   assert (i >= 0);
 
-  return internal_nextword (result, i, separator, _things, _number_elements);
+  return internal_nextword(result, i, separator, _things, _number_elements);
 }
 
 int
-const_IWSubstring::nextword (IWString & result, int & i, char separator) const
+const_IWSubstring::nextword(IWString & result, int & i, char separator) const
 {
   assert (i >= 0);
 
-  return internal_nextword (result, i, separator, _data, _nchars);
+  return internal_nextword(result, i, separator, _data, _nchars);
 }
 
 int
-IWString::nextword (const_IWSubstring & result, int & i, char separator) const
+IWString::nextword(const_IWSubstring & result, int & i, char separator) const
 {
   assert (i >= 0);
 
-  return internal_nextword (result, i, separator, _things, _number_elements);
+  return internal_nextword(result, i, separator, _things, _number_elements);
 }
 
 int
-const_IWSubstring::nextword (const_IWSubstring & result, int & i, char separator) const
+const_IWSubstring::nextword(const_IWSubstring & result, int & i, char separator) const
 {
   assert (i >= 0);
 
-  return internal_nextword (result, i, separator, _data, _nchars);
+  return internal_nextword(result, i, separator, _data, _nchars);
 }
 
 int
-IWString::prevword (IWString & result, int & i, char separator) const
+IWString::prevword(IWString & result, int & i, char separator) const
 {
   if (i <= 0)
     return 0;
 
   assert (i < _number_elements);
 
-  return internal_prevword (result, i, separator, _things);
+  return internal_prevword(result, i, separator, _things);
 }
 
 int
-const_IWSubstring::prevword (IWString & result, int & i, char separator) const
+const_IWSubstring::prevword(IWString & result, int & i, char separator) const
 {
   if (i <= 0)
     return 0;
 
   assert (i < _nchars);
 
-  return internal_prevword (result, i, separator, _data);
+  return internal_prevword(result, i, separator, _data);
 }
 
 int 
@@ -2062,7 +2255,7 @@ const_IWSubstring::nwords_single_delimiter(char separator) const
 }
 
 const_IWSubstring
-IWString::substr (int istart, int nchars) const
+IWString::substr(int istart, int nchars) const
 {
   assert (istart >= 0 && istart < _number_elements);
   if (nchars < 0)
@@ -2070,25 +2263,25 @@ IWString::substr (int istart, int nchars) const
 
   assert (nchars >= 0 && istart + nchars <= _number_elements);
 
-  return const_IWSubstring (&(_things[istart]), nchars);
+  return const_IWSubstring(&(_things[istart]), nchars);
 }
 
 const_IWSubstring
-IWString::from_to (int istart, int istop) const
+IWString::from_to(int istart, int istop) const
 {
   assert (istart >= 0);
   assert (istop >= istart && istop < _number_elements);
 
-  return const_IWSubstring (&(_things[istart]), istop - istart + 1);
+  return const_IWSubstring(&(_things[istart]), istop - istart + 1);
 }
 
 const_IWSubstring
-const_IWSubstring::from_to (int istart, int istop) const
+const_IWSubstring::from_to(int istart, int istop) const
 {
   assert (istart >= 0);
   assert (istop >= istart && istop < _nchars);
 
-  return const_IWSubstring (&(_data[istart]), istop - istart + 1);
+  return const_IWSubstring(&(_data[istart]), istop - istart + 1);
 }
 
 /*
@@ -2101,28 +2294,28 @@ const_IWSubstring::from_to (int istart, int istop) const
 */
 
 const_IWSubstring
-IWString::from_to (int istart, const char * s) const
+IWString::from_to(int istart, const char * s) const
 {
   assert (istart >= 0 && istart < _number_elements);
 
   if (0 == _number_elements)
-    return const_IWSubstring (NULL, 0);
+    return const_IWSubstring(NULL, 0);
 
-  int lens = static_cast<int>(strlen (s));
+  int lens = static_cast<int>(strlen(s));
 
   if (0 == lens)
-    return const_IWSubstring (NULL, 0);
+    return const_IWSubstring(NULL, 0);
 
-  int i = do_find (_things, _number_elements, s, lens);
+  int i = do_find(_things, _number_elements, s, lens);
 
   if (i < 0)
-    return const_IWSubstring (NULL, 0);
+    return const_IWSubstring(NULL, 0);
 
-  return const_IWSubstring (&_things[istart], i - istart + 1);
+  return const_IWSubstring(&_things[istart], i - istart + 1);
 }
 
 void
-IWString::from_to (int istart, int istop, char * destination) const
+IWString::from_to(int istart, int istop, char * destination) const
 {
   assert (istart >= 0);
   assert (istop >= istart && istart < _number_elements);
@@ -2135,9 +2328,9 @@ IWString::from_to (int istart, int istop, char * destination) const
 }
 
 void
-IWString::from_to (int istart, int istop, const_IWSubstring & destination) const
+IWString::from_to(int istart, int istop, const_IWSubstring & destination) const
 {
-  assert (ok_index (istart));
+  assert (ok_index(istart));
   assert (istop >= istart && istop < _number_elements);
 
   destination._data = &_things[istart];
@@ -2147,18 +2340,18 @@ IWString::from_to (int istart, int istop, const_IWSubstring & destination) const
 }
 
 void
-IWString::from_to (int istart, int istop, IWString & destination) const
+IWString::from_to(int istart, int istop, IWString & destination) const
 {
-  assert (ok_index (istart));
+  assert (ok_index(istart));
   assert (istop >= istart && istop < _number_elements);
 
-  destination.strncpy (&_things[istart], istop - istart + 1);
+  destination.strncpy(&_things[istart], istop - istart + 1);
 
   return;
 }
 
 void
-const_IWSubstring::from_to (int istart, int istop, const_IWSubstring & destination) const
+const_IWSubstring::from_to(int istart, int istop, const_IWSubstring & destination) const
 {
   assert (istart >= 0 && istart < _nchars);
   assert (istop >= istart && istop < _nchars);
@@ -2170,44 +2363,44 @@ const_IWSubstring::from_to (int istart, int istop, const_IWSubstring & destinati
 }
 
 void
-const_IWSubstring::from_to (int istart, int istop, IWString & destination) const
+const_IWSubstring::from_to(int istart, int istop, IWString & destination) const
 {
   assert (istart >= 0 && istart < _nchars);
   assert (istop >= istart && istop < _nchars);
 
-  destination.strncpy (&_data[istart], istop - istart + 1);
+  destination.strncpy(&_data[istart], istop - istart + 1);
 
   return;
 }
 
 
 void
-const_IWSubstring::from_to (int istart, IWString & zresult) const
+const_IWSubstring::from_to(int istart, IWString & zresult) const
 {
   assert (istart >= 0 && istart < _nchars);
 
-  zresult.strncpy (_data + istart, _nchars - istart);
+  zresult.strncpy(_data + istart, _nchars - istart);
 
   return;
 }
 
 IWString &
-IWString::operator= (const const_IWSubstring & rhs)
+IWString::operator=(const const_IWSubstring & rhs)
 {
   if (_elements_allocated < rhs._nchars)
-    resize (rhs._nchars + 1);
+    resize(rhs._nchars + 1);
 
-  IW_STRNCPY (_things, rhs._data, rhs._nchars);
+  IW_STRNCPY(_things, rhs._data, rhs._nchars);
   _number_elements = rhs._nchars;
 
   return *this;
 }
 
 IWString &
-IWString::operator= (char c)
+IWString::operator=(char c)
 {
   if (_elements_allocated < 1)
-    resize (2);
+    resize(2);
 
   _things[0] = c;
   if (_elements_allocated > 1)
@@ -2218,7 +2411,7 @@ IWString::operator= (char c)
   return *this;
 }
 
-const_IWSubstring::const_IWSubstring ()
+const_IWSubstring::const_IWSubstring()
 {
   _data = NULL;
   _nchars = 0;
@@ -2226,17 +2419,17 @@ const_IWSubstring::const_IWSubstring ()
   return;
 }
 
-const_IWSubstring::const_IWSubstring (const char * data, int nchars) :
-          _data (data), _nchars (nchars)
+const_IWSubstring::const_IWSubstring(const char * data, int nchars) :
+          _data(data), _nchars(nchars)
 {
   return;
 }
 
-const_IWSubstring::const_IWSubstring (const char * data) :
-          _data (data)
+const_IWSubstring::const_IWSubstring(const char * data) :
+          _data(data)
 {
   if (NULL != data)
-    _nchars = static_cast<int>(::strlen (data));
+    _nchars = static_cast<int>(::strlen(data));
   else
     _nchars = 0;
 
@@ -2244,19 +2437,19 @@ const_IWSubstring::const_IWSubstring (const char * data) :
 }
 
 
-const_IWSubstring::const_IWSubstring (const IWString & s) :
-          _data (s._things), _nchars (s._number_elements)
+const_IWSubstring::const_IWSubstring(const IWString & s) :
+          _data(s._things), _nchars(s._number_elements)
 {
   return;
 }
 
-const_IWSubstring::~const_IWSubstring ()
+const_IWSubstring::~const_IWSubstring()
 {
   _nchars = 0;
 }
 
 const_IWSubstring &
-const_IWSubstring::operator = (const const_IWSubstring & other)
+const_IWSubstring::operator =(const const_IWSubstring & other)
 {
   _data = other._data;
   _nchars = other._nchars;
@@ -2265,15 +2458,15 @@ const_IWSubstring::operator = (const const_IWSubstring & other)
 }
 
 IWString &
-IWString::operator = (const IWString & other)
+IWString::operator =(const IWString & other)
 {
   if (_elements_allocated < other._number_elements)
-    resize (other._number_elements);
+    resize(other._number_elements);
 
 #ifdef _WIN32
-  IW_STRNCPY (_things, other._things, other._number_elements);
+  IW_STRNCPY(_things, other._things, other._number_elements);
 #else
-  ::memcpy (_things, other._things, other._number_elements);
+  ::memcpy(_things, other._things, other._number_elements);
 #endif
 
 //for (int i = 0; i < other._number_elements; i++)
@@ -2283,20 +2476,37 @@ IWString::operator = (const IWString & other)
 
   return *this;
 }
-int
-const_IWSubstring::copy_to_char_array (char * s) const
+
+/*
+  Maybe there is some way to make this more elegant...
+*/
+
+IWString &
+IWString::operator =(IWString && other)
 {
-  IW_STRNCPY (s, _data, _nchars);
+  resizable_array<char> & t = *this;
+  resizable_array<char> & o = other;
+  t = std::move(o);
+
+//cerr << " After move '" << other << "'\n";
+
+  return *this;
+}
+
+int
+const_IWSubstring::copy_to_char_array(char * s) const
+{
+  IW_STRNCPY(s, _data, _nchars);
   s[_nchars] = '\0';
 
   return _nchars;
 }
 
 int
-IWString::copy_to_char_array (char * s) const
+IWString::copy_to_char_array(char * s) const
 {
   if (_number_elements)
-    IW_STRNCPY (s, _things, _number_elements);
+    IW_STRNCPY(s, _things, _number_elements);
 
   s[_number_elements] = '\0';
 
@@ -2304,18 +2514,18 @@ IWString::copy_to_char_array (char * s) const
 }
 
 const_IWSubstring
-const_IWSubstring::substr (int cstart, int nchars) const
+const_IWSubstring::substr(int cstart, int nchars) const
 {
   if (nchars < 0)
     nchars = _nchars - cstart;
 
   assert (nchars >= 0 && nchars < _nchars);
 
-  return const_IWSubstring (&(_data[cstart]), nchars);
+  return const_IWSubstring(&(_data[cstart]), nchars);
 }
 
 int
-const_IWSubstring::starts_with (char s) const
+const_IWSubstring::starts_with(char s) const
 {
   if (0 == _nchars)
     return 0;
@@ -2324,35 +2534,35 @@ const_IWSubstring::starts_with (char s) const
 }
 
 int
-const_IWSubstring::starts_with (const char * s) const
+const_IWSubstring::starts_with(const char * s) const
 {
-  int lens = static_cast<int>(strlen (s));
+  int lens = static_cast<int>(strlen(s));
   if (_nchars < lens)
     return 0;
 
-  return 0 == ::strncmp (_data, s, lens);
+  return 0 == ::strncmp(_data, s, lens);
 }
 
 int
-const_IWSubstring::starts_with (const const_IWSubstring & s) const
+const_IWSubstring::starts_with(const const_IWSubstring & s) const
 {
   if (s._nchars > _nchars)
     return 0;
 
-  return 0 == ::strncmp (_data, s._data, s._nchars);
+  return 0 == ::strncmp(_data, s._data, s._nchars);
 }
 
 int
-const_IWSubstring::starts_with (const IWString & s) const
+const_IWSubstring::starts_with(const IWString & s) const
 {
   if (s._number_elements > _nchars)
     return 0;
 
-  return 0 == ::strncmp (_data, s._things, s._number_elements);
+  return 0 == ::strncmp(_data, s._things, s._number_elements);
 }
 
 int
-const_IWSubstring::ends_with (char s) const
+const_IWSubstring::ends_with(char s) const
 {
   if (0 == _nchars)
     return 0;
@@ -2361,35 +2571,35 @@ const_IWSubstring::ends_with (char s) const
 }
 
 int
-const_IWSubstring::ends_with (const char * s) const
+const_IWSubstring::ends_with(const char * s) const
 {
-  int lens = static_cast<int>(strlen (s));
+  int lens = static_cast<int>(strlen(s));
   if (_nchars < lens)
     return 0;
 
-  return 0 == ::strncmp (_data + _nchars - lens, s, lens);
+  return 0 == ::strncmp(_data + _nchars - lens, s, lens);
 }
 
 int
-const_IWSubstring::ends_with (const const_IWSubstring & s) const
-{
-  if (s.length () > _nchars)
-    return 0;
-
-  return 0 == ::strncmp (_data + _nchars - s._nchars, s._data, s._nchars);
-}
-
-int
-const_IWSubstring::ends_with (const IWString & s) const
+const_IWSubstring::ends_with(const const_IWSubstring & s) const
 {
   if (s.length() > _nchars)
     return 0;
 
-  return 0 == ::strncmp (_data + _nchars - s.length(), s.rawdata(), s.length());
+  return 0 == ::strncmp(_data + _nchars - s._nchars, s._data, s._nchars);
 }
 
 int
-const_IWSubstring::remove_leading_chars (int nremove)
+const_IWSubstring::ends_with(const IWString & s) const
+{
+  if (s.length() > _nchars)
+    return 0;
+
+  return 0 == ::strncmp(_data + _nchars - s.length(), s.rawdata(), s.length());
+}
+
+int
+const_IWSubstring::remove_leading_chars(int nremove)
 {
   assert (nremove > 0 && nremove <= _nchars);
 
@@ -2414,7 +2624,7 @@ common_remove_leading_words (const char * s, int nchars,
 // Most of the time, we will strip off everything before the first
 // word to be retained
 
-  if (common_locate_word_boundaries (s, nchars,
+  if (common_locate_word_boundaries(s, nchars,
                  nremove, word_separator, word_start, word_stop))
 
     return word_start;
@@ -2430,37 +2640,37 @@ common_remove_leading_words (const char * s, int nchars,
 }
 
 int
-const_IWSubstring::remove_leading_words (int nremove, char separator)
+const_IWSubstring::remove_leading_words(int nremove, char separator)
 {
-  int rc = common_remove_leading_words (_data, _nchars, nremove, separator);
+  int rc = common_remove_leading_words(_data, _nchars, nremove, separator);
 
   if (rc <= 0)
     return rc;
 
-  remove_leading_chars (rc);
+  remove_leading_chars(rc);
 
   return rc;
 }
 
 int
-IWString::remove_leading_words (int nremove, char separator)
+IWString::remove_leading_words(int nremove, char separator)
 {
-  int rc = common_remove_leading_words (_things, _number_elements, nremove, separator);
+  int rc = common_remove_leading_words(_things, _number_elements, nremove, separator);
 
   if (rc <= 0)
     return rc;
 
-  remove_leading_chars (rc);
+  remove_leading_chars(rc);
 
   return rc;
 }
 
 int
-IWString::remove_word (int which_word, char word_separator)
+IWString::remove_word(int which_word, char word_separator)
 {
   int word_start, word_stop;
 
-  if (! common_locate_word_boundaries (_things, _number_elements,
+  if (! common_locate_word_boundaries(_things, _number_elements,
                  which_word, word_separator, word_start, word_stop))
   {
     return 0;
@@ -2487,13 +2697,13 @@ IWString::remove_word (int which_word, char word_separator)
     }
   }
 
-  erase (word_start, word_stop);
+  erase(word_start, word_stop);
 
   return 1;
 }
 
 int
-const_IWSubstring::chop (int nchop)
+const_IWSubstring::chop(int nchop)
 {
   assert (nchop > 0 && nchop <= _nchars);
 
@@ -2501,7 +2711,7 @@ const_IWSubstring::chop (int nchop)
 }
 
 int
-const_IWSubstring::iwtruncate (int n)
+const_IWSubstring::iwtruncate(int n)
 {
   assert (n >= 0 && n <= _nchars);
 
@@ -2514,20 +2724,23 @@ const_IWSubstring::iwtruncate (int n)
 */
 
 int
-const_IWSubstring::is_int (int & result) const
+const_IWSubstring::is_int(int & result) const
 {
-  return string_class_is_int (_data, _nchars, result);
+  return string_class_is_int_4(_data, _nchars, result);
 }
 
 int
-const_IWSubstring::numeric_value (float & result) const
+const_IWSubstring::numeric_value(float & result) const
 {
   double tmp;
 
   if (! numeric_value(tmp))
     return 0;
 
-// Check for overflow!!!
+  static const double maxfloat = static_cast<double>(std::numeric_limits<float>::max());
+
+  if (fabs(tmp) > maxfloat)
+    return 0;
 
   result = static_cast<float>(tmp);
 
@@ -2535,7 +2748,7 @@ const_IWSubstring::numeric_value (float & result) const
 }
 
 int
-const_IWSubstring::numeric_value (double & result) const
+const_IWSubstring::numeric_value(double & result) const
 {
   if (0 == _nchars)
     return 0;
@@ -2560,61 +2773,76 @@ const_IWSubstring::numeric_value (double & result) const
 }
 
 int
-const_IWSubstring::numeric_value (int & result) const
+const_IWSubstring::numeric_value(int & result) const
 {
-  return string_class_is_int (_data, _nchars, result);
+  return string_class_is_int_4(_data, _nchars, result);
 }
 
 int
-const_IWSubstring::numeric_value (unsigned char & result) const
+const_IWSubstring::numeric_value(unsigned char & result) const
 {
   int tmp;
-  if (! string_class_is_int (_data, _nchars, tmp))
+  if (! string_class_is_int_4(_data, _nchars, tmp))
     return 0;
 
   if (tmp < 0 || tmp > std::numeric_limits<unsigned char>::max())
     return 0;
 
-  result = static_cast<unsigned char> (tmp);
+  result = static_cast<unsigned char>(tmp);
 
   return 1;
 }
 
 int
-const_IWSubstring::numeric_value (unsigned short & result) const
+const_IWSubstring::numeric_value(unsigned short & result) const
 {
   int tmp;
-  if (! string_class_is_int (_data, _nchars, tmp))
+  if (! string_class_is_int_4(_data, _nchars, tmp))
     return 0;
 
   if (tmp < 0 || tmp > std::numeric_limits<unsigned short>::max())
     return 0;
 
-  result = static_cast<unsigned char> (tmp);
+  result = static_cast<unsigned char>(tmp);
 
   return 1;
 }
 
 int
-const_IWSubstring::numeric_value (unsigned int & result) const
+const_IWSubstring::numeric_value(unsigned int & result) const
 {
-  return string_class_is_unsigned_int (_data, _nchars, result);
+  return string_class_is_unsigned_int_4(_data, _nchars, result);
 }
 
 int
-const_IWSubstring::numeric_value (long & result) const
+const_IWSubstring::numeric_value(long & result) const
 {
-  return string_class_is_int (_data, _nchars, result);
+  if (4 == sizeof(result))
+    return string_class_is_int_4(_data, _nchars, result);
+  else
+    return string_class_is_int_8(_data, _nchars, result);
 }
 
 int
-const_IWSubstring::numeric_value (long long & result) const
+const_IWSubstring::numeric_value(long long & result) const
 {
-  return string_class_is_int (_data, _nchars, result);
+  return string_class_is_int_8(_data, _nchars, result);
 }
 
 int
-const_IWSubstring::index (const char c) const
+const_IWSubstring::numeric_value(unsigned long & result) const
+{
+  return string_class_is_unsigned_int_8(_data, _nchars, result);
+}
+
+int
+const_IWSubstring::numeric_value(unsigned long long & result) const
+{
+  return string_class_is_unsigned_int_8(_data, _nchars, result);
+}
+
+int
+const_IWSubstring::index(const char c) const
 {
   for (int i = 0; i < _nchars; i++)
   {
@@ -2626,9 +2854,9 @@ const_IWSubstring::index (const char c) const
 }
 
 int
-const_IWSubstring::rindex (const char c) const
+const_IWSubstring::rindex(const char c) const
 {
-  for (int i = _nchars - 1; i > 0; i--)
+  for (int i = _nchars - 1; i >= 0; i--)
   {
     if (c == _data[i])
       return i;
@@ -2652,11 +2880,11 @@ do_next (const char * s, int nchars, const char c, int & istart)
 }
 
 int
-const_IWSubstring::next (const char c, int & istart) const
+const_IWSubstring::next(const char c, int & istart) const
 {
   assert (istart >= 0 && istart < _nchars);
 
-  return do_next (_data, _nchars, c, istart);
+  return do_next(_data, _nchars, c, istart);
 }
 
 /*ostream &
@@ -2674,7 +2902,7 @@ operator << (ostream & os, const const_IWSubstring * ss)
 {
   assert (os.good ());
 
-  os.write (ss->rawchars (), ss->nchars ());
+  os.write (ss->rawchars(), ss->nchars());
 
   return os;
 }*/
@@ -2684,7 +2912,7 @@ append_int (IWString & s, int n)
 {
   char buffer[24];
 
-  (void) IW_SPRINTF (buffer, "%d", n);
+  (void) IW_SPRINTF(buffer, "%d", n);
 
   s += buffer;
 
@@ -2695,10 +2923,10 @@ static void
 _cat (const char * lhs, int l1, const char * rhs, int l2,
      IWString & result)
 {
-  result.resize (l1 + l2 + 1);   // leave room for newline
+  result.resize(l1 + l2 + 1);   // leave room for newline
 
-  result.add (lhs, l1);
-  result.add (rhs, l2);
+  result.add(lhs, l1);
+  result.add(rhs, l2);
 
   return;
 }
@@ -2706,11 +2934,11 @@ _cat (const char * lhs, int l1, const char * rhs, int l2,
 IWString
 operator + (const char * lhs, const IWString & rhs)
 {
-  int l1 = static_cast<int>(strlen (lhs));
+  int l1 = static_cast<int>(strlen(lhs));
 
   IWString rc;
 
-  _cat (lhs, l1, rhs._things, rhs._number_elements, rc);
+  _cat(lhs, l1, rhs._things, rhs._number_elements, rc);
 
   return rc;
 }
@@ -2720,9 +2948,9 @@ operator + (const IWString & lhs, const char * rhs)
 {
   IWString rc;
 
-  int l2 = static_cast<int>(strlen (rhs));
+  int l2 = static_cast<int>(strlen(rhs));
 
-  _cat (lhs._things, lhs._number_elements, rhs, l2, rc);
+  _cat(lhs._things, lhs._number_elements, rhs, l2, rc);
 
   return rc;
 }
@@ -2732,7 +2960,7 @@ operator + (const IWString & lhs, const IWString & rhs)
 {
   IWString rc;
 
-  _cat (lhs._things, lhs._number_elements, rhs._things, rhs._number_elements, rc);
+  _cat(lhs._things, lhs._number_elements, rhs._things, rhs._number_elements, rc);
 
   return rc;
 }
@@ -2742,7 +2970,7 @@ append_digit (IWString & s, int digit)
 {
   char buffer[24];
 
-  IW_SPRINTF (buffer, "%d", digit);
+  IW_SPRINTF(buffer, "%d", digit);
 
   s += buffer;
 
@@ -2750,7 +2978,7 @@ append_digit (IWString & s, int digit)
 }
 
 void
-IWString::append_number (int znumber)
+IWString::append_number(int znumber)
 {
   if (znumber < 0)
   {
@@ -2764,7 +2992,7 @@ IWString::append_number (int znumber)
 }
 
 void
-IWString::append_number (unsigned int znumber)
+IWString::append_number(unsigned int znumber)
 {
   _append_int_form(znumber);
 
@@ -2772,7 +3000,7 @@ IWString::append_number (unsigned int znumber)
 }
 
 void
-IWString::append_number (long znumber)
+IWString::append_number(long znumber)
 {
   if (znumber < 0)
   {
@@ -2786,7 +3014,7 @@ IWString::append_number (long znumber)
 }
 
 void
-IWString::append_number (long long znumber)
+IWString::append_number(long long znumber)
 {
   if (znumber < 0)
   {
@@ -2799,10 +3027,17 @@ IWString::append_number (long long znumber)
   return;
 }
 void
-IWString::append_number (unsigned long long znumber)
+IWString::append_number(unsigned long long znumber)
 {
   _append_int_form(znumber);
 
+  return;
+}
+
+void
+IWString::append_number(unsigned long znumber)
+{
+  _append_int_form(znumber);
   return;
 }
 
@@ -2815,39 +3050,46 @@ set_default_iwstring_float_concatenation_precision (int s)
 }
 
 void
-IWString::append_number (float f)
+IWString::append_number(float f)
 {
   char buffer[100];
 
 #ifdef sun
-  sgconvert (&f, float_precision, 0, buffer);
+  sgconvert(&f, float_precision, 0, buffer);
 
-  resizable_array<char>::add (buffer, static_cast<int>(::strlen (buffer)));
+  resizable_array<char>::add(buffer, static_cast<int>(::strlen(buffer)));
 
 #endif
 
 #ifdef mips
-  gcvt (f, float_precision, buffer);
+  gcvt(f, float_precision, buffer);
 
-  resizable_array<char>::add (buffer,static_cast<int>(::strlen (buffer)));
+  resizable_array<char>::add(buffer,static_cast<int>(::strlen(buffer)));
 #endif
 
 #ifdef __linux__
-  gcvt (static_cast<double> (f), float_precision, buffer);
+  gcvt(static_cast<double>(f), float_precision, buffer);
 
-  resizable_array<char>::add (buffer, static_cast<int>(::strlen (buffer)));
+  resizable_array<char>::add(buffer, static_cast<int>(::strlen(buffer)));
 #endif
 
 #ifdef IWCYGWIN
-  gcvt (static_cast<double> (f), float_precision, buffer);
+  gcvt(static_cast<double>(f), float_precision, buffer);
 
-  resizable_array<char>::add (buffer, static_cast<int>(::strlen (buffer)));
+  resizable_array<char>::add(buffer, static_cast<int>(::strlen(buffer)));
 #endif
 
 #ifdef _WIN32
+#ifdef ONCE_I_FIGURE_OUT_GCVT_ON_WINDOWS
   _gcvt(static_cast<double>(f), float_precision, buffer);
 
   resizable_array<char>::add(buffer, static_cast<int>(::strlen(buffer)));
+#else
+#include <sstream>
+  std::ostringstream str;
+  str << f;
+  resizable_array<char>::add(str.str().c_str(), str.str().length());
+#endif
 #endif
 
   return;
@@ -2862,91 +3104,97 @@ set_default_iwstring_double_concatenation_precision (int s)
 }
 
 void
-IWString::append_number (double d)
+IWString::append_number(double d)
 {
   char buffer[32];
 
 #ifdef sun
-  gconvert (d, double_precision, 0, buffer);
+  gconvert(d, double_precision, 0, buffer);
 #endif
 
 #ifdef mips
-  gcvt (d, double_precision, buffer);
+  gcvt(d, double_precision, buffer);
 #endif
 
 #ifdef __linux__
-  gcvt (d, double_precision, buffer);
+  gcvt(d, double_precision, buffer);
 #endif
 
 #ifdef IWCYGWIN
-  gcvt (d, double_precision, buffer);
+  gcvt(d, double_precision, buffer);
 #endif
 
 #ifdef _WIN32
   _gcvt_s( buffer, 32, d, double_precision );
 #endif
 
-  resizable_array<char>::add (buffer, static_cast<int>(::strlen (buffer)));
+  resizable_array<char>::add(buffer, static_cast<int>(::strlen(buffer)));
 
   return;
 }
 
 void
-IWString::append_number (float f, int fprecision)
+IWString::append_number(float f, int fprecision)
 {
   char buffer[100];
 
 #ifdef sun
-  sgconvert (&f, fprecision, 0, buffer);
+  sgconvert(&f, fprecision, 0, buffer);
 #endif
 
 #ifdef mips
-  gcvt (f, fprecision, buffer);
+  gcvt(f, fprecision, buffer);
 #endif
 
 #ifdef __linux__
-  gcvt (static_cast<double> (f), fprecision, buffer);
+  gcvt(static_cast<double>(f), fprecision, buffer);
+#elif WIN32
+  _gcvt(static_cast<double>(f), fprecision, buffer); // C4996
 #endif
 
-  resizable_array<char>::add (buffer, static_cast<int>(::strlen (buffer)));
+  resizable_array<char>::add(buffer, static_cast<int>(::strlen(buffer)));
 
   return;
 }
 
 void
-IWString::append_number (double d, int dprecision)
+IWString::append_number(double d, int dprecision)
 {
   char buffer[32];
 
 #ifdef sun
-  gconvert (d, dprecision, 0, buffer);
+  gconvert(d, dprecision, 0, buffer);
 #endif
 
 #ifdef mips
-  gcvt (d, dprecision, buffer);
+  gcvt(d, dprecision, buffer);
 #endif
 
 #ifdef __linux__
-  gcvt (d, dprecision, buffer);
+  gcvt(d, dprecision, buffer);
 #endif
 
 #ifdef IWCYGWIN
-  gcvt (d, dprecision, buffer);
+  gcvt(d, dprecision, buffer);
 #endif
 
-  resizable_array<char>::add (buffer, static_cast<int>(::strlen (buffer)));
+#ifdef WIN32
+_gcvt(static_cast<double>(d), dprecision, buffer); // C4996
+#endif
+
+  resizable_array<char>::add(buffer, static_cast<int>(::strlen(buffer)));
 
   return;
 }
 
 void
-IWString::append_number (float f, const char * fformat)
+IWString::append_number(float f, const char * fformat)
 {
   char buffer[32];
 
-  int nchars = IW_SPRINTF (buffer, fformat, f);
+  int nchars = IW_SPRINTF(buffer, fformat, f);
 
-  resizable_array<char>::add (buffer, nchars);
+  resizable_array<char>::add(buffer, nchars);
 
   return;
 }
@@ -2955,9 +3203,9 @@ const_IWSubstring
 substr (const IWString &s, int cstart, int nchars)
 { 
   if (nchars < 0)
-    nchars = s.number_elements () - cstart;
+    nchars = s.number_elements() - cstart;
 
-  return s.substr (cstart, nchars);
+  return s.substr(cstart, nchars);
 }
 
 const_IWSubstring
@@ -2966,13 +3214,13 @@ substr (const const_IWSubstring & s, int cstart, int nchars)
   if (nchars < 0)
     nchars = s._nchars - cstart;
 
-  return s.substr (cstart, nchars);
+  return s.substr(cstart, nchars);
 }
 
 const_IWSubstring
 from_to (const IWString & s, int cstart, int cstop)
 {
-  return s.from_to (cstart, cstop);
+  return s.from_to(cstart, cstop);
 }
 
 /*
@@ -2986,7 +3234,7 @@ _is_int (const char * s, int nchars, int & result)
 // skip over leading blanks
 
   int istart = 0;
-  while (isspace (s[istart]) && istart < nchars)
+  while (isspace(s[istart]) && istart < nchars)
   {
     istart++;
   }
@@ -3022,13 +3270,13 @@ _is_int (const char * s, int nchars, int & result)
 int
 is_int (const const_IWSubstring & s, int & result)
 {
-  return _is_int (s.rawchars (), s.nchars (), result);
+  return _is_int(s.rawchars(), s.nchars(), result);
 }
 
 int
 change_suffix (IWString & fname, const IWString & new_suffix)
 {
-  int len_fname = fname.length ();
+  int len_fname = fname.length();
 
   if (0 == len_fname)
     return 0;
@@ -3043,7 +3291,7 @@ change_suffix (IWString & fname, const IWString & new_suffix)
   if (last_period < 0)
     fname += '.';
   else
-    fname.shorten (last_period + 1);
+    fname.shorten(last_period + 1);
 
   fname += new_suffix;
 
@@ -3056,7 +3304,7 @@ change_suffix (IWString & fname, const IWString & new_suffix)
 */
 
 int
-IWString::shorten (int new_size)
+IWString::shorten(int new_size)
 {
   assert (new_size >= 0 && new_size <= _number_elements);
 
@@ -3066,7 +3314,7 @@ IWString::shorten (int new_size)
 }
 
 int
-IWString::starts_with (char s) const
+IWString::starts_with(char s) const
 {
   if (0 == _number_elements)
     return 0;
@@ -3075,43 +3323,43 @@ IWString::starts_with (char s) const
 }
 
 int
-IWString::starts_with (const char * s, int lens) const
+IWString::starts_with(const char * s, int lens) const
 {
   if (0 == _number_elements)
     return 0;
 
   if (lens < 0)
-    lens = static_cast<int>(::strlen (s));
+    lens = static_cast<int>(::strlen(s));
 
-  return (0 == ::strncmp (_things, s, lens));
+  return (0 == ::strncmp(_things, s, lens));
 }
 
 int
-IWString::starts_with (const IWString & s) const
+IWString::starts_with(const IWString & s) const
 {
   int lens = s._number_elements;
 
   if (lens > _number_elements)
     return 0;
 
-  return (0 == ::strncmp (_things, s._things, lens));
+  return (0 == ::strncmp(_things, s._things, lens));
 }
 
 int
-IWString::starts_with (const const_IWSubstring & s) const
+IWString::starts_with(const const_IWSubstring & s) const
 {
   int lens = s._nchars;
 
   if (lens > _number_elements)
     return 0;
 
-  return (0 == ::strncmp (_things, s._data, lens));
+  return (0 == ::strncmp(_things, s._data, lens));
 }
 
 int
-IWString::translate (char cfrom, char cto)
+IWString::translate(char cfrom, char cto)
 {
-  assert (ok ());
+  assert (ok());
 
   int rc = 0;
   for (int i = 0; i < _number_elements; i++)
@@ -3127,7 +3375,7 @@ IWString::translate (char cfrom, char cto)
 }
 
 int
-IWString::ends_with (char s) const
+IWString::ends_with(char s) const
 {
   if (0 == _number_elements)
     return 0;
@@ -3136,12 +3384,12 @@ IWString::ends_with (char s) const
 }
 
 int
-IWString::ends_with (const char * s, int lens) const
+IWString::ends_with(const char * s, int lens) const
 {
-  assert (s);
+  assert(s);
 
   if (lens < 0)
-    lens = static_cast<int>(::strlen (s));
+    lens = static_cast<int>(::strlen(s));
 
   if (lens > _number_elements)
     return 0;
@@ -3150,11 +3398,22 @@ IWString::ends_with (const char * s, int lens) const
     return 0;
 
   int i = _number_elements - lens;
-  return (0 == ::strncmp (s, &(_things[i]), lens));
+
+#ifdef MANUALLY_CHECK_ENDS_WITH
+  for (int q = 0; q < lens; ++q)
+  {
+    if (s[q] == _things[i+q])
+      cerr << "Character " << q << " '" << _things[i+q] << "' the same\n";
+    else
+      cerr << "Character " << q << " '" << _things[i+q] << "' different\n";
+  }
+#endif
+
+  return (0 == ::strncmp(s, _things + i, lens));
 }
 
 int
-IWString::ends_with (const IWString & s) const
+IWString::ends_with(const IWString & s) const
 {
   if (s._number_elements > _number_elements)
     return 0;
@@ -3163,31 +3422,31 @@ IWString::ends_with (const IWString & s) const
     return 0;
 
   int i = _number_elements - s._number_elements;
-  return (0 == ::strncmp (s._things, &(_things[i]), s._number_elements));
+  return (0 == ::strncmp(s._things, &(_things[i]), s._number_elements));
 }
 
 int
-IWString::ends_with (const const_IWSubstring & s) const
+IWString::ends_with(const const_IWSubstring & s) const
 {
-  return ends_with (s.rawchars (), s.length ());
+  return ends_with(s.rawchars(), s.length());
 }
 
 int
-IWString::looks_like (const char * s, int min_chars_needed_for_match) const
+IWString::looks_like(const char * s, int min_chars_needed_for_match) const
 {
-  assert (ok ());
+  assert (ok());
   assert (s);
   assert (min_chars_needed_for_match);
 
   if (_number_elements < min_chars_needed_for_match)
     return 0;
 
-  int lens = static_cast<int>(::strlen (s));
+  int lens = static_cast<int>(::strlen(s));
 
   if (_number_elements > lens) 
     return 0;
 
-  return 0 == ::strncmp (_things, s, _number_elements);
+  return 0 == ::strncmp(_things, s, _number_elements);
 }
 
 /*
@@ -3203,7 +3462,7 @@ expand_environment_variables (const char * old_name, IWString & expanded_name)
   char buffer[256];
   old_name++;
   int iptr = 0;
-  while (isalpha (*old_name))
+  while (isalpha(*old_name))
   {
     buffer[iptr] = *old_name;
     old_name++;
@@ -3211,7 +3470,7 @@ expand_environment_variables (const char * old_name, IWString & expanded_name)
   }
   buffer[iptr] = '\0';
 
-  const char * env = getenv (buffer);
+  const char * env = getenv(buffer);
 
   if (NULL == env)
   {
@@ -3229,14 +3488,14 @@ expand_environment_variables (const char * old_name, IWString & expanded_name)
 }
 
 int
-IWString::insert (char c, int pos)
+IWString::insert(char c, int pos)
 {
   assert (pos >= 0 && pos < _number_elements);
 
   if (_number_elements == _elements_allocated)
-    resize (_number_elements + 1);
+    resize(_number_elements + 1);
 
-  for (int i = _number_elements; i >= pos; i--)
+  for (int i = _number_elements; i > pos; i--)
   {
     _things[i] = _things[i - 1];
   }
@@ -3249,36 +3508,36 @@ IWString::insert (char c, int pos)
 }
 
 int
-IWString::insert (const char * c, int pos)
+IWString::insert(const char * c, int pos)
 {
   assert (pos >= 0 && pos < _number_elements);
 
-  int lens = static_cast<int>(::strlen (c));
+  int lens = static_cast<int>(::strlen(c));
 
-  return _insert (pos, c, lens);
+  return _insert(pos, c, lens);
 }
 
 int
-IWString::insert (const IWString & c, int pos)
+IWString::insert(const IWString & c, int pos)
 {
   assert (pos >= 0 && pos < _number_elements);
 
-  return _insert (pos, c._things, c._number_elements);
+  return _insert(pos, c._things, c._number_elements);
 }
 
 int
-IWString::insert (const const_IWSubstring & c, int pos)
+IWString::insert(const const_IWSubstring & c, int pos)
 {
   assert (pos >= 0 && pos < _number_elements);
 
-  return _insert (pos, c._data, c._nchars);
+  return _insert(pos, c._data, c._nchars);
 }
 
 int
-IWString::_insert (int pos, const char * s, int lens)
+IWString::_insert(int pos, const char * s, int lens)
 {
   if (_number_elements + lens > _elements_allocated)
-    resize (_number_elements + lens);
+    resize(_number_elements + lens);
 
   for (int i = _number_elements + lens - 1; i >= pos + lens; i--)
   {
@@ -3297,7 +3556,7 @@ IWString::_insert (int pos, const char * s, int lens)
 
 
 int
-IWString::overwrite (char c, int pos)
+IWString::overwrite(char c, int pos)
 {
   assert (pos >= 0 && pos < _number_elements);
 
@@ -3307,27 +3566,27 @@ IWString::overwrite (char c, int pos)
 }
 
 int
-IWString::overwrite (const char * s, int pos)
+IWString::overwrite(const char * s, int pos)
 {
-  int lens = static_cast<int>(::strlen (s));
+  int lens = static_cast<int>(::strlen(s));
 
-  return _overwrite (s, lens, pos);
+  return _overwrite(s, lens, pos);
 }
 
 int
-IWString::overwrite (const const_IWSubstring & s, int pos)
+IWString::overwrite(const const_IWSubstring & s, int pos)
 {
-  return _overwrite (s.rawchars (), s.length (), pos);
+  return _overwrite(s.rawchars(), s.length(), pos);
 }
 
 int
-IWString::overwrite (const IWString & s, int pos)
+IWString::overwrite(const IWString & s, int pos)
 {
-  return _overwrite (s.rawchars (), s.length (), pos);
+  return _overwrite(s.rawchars(), s.length(), pos);
 }
 
 int
-IWString::_overwrite (const char * s, int nchars, int pos)
+IWString::_overwrite(const char * s, int nchars, int pos)
 {
   assert (pos >= 0 && pos < _number_elements);
   assert (pos + nchars - 1 < _number_elements);
@@ -3345,11 +3604,11 @@ IWString::_overwrite (const char * s, int nchars, int pos)
 */
 
 int
-IWString::next (const char c, int & istart) const
+IWString::next(const char c, int & istart) const
 {
-  assert (ok_index (istart));
+  assert (ok_index(istart));
 
-  return do_next (_things, _number_elements, c, istart);
+  return do_next(_things, _number_elements, c, istart);
 }
 
 /*
@@ -3357,7 +3616,7 @@ IWString::next (const char c, int & istart) const
 */
 
 int
-IWString::gsub (char cfrom, char cto, int how_many)
+IWString::gsub(char cfrom, char cto, int how_many)
 {
   int rc = 0;
   for (int i = 0; i < _number_elements; i++)
@@ -3390,25 +3649,25 @@ _internal_ccount (const char * haystack,
 }
 
 int
-const_IWSubstring::ccount (char c) const
+const_IWSubstring::ccount(char c) const
 {
-  return _internal_ccount (_data, _nchars, c);
+  return _internal_ccount(_data, _nchars, c);
 }
 
 int
-IWString::ccount (char c) const
+IWString::ccount(char c) const
 {
-  return _internal_ccount (_things, _number_elements, c);
+  return _internal_ccount(_things, _number_elements, c);
 }
 
 int
-IWString::strncpy (const char * s, int nchars)
+IWString::strncpy(const char * s, int nchars)
 {
   if (_elements_allocated < nchars + 1)
-    resize (nchars + 1);
+    resize(nchars + 1);
 
 #ifdef _WIN32
-  IW_STRNCPY (_things, s, nchars);
+  IW_STRNCPY(_things, s, nchars);
 #else
   ::memcpy(_things, s, nchars);
 #endif
@@ -3419,11 +3678,11 @@ IWString::strncpy (const char * s, int nchars)
 }
 
 int
-IWString::strncat (const char * s, int nchars)
+IWString::strncat(const char * s, int nchars)
 {
-  make_room_for_extra_items (nchars);
+  make_room_for_extra_items(nchars);
 
-  ::memcpy (_things + _number_elements, s, nchars);
+  ::memcpy(_things + _number_elements, s, nchars);
 
   for (int i = 0; i < nchars; i++)
   {
@@ -3436,7 +3695,7 @@ IWString::strncat (const char * s, int nchars)
 }
 
 int
-IWString::strncat (const IWString & s, int nchars)
+IWString::strncat(const IWString & s, int nchars)
 {
   assert (nchars <= s.length());
 
@@ -3444,7 +3703,7 @@ IWString::strncat (const IWString & s, int nchars)
 }
 
 int
-IWString::strncat (const const_IWSubstring & s, int nchars)
+IWString::strncat(const const_IWSubstring & s, int nchars)
 {
   assert (nchars <= s.length());
 
@@ -3452,7 +3711,7 @@ IWString::strncat (const const_IWSubstring & s, int nchars)
 }
 
 int
-IWString::append_with_spacer (const const_IWSubstring zextra, char spacer)
+IWString::append_with_spacer(const const_IWSubstring zextra, char spacer)
 {
   if (0 == _number_elements)
   {
@@ -3460,8 +3719,8 @@ IWString::append_with_spacer (const const_IWSubstring zextra, char spacer)
     return 1;
   }
 
-  if (_elements_allocated < _number_elements + 1 + zextra.nchars ())
-    resize (_number_elements + 1 + zextra.nchars ());
+  if (_elements_allocated < _number_elements + 1 + zextra.nchars())
+    resize (_number_elements + 1 + zextra.nchars());
 
   *this << spacer << zextra;
 
@@ -3469,7 +3728,7 @@ IWString::append_with_spacer (const const_IWSubstring zextra, char spacer)
 }
 
 int
-IWString::append_with_spacer (const const_IWSubstring zextra, const IWString & spacer)
+IWString::append_with_spacer(const const_IWSubstring zextra, const IWString & spacer)
 {
   if (0 == _number_elements)
   {
@@ -3477,7 +3736,7 @@ IWString::append_with_spacer (const const_IWSubstring zextra, const IWString & s
     return 1;
   }
 
-  make_room_for_extra_items (zextra.length () + spacer.length ());
+  make_room_for_extra_items(zextra.length() + spacer.length());
 
   *this << spacer << zextra;
 
@@ -3489,7 +3748,7 @@ IWString::append_with_spacer (const const_IWSubstring zextra, const IWString & s
 */
 
 char
-const_IWSubstring::operator++ (int)
+const_IWSubstring::operator++(int)
 {
 //cerr << "Substring operator ++ postfix, " << _nchars << " characters\n";
   if (0 == _nchars)
@@ -3510,7 +3769,7 @@ const_IWSubstring::operator++ (int)
 */
 
 char
-const_IWSubstring::operator++ ()
+const_IWSubstring::operator++()
 {
   if (0 == _nchars)
     return '\0';
@@ -3522,7 +3781,7 @@ const_IWSubstring::operator++ ()
 }
 
 void
-const_IWSubstring::operator+= (int howfar)
+const_IWSubstring::operator+=(int howfar)
 {
   assert (howfar >= 0 && howfar <= _nchars);
 
@@ -3533,11 +3792,11 @@ const_IWSubstring::operator+= (int howfar)
 }
 
 int
-IWString::strspn (const char * s2)
+IWString::strspn(const char * s2)
 {
   null_terminate ();
 
-  return static_cast<int>(::strspn (_things, s2));
+  return static_cast<int>(::strspn(_things, s2));
 }
 
 /*
@@ -3575,57 +3834,57 @@ common_split (const char * s, int nchars,
 
   if (0 == sindex)       // before is empty
   {
-    after.set (s + 1, nchars - 1);
+    after.set(s + 1, nchars - 1);
     return 1;
   }
 
   if (sindex == nchars - 1)    // after is empty
   {
-    before.set (s, nchars - 1);
+    before.set(s, nchars - 1);
     return 1;
   }
 
-  before.set (s, sindex);
-  after.set (s + sindex + 1, nchars - sindex - 1);
+  before.set(s, sindex);
+  after.set(s + sindex + 1, nchars - sindex - 1);
 
   return 2;
 }
 
 //#if defined (__GNUG__) || defined (__SUNPRO_CC)
-template int common_split (const char *, int, const_IWSubstring &, char, const_IWSubstring &);
-template int common_split (const char *, int, IWString &, char, IWString &);
+template int common_split(const char *, int, const_IWSubstring &, char, const_IWSubstring &);
+template int common_split(const char *, int, IWString &, char, IWString &);
 //#endif
 
 int
-IWString::split (const_IWSubstring & before,
+IWString::split(const_IWSubstring & before,
                  char separator,
                  const_IWSubstring & after) const
 {
-  return common_split (_things, _number_elements, before, separator, after);
+  return common_split(_things, _number_elements, before, separator, after);
 }
 
 int
-IWString::split (IWString & before,
+IWString::split(IWString & before,
                  char separator,
                  IWString & after) const
 {
-  return common_split (_things, _number_elements, before, separator, after);
+  return common_split(_things, _number_elements, before, separator, after);
 }
 
 int
-const_IWSubstring::split (const_IWSubstring & before,
+const_IWSubstring::split(const_IWSubstring & before,
                           char separator,
                           const_IWSubstring & after) const
 {
-  return common_split (_data, _nchars, before, separator, after);
+  return common_split(_data, _nchars, before, separator, after);
 }
 
 int
-const_IWSubstring::split (IWString & before,
+const_IWSubstring::split(IWString & before,
                           char separator,
                           IWString & after) const
 {
-  return common_split (_data, _nchars, before, separator, after);
+  return common_split(_data, _nchars, before, separator, after);
 }
 
 IWString &
@@ -3645,7 +3904,7 @@ operator << (IWString & s1, const const_IWSubstring & s2)
 }
 
 IWString &
-IWString::operator << (const const_IWSubstring & s2)
+IWString::operator <<(const const_IWSubstring & s2)
 {
   operator += (s2);
 
@@ -3653,7 +3912,7 @@ IWString::operator << (const const_IWSubstring & s2)
 }
 
 IWString & 
-IWString::operator << (const IWString & s2)
+IWString::operator <<(const IWString & s2)
 {
   operator += (s2);
 
@@ -3678,7 +3937,7 @@ operator << (IWString & s1, char s2)
 }
 
 IWString &
-IWString::operator << (char s2)
+IWString::operator <<(char s2)
 {
   operator += (s2);
 
@@ -3686,9 +3945,9 @@ IWString::operator << (char s2)
 }
 
 IWString &
-IWString::operator << (const char * s2)
+IWString::operator <<(const char * s2)
 {
-  add (s2, static_cast<int>(::strlen (s2)));
+  add (s2, static_cast<int>(::strlen(s2)));
 
   return *this;
 }
@@ -3696,47 +3955,55 @@ IWString::operator << (const char * s2)
 IWString &
 operator << (IWString & s1, int s2)
 {
-  s1.append_number (s2);
+  s1.append_number(s2);
 
   return s1;
 }
 
 IWString &
-IWString::operator << (int i)
+IWString::operator <<(int i)
 {
-  append_number (i);
+  append_number(i);
 
   return *this;
 }
 
 IWString &
-IWString::operator << (long i)
+IWString::operator <<(long i)
 {
-  append_number (i);
+  append_number(i);
 
   return *this;
 }
 
 IWString &
-IWString::operator << (long long i)
+IWString::operator <<(long long i)
 {
-  append_number (i);
+  append_number(i);
 
   return *this;
 }
 
 IWString &
-IWString::operator << (unsigned long long i)
+IWString::operator <<(unsigned long long i)
 {
-  append_number (i);
+  append_number(i);
 
   return *this;
 }
 
 IWString &
-IWString::operator << (unsigned int i)
+IWString::operator <<(unsigned long i)
 {
-  append_number (i);
+  append_number(i);
+
+  return *this;
+}
+
+IWString &
+IWString::operator <<(unsigned int i)
+{
+  append_number(i);
 
   return *this;
 }
@@ -3744,23 +4011,23 @@ IWString::operator << (unsigned int i)
 IWString &
 operator << (IWString & s1, float s2)
 {
-  s1.append_number (s2);
+  s1.append_number(s2);
 
   return s1;
 }
 
 IWString &
-IWString::operator << (float s2)
+IWString::operator <<(float s2)
 {
-  append_number (s2);
+  append_number(s2);
 
   return *this;
 }
 
 IWString &
-IWString::operator << (double s2)
+IWString::operator <<(double s2)
 {
-  append_number (s2);
+  append_number(s2);
 
   return *this;
 }
@@ -3775,10 +4042,10 @@ common_split (resizable_array_p<const_IWSubstring> & tokens,
 
   int i = 0;
   const_IWSubstring token;
-  while (internal_nextword (token, i, separator, zdata, nchars))
+  while (internal_nextword(token, i, separator, zdata, nchars))
   {
-    const_IWSubstring * tmp = new const_IWSubstring (zdata + i - token.nchars (), token.nchars ());
-    tokens.add (tmp);
+    const_IWSubstring * tmp = new const_IWSubstring(zdata + i - token.nchars(), token.nchars());
+    tokens.add(tmp);
 
     rc++;
   }
@@ -3796,10 +4063,10 @@ common_split (resizable_array_p<IWString> & tokens,
 
   int i = 0;
   const_IWSubstring token;
-  while (internal_nextword (token, i, separator, zdata, nchars))
+  while (internal_nextword(token, i, separator, zdata, nchars))
   {
-    IWString * tmp = new IWString (zdata + i - token.nchars (), token.nchars ());
-    tokens.add (tmp);
+    IWString * tmp = new IWString(zdata + i - token.nchars(), token.nchars());
+    tokens.add(tmp);
 
     rc++;
   }
@@ -3808,40 +4075,40 @@ common_split (resizable_array_p<IWString> & tokens,
 }
 
 int
-IWString::split (resizable_array_p<const_IWSubstring> & tokens,
+IWString::split(resizable_array_p<const_IWSubstring> & tokens,
                  char separator) const
 {
-  tokens.resize_keep_storage (0);
-  int nw = nwords (separator);
-  if (tokens.elements_allocated () < nw)
-    tokens.resize (nw);
+  tokens.resize_keep_storage(0);
+  int nw = nwords(separator);
+  if (tokens.elements_allocated() < nw)
+    tokens.resize(nw);
 
-  return common_split (tokens, separator, _things, _number_elements);
+  return common_split(tokens, separator, _things, _number_elements);
 }
 
 int
-IWString::split (resizable_array_p<IWString> & tokens,
+IWString::split(resizable_array_p<IWString> & tokens,
                  char separator) const
 {
-  tokens.resize_keep_storage (0);
+  tokens.resize_keep_storage(0);
 
-  int nw = nwords (separator);
-  if (tokens.elements_allocated () < nw)
-    tokens.resize (nw);
+  int nw = nwords(separator);
+  if (tokens.elements_allocated() < nw)
+    tokens.resize(nw);
 
-  return common_split (tokens, separator, _things, _number_elements);
+  return common_split(tokens, separator, _things, _number_elements);
 }
 
 int
-const_IWSubstring::split (resizable_array_p<const_IWSubstring> & tokens,
+const_IWSubstring::split(resizable_array_p<const_IWSubstring> & tokens,
                           char separator) const
 {
-  tokens.resize_keep_storage (0);
-  int nw = nwords (separator);
-  if (tokens.elements_allocated () < nw)
-    tokens.resize (nw);
+  tokens.resize_keep_storage(0);
+  int nw = nwords(separator);
+  if (tokens.elements_allocated() < nw)
+    tokens.resize(nw);
 
-  return common_split (tokens, separator, _data, _nchars);
+  return common_split(tokens, separator, _data, _nchars);
 }
 
 template <typename T>
@@ -3850,9 +4117,9 @@ common_split (const char * s, int nchars,
               iwaray<T> & tokens,
               char separator)
 {
-  int nw = common_nwords_with_separator (s, nchars, separator);
+  int nw = common_nwords_with_separator(s, nchars, separator);
 
-  if (! tokens.resize (nw))
+  if (! tokens.resize(nw))
   {
     cerr << "Memory failure in split\n";
     return 0;
@@ -3862,7 +4129,7 @@ common_split (const char * s, int nchars,
 
   int i = 0;
   const_IWSubstring token;
-  while (internal_nextword (token, i, separator, s, nchars))
+  while (internal_nextword(token, i, separator, s, nchars))
   {
     tokens[rc] = token;
 
@@ -3875,26 +4142,26 @@ common_split (const char * s, int nchars,
 }
 
 //#if defined (__GNUG__) || defined (__SUNPRO_CC)
-template int common_split (const char *, int, iwaray<IWString> &, char);
-template int common_split (const char *, int, iwaray<const_IWSubstring> &, char);
+template int common_split(const char *, int, iwaray<IWString> &, char);
+template int common_split(const char *, int, iwaray<const_IWSubstring> &, char);
 //#endif
 
 int
-IWString::split (iwaray<const_IWSubstring> & tokens, char separator) const
+IWString::split(iwaray<const_IWSubstring> & tokens, char separator) const
 {
-  return common_split (_things, _number_elements, tokens, separator);
+  return common_split(_things, _number_elements, tokens, separator);
 }
 
 int
-const_IWSubstring::split (iwaray<const_IWSubstring> & tokens, char separator) const
+const_IWSubstring::split(iwaray<const_IWSubstring> & tokens, char separator) const
 {
-  return common_split (_data, _nchars, tokens, separator);
+  return common_split(_data, _nchars, tokens, separator);
 }
 
 int
-IWString::split (iwaray<IWString> & tokens, char separator) const
+IWString::split(iwaray<IWString> & tokens, char separator) const
 {
-  return common_split (_things, _number_elements, tokens, separator);
+  return common_split(_things, _number_elements, tokens, separator);
 }
 
 static int
@@ -3909,7 +4176,7 @@ common_split (const char * s,
   const_IWSubstring token;
   int rc = 0;
 
-  while (internal_nextword (token, i, separator, s, nchars))
+  while (internal_nextword(token, i, separator, s, nchars))
   {
     tokens[rc] = token;
 
@@ -3920,21 +4187,21 @@ common_split (const char * s,
 }
 
 int
-const_IWSubstring::split (IWString * tokens, char separator) const
+const_IWSubstring::split(IWString * tokens, char separator) const
 {
-  return common_split (_data, _nchars, tokens, separator);
+  return common_split(_data, _nchars, tokens, separator);
 }
 
 
 int
-IWString::split (IWString * tokens, char separator) const
+IWString::split(IWString * tokens, char separator) const
 {
-  return common_split (_things, _number_elements, tokens, separator);
+  return common_split(_things, _number_elements, tokens, separator);
 }
 
 
 int
-IWString::remove_up_to_first (char target)
+IWString::remove_up_to_first(char target)
 {
   int index_of_target = -1;
   for (int i = 0; i < _number_elements; i++)
@@ -3951,7 +4218,7 @@ IWString::remove_up_to_first (char target)
 
   if (index_of_target == _number_elements - 1)
   {
-    resize (0);
+    resize(0);
     return index_of_target + 1;
   }
 
@@ -3968,7 +4235,7 @@ IWString::remove_up_to_first (char target)
 }
 
 int
-const_IWSubstring::remove_up_to_first (char target)
+const_IWSubstring::remove_up_to_first(char target)
 {
   int index_of_target = -1;
   for (int i = 0; i < _nchars; i++)
@@ -3996,210 +4263,210 @@ const_IWSubstring::remove_up_to_first (char target)
 */
 
 int 
-const_IWSubstring::operator < (int rhs) const
+const_IWSubstring::operator <(int rhs) const
 {
   int intme;
-  if (! numeric_value (intme))
+  if (! numeric_value(intme))
   {
     cerr << "Non numeric string value '";
-    cerr.write (_data, _nchars) << "'\n";
-    abort ();
+    cerr.write(_data, _nchars) << "'\n";
+    abort();
   }
 
   return intme < rhs;
 }
 
 int
-const_IWSubstring::operator == (int rhs) const
+const_IWSubstring::operator ==(int rhs) const
 {
   int intme;
-  if (! numeric_value (intme))
+  if (! numeric_value(intme))
   {
     cerr << "Non numeric string value '";
-    cerr.write (_data, _nchars) << "'\n";
-    abort ();
+    cerr.write(_data, _nchars) << "'\n";
+    abort();
   }
 
   return intme == rhs;
 }
 
 int
-const_IWSubstring::operator <= (int rhs) const
+const_IWSubstring::operator <=(int rhs) const
 {
   int intme;
-  if (! numeric_value (intme))
+  if (! numeric_value(intme))
   {
     cerr << "Non numeric string value '";
-    cerr.write (_data, _nchars) << "'\n";
-    abort ();
+    cerr.write(_data, _nchars) << "'\n";
+    abort();
   }
 
   return intme <= rhs;
 }
 
 int
-const_IWSubstring::operator >= (int rhs) const
+const_IWSubstring::operator >=(int rhs) const
 {
   int intme;
-  if (! numeric_value (intme))
+  if (! numeric_value(intme))
   {
     cerr << "Non numeric string value '";
-    cerr.write (_data, _nchars) << "'\n";
-    abort ();
+    cerr.write(_data, _nchars) << "'\n";
+    abort();
   }
 
   return intme >= rhs;
 }
 
 int
-const_IWSubstring::operator != (int rhs) const
+const_IWSubstring::operator !=(int rhs) const
 {
   int intme;
-  if (! numeric_value (intme))
+  if (! numeric_value(intme))
   {
     cerr << "Non numeric string value '";
-    cerr.write (_data, _nchars) << "'\n";
-    abort ();
+    cerr.write(_data, _nchars) << "'\n";
+    abort();
   }
 
   return intme != rhs;
 }
 
 int 
-const_IWSubstring::operator < (float rhs) const
+const_IWSubstring::operator <(float rhs) const
 {
   float floatme;
-  if (! numeric_value (floatme))
+  if (! numeric_value(floatme))
   {
     cerr << "Non numeric string value '";
-    cerr.write (_data, _nchars) << "'\n";
-    abort ();
+    cerr.write(_data, _nchars) << "'\n";
+    abort();
   }
 
   return floatme < rhs;
 }
 
 int
-const_IWSubstring::operator == (float rhs) const
+const_IWSubstring::operator ==(float rhs) const
 {
   float floatme;
-  if (! numeric_value (floatme))
+  if (! numeric_value(floatme))
   {
     cerr << "Non numeric string value '";
-    cerr.write (_data, _nchars) << "'\n";
-    abort ();
+    cerr.write(_data, _nchars) << "'\n";
+    abort();
   }
 
   return floatme == rhs;
 }
 
 int
-const_IWSubstring::operator <= (float rhs) const
+const_IWSubstring::operator <=(float rhs) const
 {
   float floatme;
-  if (! numeric_value (floatme))
+  if (! numeric_value(floatme))
   {
     cerr << "Non numeric string value '";
-    cerr.write (_data, _nchars) << "'\n";
-    abort ();
+    cerr.write(_data, _nchars) << "'\n";
+    abort();
   }
 
   return floatme <= rhs;
 }
 
 int
-const_IWSubstring::operator >= (float rhs) const
+const_IWSubstring::operator >=(float rhs) const
 {
   float floatme;
-  if (! numeric_value (floatme))
+  if (! numeric_value(floatme))
   {
     cerr << "Non numeric string value '";
-    cerr.write (_data, _nchars) << "'\n";
-    abort ();
+    cerr.write(_data, _nchars) << "'\n";
+    abort();
   }
 
   return floatme >= rhs;
 }
 
 int
-const_IWSubstring::operator != (float rhs) const
+const_IWSubstring::operator !=(float rhs) const
 {
   float floatme;
-  if (! numeric_value (floatme))
+  if (! numeric_value(floatme))
   {
     cerr << "Non numeric string value '";
-    cerr.write (_data, _nchars) << "'\n";
-    abort ();
+    cerr.write(_data, _nchars) << "'\n";
+    abort();
   }
 
   return floatme != rhs;
 }
 
 int 
-const_IWSubstring::operator < (double rhs) const
+const_IWSubstring::operator <(double rhs) const
 {
   double doubleme;
-  if (! numeric_value (doubleme))
+  if (! numeric_value(doubleme))
   {
     cerr << "Non numeric string value '";
-    cerr.write (_data, _nchars) << "'\n";
-    abort ();
+    cerr.write(_data, _nchars) << "'\n";
+    abort();
   }
 
   return doubleme < rhs;
 }
 
 int
-const_IWSubstring::operator == (double rhs) const
+const_IWSubstring::operator ==(double rhs) const
 {
   double doubleme;
-  if (! numeric_value (doubleme))
+  if (! numeric_value(doubleme))
   {
     cerr << "Non numeric string value '";
-    cerr.write (_data, _nchars) << "'\n";
-    abort ();
+    cerr.write(_data, _nchars) << "'\n";
+    abort();
   }
 
   return doubleme == rhs;
 }
 
 int
-const_IWSubstring::operator <= (double rhs) const
+const_IWSubstring::operator <=(double rhs) const
 {
   double doubleme;
-  if (! numeric_value (doubleme))
+  if (! numeric_value(doubleme))
   {
     cerr << "Non numeric string value '";
-    cerr.write (_data, _nchars) << "'\n";
-    abort ();
+    cerr.write(_data, _nchars) << "'\n";
+    abort();
   }
 
   return doubleme <= rhs;
 }
 
 int
-const_IWSubstring::operator >= (double rhs) const
+const_IWSubstring::operator >=(double rhs) const
 {
   double doubleme;
-  if (! numeric_value (doubleme))
+  if (! numeric_value(doubleme))
   {
     cerr << "Non numeric string value '";
-    cerr.write (_data, _nchars) << "'\n";
-    abort ();
+    cerr.write(_data, _nchars) << "'\n";
+    abort();
   }
 
   return doubleme >= rhs;
 }
 
 int
-const_IWSubstring::operator != (double rhs) const
+const_IWSubstring::operator !=(double rhs) const
 {
   double doubleme;
-  if (! numeric_value (doubleme))
+  if (! numeric_value(doubleme))
   {
     cerr << "Non numeric string value '";
-    cerr.write (_data, _nchars) << "'\n";
-    abort ();
+    cerr.write(_data, _nchars) << "'\n";
+    abort();
   }
 
   return doubleme != rhs;
@@ -4223,15 +4490,15 @@ common_balance (char open, char close, const char * s, int nchars)
 }
 
 int
-const_IWSubstring::balance (char open, char close) const
+const_IWSubstring::balance(char open, char close) const
 {
-  return common_balance (open, close, _data, _nchars);
+  return common_balance(open, close, _data, _nchars);
 }
 
 int
-IWString::balance (char open, char close) const
+IWString::balance(char open, char close) const
 {
-  return common_balance (open, close, _things, _number_elements);
+  return common_balance(open, close, _things, _number_elements);
 }
 
 /*
@@ -4239,32 +4506,32 @@ IWString::balance (char open, char close) const
 */
 
 void
-IWString::append (int n, const char * s)
+IWString::append(int n, const char * s)
 {
-  _append (n, s, static_cast<int>(::strlen (s)));
+  _append(n, s, static_cast<int>(::strlen(s)));
 
   return;
 }
 
 void
-IWString::append (int n, const IWString & s)
+IWString::append(int n, const IWString & s)
 {
-  _append (n, s.rawchars (), s.length ());
+  _append(n, s.rawchars(), s.length());
 
   return;
 }
 
 void
-IWString::_append (int n, const char * s, int nchars)
+IWString::_append(int n, const char * s, int nchars)
 {
   int storage_needed = _number_elements + n * nchars;
 
   if (_elements_allocated < storage_needed)
-    resize (storage_needed);
+    resize(storage_needed);
 
   for (int i = 0; i < n; i++)
   {
-    IW_STRNCPY (_things + _number_elements, s, nchars);
+    IW_STRNCPY(_things + _number_elements, s, nchars);
     _number_elements += nchars;
   }
 
@@ -4272,43 +4539,43 @@ IWString::_append (int n, const char * s, int nchars)
 }
 
 const_IWSubstring
-const_IWSubstring::before (char c) const
+const_IWSubstring::before(char c) const
 {
-  int i = index (c);
+  int i = index(c);
   if (i <= 0)
     return "";
 
-  return const_IWSubstring (_data, i);
+  return const_IWSubstring(_data, i);
 }
 
 const_IWSubstring
-const_IWSubstring::after (char c) const
+const_IWSubstring::after(char c) const
 {
-  int i = index (c);
+  int i = index(c);
   if (i <= 0)
     return "";
 
-  return const_IWSubstring (_data + i + 1, _nchars - i - 1);
+  return const_IWSubstring(_data + i + 1, _nchars - i - 1);
 }
 
 const_IWSubstring
-IWString::before (char c) const
+IWString::before(char c) const
 {
-  int i = index (c);
+  int i = index(c);
   if (i <= 0)
     return "";
 
-  return const_IWSubstring (_things, i);
+  return const_IWSubstring(_things, i);
 }
 
 const_IWSubstring
-IWString::after (char c) const
+IWString::after(char c) const
 {
-  int i = index (c);
+  int i = index(c);
   if (i <= 0)
     return "";
 
-  return const_IWSubstring (_things + i + 1, _number_elements - i - 1);
+  return const_IWSubstring(_things + i + 1, _number_elements - i - 1);
 }
 
 template <typename T>
@@ -4346,68 +4613,68 @@ common_basename (const char * s, int nchars,
   }
 
   if (last_separator > nchars)    // no separator found
-    zresult.set (s, nchars);
+    zresult.set(s, nchars);
   else
-    zresult.set (s + last_separator + 1, nchars - last_separator - 1);
+    zresult.set(s + last_separator + 1, nchars - last_separator - 1);
 
   return 1;
 }
 
-//#if defined (__GNUG__) || defined (__SUNPRO_CC)
-template int common_basename (const char *, int, const_IWSubstring &, char);
-template int common_basename (const char *, int, IWString &, char);
+//#if defined (__GNUG__) || defined(__SUNPRO_CC)
+template int common_basename(const char *, int, const_IWSubstring &, char);
+template int common_basename(const char *, int, IWString &, char);
 //#endif
 
 void
-const_IWSubstring::iwbasename (const_IWSubstring & zresult, char separator) const
+const_IWSubstring::iwbasename(const_IWSubstring & zresult, char separator) const
 {
-  common_basename (_data, _nchars, zresult, separator);
+  common_basename(_data, _nchars, zresult, separator);
 
   return;
 }
 
 void
-IWString::iwbasename (const_IWSubstring & zresult, char separator) const
+IWString::iwbasename(const_IWSubstring & zresult, char separator) const
 {
-  common_basename (_things, _number_elements, zresult, separator);
+  common_basename(_things, _number_elements, zresult, separator);
 
   return;
 }
 
 void
-const_IWSubstring::iwbasename (IWString & zresult, char separator) const
+const_IWSubstring::iwbasename(IWString & zresult, char separator) const
 {
-  common_basename (_data, _nchars, zresult, separator);
+  common_basename(_data, _nchars, zresult, separator);
 
   return;
 }
 
 void
-IWString::iwbasename (IWString & zresult, char separator) const
+IWString::iwbasename(IWString & zresult, char separator) const
 {
-  common_basename (_things, _number_elements, zresult, separator);
+  common_basename(_things, _number_elements, zresult, separator);
 
   return;
 }
 
 IWString &
-IWString::append_to_space_separated_list (const IWString & rhs)
+IWString::append_to_space_separated_list(const IWString & rhs)
 {
   if (_number_elements)
   {
-    resizable_array<char>::make_room_for_extra_items (1 + rhs._number_elements);
-    resizable_array<char>::add (' ');
+    resizable_array<char>::make_room_for_extra_items(1 + rhs._number_elements);
+    resizable_array<char>::add(' ');
   }
   else
-    resizable_array<char>::make_room_for_extra_items (rhs._number_elements);
+    resizable_array<char>::make_room_for_extra_items(rhs._number_elements);
 
-  resizable_array<char>::add (rhs._things, rhs._number_elements);
+  resizable_array<char>::add(rhs._things, rhs._number_elements);
 
   return *this;
 }
 
 int
-IWString::remove_chars (int istart, int nchars)
+IWString::remove_chars(int istart, int nchars)
 {
   assert (istart >= 0 && istart < _number_elements);
   assert (nchars >= 0);
@@ -4427,13 +4694,13 @@ IWString::remove_chars (int istart, int nchars)
 }
 
 int
-IWString::remove_from_to (int zfrom, int zto)
+IWString::remove_from_to(int zfrom, int zto)
 {
-  return remove_chars (zfrom, zto - zfrom + 1);
+  return remove_chars(zfrom, zto - zfrom + 1);
 }
 
 int 
-IWString::_common_gsub (const char * zfrom,
+IWString::_common_gsub(const char * zfrom,
                         int len_from,
                         const char * zto,
                         int len_to)
@@ -4445,11 +4712,11 @@ IWString::_common_gsub (const char * zfrom,
     return 0;
 
   if (len_from > len_to)
-    return _common_gsub_getting_smaller (zfrom, len_from, zto, len_to);
+    return _common_gsub_getting_smaller(zfrom, len_from, zto, len_to);
   else if (len_from < len_to)
-    return _common_gsub_getting_larger (zfrom, len_from, zto, len_to);
+    return _common_gsub_getting_larger(zfrom, len_from, zto, len_to);
   else
-    return _common_gsub_same_size (zfrom, len_from, zto);
+    return _common_gsub_same_size(zfrom, len_from, zto);
 }
 
 /*
@@ -4458,7 +4725,7 @@ IWString::_common_gsub (const char * zfrom,
 */
 
 int
-IWString::_common_gsub_getting_larger (const char * zfrom,
+IWString::_common_gsub_getting_larger(const char * zfrom,
                         int len_from,
                         const char * zto,
                         int len_to)
@@ -4482,15 +4749,15 @@ IWString::_common_gsub_getting_larger (const char * zfrom,
 
   int iptr = 0;
 
-  int increment_iptr;
+/*int increment_iptr;
   if (len_from > len_to)
     increment_iptr = len_to;
   else 
-    increment_iptr = len_from;
+    increment_iptr = len_from;*/
 
   while (iptr < _number_elements - len_from + 1)
   {
-    if (_things[iptr] != zfrom[0] || 0 != ::strncmp (_things + iptr, zfrom, len_from))
+    if (_things[iptr] != zfrom[0] || 0 != ::strncmp(_things + iptr, zfrom, len_from))
     {
       iptr++;
       continue;
@@ -4501,13 +4768,13 @@ IWString::_common_gsub_getting_larger (const char * zfrom,
       if (rc > 1 && 0 == rc % 10)           // looks like lots of matches
         extra_allocation = extra_allocation * 2;
       
-      make_room_for_extra_items (extra_allocation);
+      make_room_for_extra_items(extra_allocation);
     }
 
-    ::memmove (_things + iptr + len_to, _things + iptr + len_from, _number_elements - iptr - len_from);
+    ::memmove(_things + iptr + len_to, _things + iptr + len_from, _number_elements - iptr - len_from);
     _number_elements += delta;
 
-    ::memcpy (_things + iptr, zto, len_to);
+    ::memcpy(_things + iptr, zto, len_to);
 
     iptr = iptr + len_to;
 
@@ -4518,7 +4785,7 @@ IWString::_common_gsub_getting_larger (const char * zfrom,
 }
 
 int
-IWString::_common_gsub_same_size (const char * zfrom,
+IWString::_common_gsub_same_size(const char * zfrom,
                                   int len_from,
                                   const char * zto)
 {
@@ -4528,13 +4795,13 @@ IWString::_common_gsub_same_size (const char * zfrom,
 
   while (iptr < _number_elements - len_from + 1)
   {
-    if (_things[iptr] != zfrom[0] || 0 != ::strncmp (_things + iptr, zfrom, len_from))
+    if (_things[iptr] != zfrom[0] || 0 != ::strncmp(_things + iptr, zfrom, len_from))
     {
       iptr++;
       continue;
     }
 
-    ::memcpy (_things + iptr, zto, len_from);    // copy replacement string in place
+    ::memcpy(_things + iptr, zto, len_from);    // copy replacement string in place
 
     iptr += len_from;
 
@@ -4545,7 +4812,7 @@ IWString::_common_gsub_same_size (const char * zfrom,
 }
 
 int
-IWString::_common_gsub_getting_smaller (const char * zfrom,
+IWString::_common_gsub_getting_smaller(const char * zfrom,
                                         int len_from,
                                         const char * zto,
                                         int len_to)
@@ -4559,7 +4826,7 @@ IWString::_common_gsub_getting_smaller (const char * zfrom,
 
   while (readfrom < _number_elements - len_from + 1)
   {
-    if (_things[readfrom] != zfrom[0] || 0 != ::strncmp (_things + readfrom, zfrom, len_from))
+    if (_things[readfrom] != zfrom[0] || 0 != ::strncmp(_things + readfrom, zfrom, len_from))
     {
       if (readfrom != putback)
         _things[putback] = _things[readfrom];
@@ -4570,7 +4837,7 @@ IWString::_common_gsub_getting_smaller (const char * zfrom,
       continue;
     }
 
-    ::memcpy (_things + putback, zto, len_to);    // copy replacement string in place
+    ::memcpy(_things + putback, zto, len_to);    // copy replacement string in place
 
     readfrom += len_from;
     putback += len_to;
@@ -4584,7 +4851,7 @@ IWString::_common_gsub_getting_smaller (const char * zfrom,
   if (rc > 0)  
   {
     if (readfrom < _number_elements)
-      ::memmove (_things + putback, _things + readfrom, _number_elements - readfrom);
+      ::memmove(_things + putback, _things + readfrom, _number_elements - readfrom);
 
     _number_elements = _number_elements - rc * (len_from - len_to);
   }
@@ -4593,27 +4860,27 @@ IWString::_common_gsub_getting_smaller (const char * zfrom,
 }
 
 int
-IWString::gsub (const char * zfrom, const char * zto)
+IWString::gsub(const char * zfrom, const char * zto)
 {
-  return _common_gsub (zfrom, static_cast<int>(::strlen (zfrom)), zto, static_cast<int>(::strlen (zto)));
+  return _common_gsub(zfrom, static_cast<int>(::strlen(zfrom)), zto, static_cast<int>(::strlen(zto)));
 }
 
 int
-IWString::gsub (const const_IWSubstring & zfrom, const const_IWSubstring & zto)
+IWString::gsub(const const_IWSubstring & zfrom, const const_IWSubstring & zto)
 {
-  return _common_gsub (zfrom.rawchars (), zfrom.length (), zto.rawchars (), zto.length ());
+  return _common_gsub(zfrom.rawchars(), zfrom.length(), zto.rawchars(), zto.length());
 }
 
 int
-IWString::gsub (char zfrom, const IWString & zto)
+IWString::gsub(char zfrom, const IWString & zto)
 {
-  return _common_gsub (&zfrom, 1, zto.rawchars (), zto.length ());
+  return _common_gsub(&zfrom, 1, zto.rawchars(), zto.length());
 }
 
 int
-IWString::gsub (char zfrom, const char * zto)
+IWString::gsub(char zfrom, const char * zto)
 {
-  return _common_gsub (&zfrom, 1, zto, static_cast<int>(::strlen (zto)));
+  return _common_gsub(&zfrom, 1, zto, static_cast<int>(::strlen(zto)));
 }
 
 static int
@@ -4626,30 +4893,30 @@ common_matches_at_position (const char * s1,
   if (offset + lens2 > lens1)
     return 0;
 
-  return 0 == ::strncmp (s1 + offset, s2, lens2);
+  return 0 == ::strncmp(s1 + offset, s2, lens2);
 }
 
 int
-const_IWSubstring::matches_at_position (int o,
+const_IWSubstring::matches_at_position(int o,
                                         const char * s,
                                         int lens) const
 {
-  return common_matches_at_position (_data, _nchars, o, s, static_cast<int>(lens));
+  return common_matches_at_position(_data, _nchars, o, s, static_cast<int>(lens));
 }
 
 int
-const_IWSubstring::matches_at_position (int o,
+const_IWSubstring::matches_at_position(int o,
                                         const IWString & s) const
 {
-  return common_matches_at_position (_data, _nchars, o, s.rawchars (), s.length ());
+  return common_matches_at_position(_data, _nchars, o, s.rawchars(), s.length());
 }
 
 int
-IWString::matches_at_position (int o,
+IWString::matches_at_position(int o,
                                const char * s,
                                int lens) const
 {
-  return common_matches_at_position (_things, _number_elements, o, s, static_cast<int>(lens));
+  return common_matches_at_position(_things, _number_elements, o, s, static_cast<int>(lens));
 }
 
 template <typename T>
@@ -4708,34 +4975,36 @@ IWString::nextword_single_delimiter(T & zresult, int & i,  char separator) const
   return common_nextword_single_delimiter(_things, _number_elements, i, separator, zresult);
 }
 
+
 template int IWString::nextword_single_delimiter<const_IWSubstring>(const_IWSubstring&, int&, char) const;
 template int IWString::nextword_single_delimiter<IWString>(IWString&, int&, char) const;
 template int const_IWSubstring::nextword_single_delimiter<const_IWSubstring>(const_IWSubstring&, int&, char) const;
 template int const_IWSubstring::nextword_single_delimiter<IWString>(IWString&, int&, char) const;
+
 template int common_nextword_single_delimiter<const_IWSubstring>(char const*, int, int&, char, const_IWSubstring&);
 template int common_nextword_single_delimiter<IWString>(char const*, int, int&, char, IWString&);
 
 #if defined (IW_STD_STRING_DEFINED)
-const_IWSubstring::const_IWSubstring (const std::string & rhs)
+const_IWSubstring::const_IWSubstring(const std::string & rhs)
 {
-  set (rhs.data (), rhs.length ());
+  set(rhs.data(), rhs.length());
 
   return;
 }
 
 const_IWSubstring &
-const_IWSubstring::operator = (const std::string & rhs)
+const_IWSubstring::operator =(const std::string & rhs)
 {
-  set (rhs.data (), rhs.length ());
+  set(rhs.data(), rhs.length());
 
   return *this;
 }
 
-IWString::IWString (const std::string & rhs)
+IWString::IWString(const std::string & rhs)
 {
-  _default_values ();
+  _default_values();
 
-  IWString::strncpy (rhs.data (), static_cast<int>(rhs.length ()));
+  IWString::strncpy(rhs.data(), static_cast<int>(rhs.length()));
 }
 
 IWString::IWString(int s)
@@ -4757,17 +5026,17 @@ IWString::IWString(unsigned int s)
 }
 
 IWString &
-IWString::operator = (const std::string & rhs)
+IWString::operator =(const std::string & rhs)
 {
-  IWString::strncpy (rhs.data(), static_cast<int>(rhs.length()));
+  IWString::strncpy(rhs.data(), static_cast<int>(rhs.length()));
 
   return *this;
 }
 
 void
-IWString::operator += (const std::string & rhs)
+IWString::operator +=(const std::string & rhs)
 {
-  const_IWSubstring tmp (rhs);
+  const_IWSubstring tmp(rhs);
 
   operator += (tmp);
 
@@ -4776,5 +5045,222 @@ IWString::operator += (const std::string & rhs)
 
 #endif
 
-// arch-tag: ce0fec8e-22a2-4d97-aef9-9df24f066066
+/*
+  Some names taken from 
 
+  https://blog.codinghorror.com/ascii-pronunciation-rules-for-programmers/
+*/
+
+int
+char_name_to_char(IWString & s)
+{
+  if (1 == s.length())
+    return 1;
+
+  if ("tab" == s)
+  {
+    s = '\t';
+    return 1;
+  }
+
+  if ("comma" == s)
+  {
+    s = ',';
+    return 1;
+  }
+
+  if ("space" == s)
+  {
+    s = ' ';
+    return 1;
+  }
+
+  if ("vbar" == s || "bar" == s)
+  {
+    s = '|';
+    return 1;
+  }
+
+  if ("squote" == s)
+  {
+    s = '\'';
+    return 1;
+  }
+
+  if ("dquote" == s)
+  {
+    s = '"';
+    return 1;
+  }
+
+  if ("semic" == s)
+  {
+    s = ';';
+    return 1;
+  }
+
+  if ("colon" == s)
+  {
+    s = ':';
+    return 1;
+  }
+
+  if ("and" == s || "amp" == s)
+  {
+    s = '&';
+    return 1;
+  }
+
+  if ("dollar" == s)
+  {
+    s = '$';
+    return 1;
+  }
+
+  if ("hash" == s)
+  {
+    s = '#';
+    return 1;
+  }
+
+  if ("at" == s)
+  {
+    s = '@';
+    return 1;
+  }
+
+  if ("excl" == s || "bang" == s)
+  {
+    s = '!';
+    return 1;
+  }
+
+  if ("squiggle" == s || "tilde" == s)
+  {
+    s = '~';
+    return 1;
+  }
+
+  if ("star" == s || "asterisk" == s)
+  {
+    s = '*';
+    return 1;
+  }
+
+  if ("hat" == s || "caret" == s)
+  {
+    s = '^';
+    return 1;
+  }
+
+  if ("oparen" == s || "lparen" == s)
+  {
+    s = '(';
+    return 1;
+  }
+
+  if ("cparen" == s || "rparen" == s)
+  {
+    s = ')';
+    return 1;
+  }
+
+  if ("dash" == s)
+  {
+    s = '-';
+    return 1;
+  }
+
+  if ("uscore" == s)
+  {
+    s = '_';
+    return 1;
+  }
+
+  if ("plus" == s)
+  {
+    s = '+';
+    return 1;
+  }
+
+  if ("minus" == s || "dash" == s)
+  {
+    s = '-';
+    return 1;
+  }
+
+  if ("ocbrace" == s || "lcbrace" == s)
+  {
+    s = '{';
+    return 1;
+  }
+
+  if ("ccbrace" == s || "rcbrace" == s)
+  {
+    s = '}';
+    return 1;
+  }
+
+  if ("osqb" == s || "lsqb" == s)
+  {
+    s = '[';
+    return 1;
+  }
+
+  if ("csqb" == s || "rsqb" == s)
+  {
+    s = ']';
+    return 1;
+  }
+
+  if ("bslash" == s)
+  {
+    s = '\\';
+    return 1;
+  }
+
+  if ("fslash" == s || "slash" == s)
+  {
+    s = '/';
+    return 1;
+  }
+
+  if ("dot" == s || "period" == s)
+  {
+    s = '.';
+    return 1;
+  }
+
+  if ("oangle" == s || "less" == s)
+  {
+    s = '<';
+    return 1;
+  }
+
+  if ("cangle" == s || "greater" == s)
+  {
+    s = '>';
+    return 1;
+  }
+
+  if ("qmark" == s)
+  {
+    s = '?';
+    return 1;
+  }
+
+  if ("pct" == s)
+  {
+    s = '%';
+    return 1;
+  }
+
+  if ("grave" == s || "backquote" == s)
+  {
+    s = '`';
+    return 1;
+  }
+
+  cerr << "Unrecognised character name '" << s << "'\n";
+  return 0;
+}

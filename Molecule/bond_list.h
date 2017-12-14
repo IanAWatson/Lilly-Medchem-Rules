@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef BOND_LIST_H
 #define BOND_LIST_H
 
@@ -42,7 +24,9 @@ class Bond_list : public resizable_array_p<Bond>
 
     int ok () const;
 
-    int debug_print (ostream &) const;
+    int debug_print (std::ostream &) const;
+
+    Bond_list & operator = (Bond_list && rhs);
 
     int nbonds () const { return _number_elements;}
 
@@ -50,6 +34,7 @@ class Bond_list : public resizable_array_p<Bond>
 
     int     remove_bonds_to_atom (atom_number_t, int = 0);
     int     remove_bond_between_atoms (atom_number_t, atom_number_t);
+    int     remove_bonds_involving_these_atoms (const int * rm);
 
     Bond *  bond_between_atoms (atom_number_t, atom_number_t) const;
 
@@ -76,6 +61,12 @@ class Bond_list : public resizable_array_p<Bond>
     int     unset_all_permanent_aromatic_bonds ();
 
     int     cis_trans_bonds_present() const;
+
+    int     remove_bonds_involving_these_atoms (const int * r, int adjust_atom_numbers);
+
+    int     adjust_atom_numbers_for_loss_of_atom (const atom_number_t zatom);
+
+    int     new_atom_numbers (const int * xref);   // makeing a subset, adjust the bonds to reflect the new numbering
 };
 
 #define OK_BOND_LIST(b) ( NULL != (b) && b->ok () )

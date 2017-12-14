@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef IWCONST_TDT_H
 #define IWCONST_TDT_H
 
@@ -71,21 +53,24 @@ class IW_TDT
 
     int next (iwstring_data_source &);
 
+    int build (const const_IWSubstring &);    // build from string with embedded newlines
+    int build (const char *, int);    // build from string with embedded newlines
+
     int next_dataitem (const_IWSubstring &, int &) const;
 
     int next_dataitem_value (const_IWSubstring & ztag, const_IWSubstring & zdata, int &) const;
 
-    int do_write (ostream &) const;
+    int do_write (std::ostream &) const;
 
     template <typename S>
     int echo_dataitem (const char * tag, int len_tag, int which_one, S & output) const;
 
-    int echo_dataitem (const IWString & tag, int which_one, ostream & output) const { return echo_dataitem (tag.rawchars (), tag.length (), which_one, output);}
-    int echo_dataitem (const const_IWSubstring & tag, int which_one, ostream & output) const { return echo_dataitem (tag.rawchars (), tag.length (), which_one, output);}
+    int echo_dataitem (const IWString & tag, int which_one, std::ostream & output) const { return echo_dataitem (tag.rawchars (), tag.length (), which_one, output);}
+    int echo_dataitem (const const_IWSubstring & tag, int which_one, std::ostream & output) const { return echo_dataitem (tag.rawchars (), tag.length (), which_one, output);}
 
     int echo_dataitem (const const_IWSubstring & tag, int which_one, IWString_and_File_Descriptor & output) const { return echo_dataitem (tag.rawchars (), tag.length (), which_one, output);}
 
-    int write_all_except_vbar (ostream &) const;
+    int write_all_except_vbar (std::ostream &) const;
     int write_all_except_vbar (IWString_and_File_Descriptor &) const;
 
     int dataitem_value (const char * tag, int len_tag, IWString & s, int which_one = 0) const { return _dataitem_value_string (tag, len_tag,                         s, which_one);}
@@ -144,6 +129,8 @@ class IW_TDT
     int count_dataitems (const IWString & tag) const { return count_dataitems (tag.rawchars (), tag.length ());}
 
     int count_dataitems (IW_Regular_Expression &) const;
+
+    bool operator == (const IW_TDT &) const;
 };
 
 extern std::ostream & operator << (std::ostream &, const IW_TDT &);
@@ -218,6 +205,8 @@ IW_TDT::dataitem (const char * tag,
                   S & s,
                   int which_to_find) const
 {
+  const const_IWSubstring mytag(tag, len_tag);
+
   int i = 0;
   const_IWSubstring token;
 
@@ -227,10 +216,7 @@ IW_TDT::dataitem (const char * tag,
 
   while (next_dataitem (token, i))
   {
-    if (token.length () < len_tag)
-      continue;
-
-    if (0 != token.strncmp (tag, len_tag))
+    if (! token.starts_with(mytag))
       continue;
 
     if ('<' == tag[len_tag - 1])     // TAG included the opening < character
@@ -331,7 +317,8 @@ IW_TDT::set_dataitem_value (const char * tag,
   int i = _find_index_in_end_array (tag, len_tag, which_one);
   if (i < 0)
   {
-    cerr << "IW_TDT::set_dataitem_value:no " << which_one << " instance of " << cerr.write (tag, len_tag) << "' found\n";
+    cerr << "IW_TDT::set_dataitem_value:no " << which_one << " instance of ";
+    cerr.write (tag, len_tag) << "' found\n";
     return 0;
   }
 

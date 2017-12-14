@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
 
 #include "mdl.h"
@@ -53,7 +35,7 @@ MDL_Atom_Record::_default_values()
 */
 
 int
-MDL_Atom_Record::build (const const_IWSubstring & buffer)
+MDL_Atom_Record::build(const const_IWSubstring & buffer)
 {
   if (buffer.length() < 34)
   {
@@ -63,9 +45,9 @@ MDL_Atom_Record::build (const const_IWSubstring & buffer)
 
   int nw = buffer.nwords();
 
-  if (nw < 6)
+  if (nw < 4)
   {
-    cerr << "MDL_Atom_Record::build:record must have at least 6 tokens '" << buffer << "'\n";
+    cerr << "MDL_Atom_Record::build:record must have at least 4 tokens '" << buffer << "'\n";
     return 0;
   }
 
@@ -77,7 +59,7 @@ MDL_Atom_Record::build (const const_IWSubstring & buffer)
   token.strip_leading_blanks();
   token.strip_trailing_blanks();
 
-  if (! token.numeric_value (_x))
+  if (! token.numeric_value(_x))
   {
     cerr << "Bad X value '" << token << "'\n";
     return 0;
@@ -87,7 +69,7 @@ MDL_Atom_Record::build (const const_IWSubstring & buffer)
   token.strip_leading_blanks();
   token.strip_trailing_blanks();
 
-  if (! token.numeric_value (_y))
+  if (! token.numeric_value(_y))
   {
     cerr << "Bad Y value '" << token << "'\n";
     return 0;
@@ -97,16 +79,16 @@ MDL_Atom_Record::build (const const_IWSubstring & buffer)
   token.strip_leading_blanks();
   token.strip_trailing_blanks();
 
-  if (! token.numeric_value (_z))
+  if (! token.numeric_value(_z))
   {
     cerr << "Bad Z value '" << token << "'\n";
     return 0;
   }
 
   int i = 30;
-  (void) buffer.nextword (_atomic_symbol, i);
+  (void) buffer.nextword(_atomic_symbol, i);
 
-  if (! buffer.nextword (token, i))    // very unusual, but OK
+  if (! buffer.nextword(token, i))    // very unusual, but OK
   {
     _msdiff = 0;
     _chg = 0;
@@ -114,25 +96,25 @@ MDL_Atom_Record::build (const const_IWSubstring & buffer)
     return 1;
   }
 
-  if (! token.numeric_value (_msdiff))
+  if (! token.numeric_value(_msdiff))
   {
     cerr << "Bad msdiff value '" << token << "'\n";
     return 0;
   }
 
-  if (! buffer.nextword (token, i))
+  if (! buffer.nextword(token, i))
     return 0;
 
-  if (! token.numeric_value (_chg))
+  if (! token.numeric_value(_chg))
   {
     cerr << "Bad chg value '" << token << "'\n";
     return 0;
   }
 
-  if (! buffer.nextword (token, i))
+  if (! buffer.nextword(token, i))
     return 1;
 
-  if (! token.numeric_value (_astere))
+  if (! token.numeric_value(_astere))
   {
     cerr << "Bad astere value '" << token << "'\n";
     return 0;
@@ -143,7 +125,7 @@ MDL_Atom_Record::build (const const_IWSubstring & buffer)
   if (! buffer.nextword(token, i))
     return 1;
 
-  if (! token.numeric_value (_hcount))
+  if (! token.numeric_value(_hcount))
   {
     cerr << "Bad hcount value '" << token << "'\n";
     return 0;
@@ -172,8 +154,9 @@ MDL_Atom_Record::build (const const_IWSubstring & buffer)
 
 // At this stage, we need to make some decisions. If nw is 16, then all tokens are
 // present. If nw is 13, then h0, and two following fields are absent
+// I think I need to change this to a column specific form...
 
-  if (16 == nw)
+  if (nw >= 15)
   {
     if (! buffer.nextword(token, i))    // if we got this far, we should have all the columns
     {
@@ -189,12 +172,25 @@ MDL_Atom_Record::build (const const_IWSubstring & buffer)
 
     (void) buffer.nextword(token, i);    // skip over unused column
     (void) buffer.nextword(token, i);
+//  cerr << "Last unused column '" << token << "'\n";
   }
   else
     _h0designator = 0;              // should not be necessary
 
-  if (! buffer.nextword(token, i))    // last 3 columns must be present if we got to here
+  if (buffer.length() < 60)
     return 1;
+
+  if (isdigit(buffer[60]))
+    buffer.from_to(60, 62, token);
+  else
+    buffer.nextword(token, i);
+
+// Beware three digit atom maps
+//    1.5000    7.4952    0.0000 C   0  0  0  0  0  0  0  0  2126  0  0
+//    2.2500    8.7942    0.0000 N   0  0  0  0  0  0  0  0  2127  0  0
+
+// not properly handling this...
+//   13.1012  -23.8165    0.0000 C   0  0  0  0  0  0  0  0 10101  0  0
 
   if (! token.numeric_value(_atom_map))
   {
@@ -202,9 +198,18 @@ MDL_Atom_Record::build (const const_IWSubstring & buffer)
     return 0;
   }
 
+/*
+  Beware atom maps above 99
+
+   35.0815   -0.0000    0.0000 C   0  0  0  0  0  0  0  0 11100  0  0
+         1         2         3         4         5         6         7         8         9
+123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789
+*/
+
   if (! buffer.nextword(token, i))    // last 3 columns must be present if we got to here
   {
     cerr << "MDL_Atom_Record::build:not enough tokens, ignored\n";
+    cerr << buffer << endl;
     return 1;
   }
 
@@ -217,6 +222,7 @@ MDL_Atom_Record::build (const const_IWSubstring & buffer)
   if (! buffer.nextword(token, i))    // last 3 columns must be present if we got to here
   {
     cerr << "MDL_Atom_Record::build:not enough tokens, ignored\n";
+    cerr << buffer << endl;
     return 1;
   }
 
@@ -230,13 +236,13 @@ MDL_Atom_Record::build (const const_IWSubstring & buffer)
 }
 
 Atom *
-MDL_Atom_Record::create_atom () const
+MDL_Atom_Record::create_atom() const
 {
   assert (_atomic_symbol.length() > 0);
 
   int is_radical = 0;
 
-  int formal_charge = convert_from_mdl_charge (_chg);
+  int formal_charge = convert_from_mdl_charge(_chg);
   if (MDL_RADICAL == formal_charge)
   {
     is_radical = 1;
@@ -244,12 +250,14 @@ MDL_Atom_Record::create_atom () const
   }
   
 
-  Atom * a = create_mdl_atom (_atomic_symbol, _msdiff, formal_charge, is_radical);
+  const MDL_File_Supporting_Material * mdlfos = global_default_MDL_File_Supporting_Material();
+
+  Atom * a = mdlfos->create_mdl_atom(_atomic_symbol, _msdiff, formal_charge, is_radical);
 
   if (NULL == a)
     return NULL;
 
-  a->setxyz (_x, _y, _z);
+  a->setxyz(_x, _y, _z);
 
   return a;
 }
@@ -257,7 +265,7 @@ MDL_Atom_Record::create_atom () const
 MDL_Bond_Record::MDL_Bond_Record()
 {
   _bond_type_read_in = 0;
-  _directionality = 0;
+//_directionality = 0;
   _bond_stereo = 0;
   _bond_topology = 0;
   _reacting_center_status = 0;
@@ -273,7 +281,8 @@ MDL_Bond_Record::MDL_Bond_Record()
 
 int
 MDL_Bond_Record::build(const const_IWSubstring & buffer,
-                       int natoms)
+                        int natoms,
+                        const MDL_File_Supporting_Material & mdlfos)
 {
   if (buffer.length() < 9)
   {
@@ -316,7 +325,7 @@ MDL_Bond_Record::build(const const_IWSubstring & buffer,
 
   if (_a1 != _a2)   // great, the most common case
     ;
-  else if (ignore_self_bonds())
+  else if (mdlfos.ignore_self_bonds())
     cerr << "MDL_Bond_Record::build:ignoring self bond, atom " << _a1 << endl;
   else
   {
@@ -431,7 +440,7 @@ MDL_Bond_Record::bond_type_for_molecule (bond_type_t & for_building_a_molecule) 
 }
 
 int
-MDL_Bond_Record::bond_type_for_query (bond_type_t & for_query) const
+MDL_Bond_Record::bond_type_for_query(bond_type_t & for_query) const
 {
   if (1 == _bond_type_read_in)
     for_query = SINGLE_BOND;

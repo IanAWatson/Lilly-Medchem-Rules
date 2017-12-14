@@ -1,26 +1,7 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef IW_AROMATIC_H
 #define IW_AROMATIC_H
 
 #include <iostream>
-using namespace std;
 
 /*
   Aromaticity can be either by Daylight rules, or Pearlman's
@@ -45,10 +26,12 @@ using namespace std;
 
 #define PUBCHEM_AROMATICITY 8
 
+#define ANY_EVEN_NUMBER_OF_PI_ELECTRONS 9
+
 extern int set_global_aromaticity_type (int);
 extern int global_aromaticity_type ();
 
-extern int display_standard_aromaticity_options (ostream &);
+extern int display_standard_aromaticity_options (std::ostream &);
 
 class Command_Line;
 
@@ -100,6 +83,9 @@ extern void set_perform_kekule_perception (int s);
 
 extern void reset_aromatic_file_scope_variables ();
 extern void  reset_mdl_file_scope_variables ();
+
+extern void set_strongly_fused_rings_can_be_aromatic(int);
+extern void set_aromatic_rings_must_contain_unsaturation(const int s);
 
 #endif
 

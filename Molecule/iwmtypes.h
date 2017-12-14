@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef _IW_BASIC_MOLECULE_TYPES
 #define _IW_BASIC_MOLECULE_TYPES
 
@@ -110,12 +92,15 @@ typedef unsigned int bond_type_t;
 #define NOT_A_BOND 32
 #define INVALID_BOND_TYPE 64
 
+#define COORDINATION_BOND 128
+
 #define OK_BOND_TYPE(b) ((b) <= DOUBLE_BOND || \
                          (b) == TRIPLE_BOND || \
                          (IS_DOUBLE_BOND (b) && IS_AROMATIC_BOND (b)) || \
                          (IS_SINGLE_BOND (b) && IS_AROMATIC_BOND (b)) || \
                          (b) == NOT_A_BOND || IS_PERMANENT_AROMATIC_BOND (b) ||\
-                         IS_AROMATIC_BOND(b))
+                         IS_AROMATIC_BOND(b) || \
+                         COORDINATION_BOND==(b))
 
 #define IS_SINGLE_BOND(b) ((b) & SINGLE_BOND)
 #define IS_DOUBLE_BOND(b) ((b) & DOUBLE_BOND)
@@ -126,6 +111,7 @@ typedef unsigned int bond_type_t;
 #define IS_MULTIPLE_BOND(b) ((b) & DOUBLE_BOND || (b) & TRIPLE_BOND)
 #define IS_NOT_A_BOND(b) (NOT_A_BOND == (b))
 #define IS_INVALID_BOND_TYPE(b) (INVALID_BOND_TYPE == (b))
+#define IS_COORDINATION_BOND(b) (COORDINATION_BOND & (b))
 
 #define SET_AROMATIC_BOND(b) ((b) |= AROMATIC_BOND)                            
 #define SET_NON_AROMATIC_BOND(b) ((b) &= NOT_AROMATIC_BOND)
@@ -270,7 +256,7 @@ typedef unsigned int atom_invariant_type_t;
   Karypis Graph Transaction file
 */
 
-#define IWMTYPE_GTF 22
+//#define IWMTYPE_GTF 22
 
 // Unique smiles order, but without aromaticity
 
@@ -285,6 +271,8 @@ typedef unsigned int atom_invariant_type_t;
 #define IWMTYPE_INCHI 25
 
 #define IWMTYPE_TDT_NAUSMI 26
+
+#define IWMTYPE_CIF 27
 
 /*enum 
 {

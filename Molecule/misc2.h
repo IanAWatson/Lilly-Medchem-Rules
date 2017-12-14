@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef IW_MISC2_H
 #define IW_MISC2_H
 
@@ -36,6 +18,7 @@ extern void iwxor (const int *, int *, int);
 class const_IWSubstring;
 
 extern int fetch_numeric (const const_IWSubstring & string, int & value, int max_chars = 0);
+extern int fetch_numeric_char (const char * string, int & value, int max_chars);
 
 /*
   Sometimes we need to compute combinatorial permutations and we
@@ -44,10 +27,10 @@ extern int fetch_numeric (const const_IWSubstring & string, int & value, int max
 
 extern iw_uint64_t iw_combinatorial_combinations (int n, int k);
 
-class iwstring_data_source;
+template <typename T> int skip_to_string (T & input, const char * target, int report_discard);
 
-extern int skip_to_string (iwstring_data_source & input,
-                const char * target,
-                int report_discard);
+// identify the + characters in a reaction smiles. Complicated by the presence of + signs inside square brackets
+
+extern int identify_plus_positions (const const_IWSubstring & buffer, resizable_array<int> & pos);
+
 #endif
-

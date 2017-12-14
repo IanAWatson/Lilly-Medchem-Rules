@@ -1,26 +1,9 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
-#include <stdlib.h>
+#include <iostream>
 #include <assert.h>
 #include <memory>
 
-using namespace std;
+using std::cerr;
+using std::endl;
 
 #ifdef IW_USE_TBB_SCALABLE_ALLOCATOR
 #include "tbb/scalable_allocator.h"
@@ -28,32 +11,32 @@ using namespace std;
 
 #include "bond_list.h"
 
-Bond_list::Bond_list ()
+Bond_list::Bond_list()
 {
   _magic = BOND_LIST_MAGIC;
 }
 
-Bond_list::~Bond_list ()
+Bond_list::~Bond_list()
 {
   _magic = 0;
 }
 
 int
-Bond_list::ok () const
+Bond_list::ok() const
 {
   if (BOND_LIST_MAGIC != _magic)
     return 0;
 
-  if (! resizable_array_p<Bond>::ok ())
+  if (! resizable_array_p<Bond>::ok())
     return 0;
 
   return 1;
 }
 
 int
-Bond_list::debug_print (ostream & os) const
+Bond_list::debug_print (std::ostream & os) const
 {
-  assert (os.good ());
+  assert(os.good());
 
   os << "Bond list contains " << _number_elements  << " members\n";
 
@@ -61,7 +44,7 @@ Bond_list::debug_print (ostream & os) const
   {
     os << " Bond " << i << " ";
     const Bond *b = _things[i];
-    b->debug_print (os);
+    b->debug_print(os);
     os << endl;
   }
 
@@ -71,16 +54,27 @@ Bond_list::debug_print (ostream & os) const
 int
 Bond_list::which_bond (atom_number_t a1, atom_number_t a2) const
 {
-  assert (ok ());
-  assert (a1 >= 0 && a2 >= 0 && a1 != a2);
+  assert(ok());
+  assert(a1 >= 0 && a2 >= 0 && a1 != a2);
 
   for (int i = 0; i < _number_elements; i++)
   {
-    if (_things[i]->involves (a1, a2))
+    if (_things[i]->involves(a1, a2))
       return i;
   }
 
   return -1;
+}
+
+Bond_list &
+Bond_list::operator = (Bond_list && rhs)
+{
+  resizable_array_p<Bond> & prhs = rhs;
+  resizable_array_p<Bond> & plhs = *this;
+
+  plhs = std::move(prhs);
+
+  return *this;
 }
 
 int
@@ -88,16 +82,35 @@ Bond_list::remove_bond_between_atoms (atom_number_t a1, atom_number_t a2)
 {
   for (int i = 0; i < _number_elements; i++)
   {
-    if (_things[i]->involves (a1, a2))
+    if (_things[i]->involves(a1, a2))
     {
-      remove_item (i);
+      remove_item(i);
       return 1;
     }
   }
 
   cerr << "Bond_list::remove_bond_between_atoms: no bond between atoms " << a1 << " and " << a2 << endl;
-  assert (NULL == "this should not happen");
+  assert(NULL == "this should not happen");
   return 0;
+}
+
+int
+Bond_list::remove_bonds_involving_these_atoms (const int * rm)
+{
+  int rc = 0;
+
+  for (int i = _number_elements - 1; i >= 0; --i)
+  {
+    const Bond * b = _things[i];
+
+    if (rm[b->a1()] || rm[b->a2()])
+    {
+      remove_item(i);
+      rc++;
+    }
+  }
+
+  return rc;
 }
 
 /*
@@ -113,7 +126,7 @@ Bond_list::swap_atoms (atom_number_t a1, atom_number_t a2)
   for (int i = 0; i < _number_elements; i++)
   {
     Bond * b = _things[i];
-    rc += b->swap_atoms (a1, a2);
+    rc += b->swap_atoms(a1, a2);
   }
 
   return rc;
@@ -126,8 +139,8 @@ Bond_list:: move_atom_to_end_of_atom_list (atom_number_t zatom, int atoms_in_mol
   {
     Bond * b = _things[i];
 
-    atom_number_t a1 = b->a1 ();
-    atom_number_t a2 = b->a2 ();
+    atom_number_t a1 = b->a1();
+    atom_number_t a2 = b->a2();
 
     if (a1 == zatom)
       a1 = atoms_in_molecule - 1;
@@ -139,7 +152,7 @@ Bond_list:: move_atom_to_end_of_atom_list (atom_number_t zatom, int atoms_in_mol
     else if (a2 > zatom)
       a2--;
 
-    b->set_a1a2 (a1, a2);
+    b->set_a1a2(a1, a2);
   }
 
   return 1;
@@ -147,12 +160,22 @@ Bond_list:: move_atom_to_end_of_atom_list (atom_number_t zatom, int atoms_in_mol
 
 #ifdef BONDS_KNOW_RING_MEMBERSHIP
 
+
+/*
+  Note that the strategy of just checking the first bond does not really work
+  because we are not properly invalidating the bond ring info - we are setting
+  it to zero rather than unknown. Must fix this sometime...
+*/
+
 int
-Bond_list::invalidate_ring_info ()
+Bond_list::invalidate_ring_info()
 {
+  if (_number_elements > 0 && ! _things[0]->nrings_known())   // /work on the assumption that if the first bond does not have ring info. then none of them do.
+    return 0;
+
   for (int i = 0; i < _number_elements; i++)
   {
-    _things[i]->invalidate_nrings ();
+    _things[i]->invalidate_nrings();
   }
 
   return 1;
@@ -163,11 +186,11 @@ Bond_list::invalidate_ring_info ()
 int
 Bond_list::copy_bond_types (bond_type_t * b) const
 {
-  assert (NULL != b);
+  assert(NULL != b);
 
   for (int i = 0; i < _number_elements; i++)
   {
-    b[i] = BOND_TYPE_ONLY (_things[i]->btype ());
+    b[i] = BOND_TYPE_ONLY(_things[i]->btype());
   }
 
   return _number_elements;
@@ -179,17 +202,17 @@ Bond_list::copy_bond_types (bond_type_t * b) const
 */
 
 void
-Bond_list::invalidate_bond_numbers ()
+Bond_list::invalidate_bond_numbers()
 {
   if (0 == _number_elements)
     return;
 
-  if (! _things[0]->bond_number_assigned ())
+  if (! _things[0]->bond_number_assigned())
     return;
 
   for (int i = 0; i < _number_elements; i++)
   {
-    _things[i]->invalidate_bond_number ();
+    _things[i]->invalidate_bond_number();
   }
 
   return;
@@ -203,10 +226,10 @@ Bond_list::set_all_bond_types (bond_type_t bt)
   {
     _things[i]->set_not_directional();   // if all bonds are being set to one type, directionality will be lost
 
-    if (bt == _things[i]->btype ())
+    if (bt == _things[i]->btype())
       continue;
 
-    _things[i]->set_bond_type (bt);
+    _things[i]->set_bond_type(bt);
     rc++;
   }
 
@@ -223,4 +246,46 @@ Bond_list::cis_trans_bonds_present() const
   }
 
   return 0;
+}
+
+int
+Bond_list::remove_bonds_involving_these_atoms (const int * r,
+                                               int adjust_atom_numbers)
+{
+  int rc = 0;
+
+  for (auto i = _number_elements - 1; i >= 0; --i)
+  {
+    if (_things[i]->either_atom_set_in_array(r))    // bond must be removed
+    {
+      remove_item(i);
+      rc++;
+    }
+    else if (adjust_atom_numbers)
+      _things[i]->adjust_for_loss_of_atom(i);
+  }
+
+  return rc;
+}
+
+int
+Bond_list::adjust_atom_numbers_for_loss_of_atom (const atom_number_t zatom)
+{
+  for (int i = 0; i < _number_elements; ++i)
+  {
+    _things[i]->adjust_for_loss_of_atom(zatom);
+  }
+
+  return 1;
+}
+
+int
+Bond_list::new_atom_numbers (const int * xref)
+{
+  for (int i = 0; i < _number_elements; ++i)
+  {
+    _things[i]->new_atom_numbers(xref);
+  }
+
+  return 1;
 }

@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 /*
   Strips leading spaces
 */
@@ -316,6 +298,122 @@ make_copy (const char *c)
 
   return copyc;
 }
+
+/*#ifdef __GNUG__
+
+template class resizable_array_p<char>;   // instantiate the template
+template class resizable_array_base<char *>;   // instantiate the template
+
+#endif*/
+
+/*
+  This function returns a resizable array of char *, consisting of
+  all the tokens in buffer. strtok is used with PATTERN to divide
+  the line.
+*/
+
+/*resizable_array_p<char> *
+tokenise_char (const char *buffer, const char *pattern)
+{
+  assert (NULL != buffer);
+  assert (NULL != pattern);
+
+  int lenbuf = strlen (buffer);
+  if (0 == lenbuf)
+    return NULL;
+
+  char * copy_buf = new char[lenbuf + 1];
+  strcpy (copy_buf, buffer);
+
+  char *c = strtok (copy_buf, pattern);
+
+  if (NULL == c)
+    return NULL;
+
+  resizable_array_p<char> *a = new resizable_array_p<char> (make_copy (c));
+
+  while (NULL != (c = strtok (NULL, pattern)))
+  {
+    a->add (make_copy (c));
+  }
+
+  delete copy_buf;
+
+  return a;
+}*/
+
+/*
+  Tokenise as double and tokenise as int are identical except
+  that one calls is_int and the other calls is_double.
+  This template can instantiate either one.
+*/
+
+/*template <typename T>
+resizable_array_p<T> *
+tokenise_as (const char *buffer, const char *pattern,
+             int (* is_t) (const char *, T *))
+{
+  assert (NULL != buffer);
+  assert (NULL != pattern);
+
+  resizable_array_p<char> * tk = tokenise (buffer, pattern);
+
+  if (NULL == tk)
+    return NULL;
+
+  if (0 == tk->number_elements ())
+  {
+    delete tk;
+    return NULL;
+  }
+
+  resizable_array_p<T> * r = new resizable_array_p<T>;
+
+  for (int i = 0; i < tk->number_elements (); i++)
+  {
+    T j;
+    if (is_t (tk->item (i), &j))
+    {
+      T *jp = new int;
+      *jp = j;
+      r->add (jp);
+    }
+    else
+    {
+      r->add (NULL);
+    }
+  }
+
+  return r;
+}*/
+
+/*
+  This doesn't work!!!
+  Leave commented out until it does.
+
+resizable_array_p<int> *
+tokenise_as_int (const char *buffer, const char *pattern)
+{
+  int i;
+  return tokenise_as (buffer, pattern, i, is_int);
+}
+
+resizable_array_p<double> *
+tokenise_as_int (const char *buffer, const char *pattern)
+{
+  return tokenise_as (buffer, pattern, is_double);
+}
+*/
+
+/*int
+find_string (const resizable_array_p<char> * strings, const char *pattern)
+{
+  for (int i = 0; i < strings->number_elements (); i++)
+    if (0 == strcmp (pattern, strings->item (i)))
+      return i;
+
+  return -1;
+}*/
 
 int
 words (const char *string, const char separator)

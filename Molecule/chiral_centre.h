@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef IW_CHIRAL_CENTRE_H
 #define IW_CHIRAL_CENTRE_H
 
@@ -68,9 +50,10 @@ class Chiral_Centre
     ~Chiral_Centre ();
 
     int ok () const;
-    int debug_print (ostream &) const;
+    int debug_print (std::ostream &) const;
 
     atom_number_t a () const { return _a;}
+    void set_centre (atom_number_t s) { _a = s;}     // no checking
 
     int make_copy (const Chiral_Centre &, const int *);
 
@@ -105,6 +88,7 @@ class Chiral_Centre
     int centre_atom_has_a_lone_pair ();
 
     void adjust_for_loss_of_atom (atom_number_t);
+    int  adjust_atom_numbers (const int * xref);
 
     int  convert_to_implicit_hydrogen (atom_number_t);
 
@@ -177,10 +161,7 @@ class Chiral_Centre
 
     int set_vector (int *, int) const;
 
-#ifdef VALHALLA
-    int build_from_vdom_data (const unsigned char * p);
-#endif
-
+    void new_atom_numbers (const int *);     // someone is changing the atoms in the molecule
 };
 
 #endif

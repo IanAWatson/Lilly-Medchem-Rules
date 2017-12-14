@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
 
 #define RESIZABLE_ARRAY_IMPLEMENTATION
@@ -126,6 +108,14 @@ set_only_include_isotopically_labeled_atoms(int s)
   File_Scope_only_include_isotopically_labeled_atoms = s;
 }
 
+static int File_Scope_only_aromatic_atoms_match_aromatic_atoms = 0;
+
+void
+set_only_aromatic_atoms_match_aromatic_atoms(int s)
+{
+  File_Scope_only_aromatic_atoms_match_aromatic_atoms = s;
+}
+
 
 Molecule_to_Query_Specifications::Molecule_to_Query_Specifications ()
 {
@@ -134,10 +124,15 @@ Molecule_to_Query_Specifications::Molecule_to_Query_Specifications ()
   _all_ring_bonds_become_undefined = 0;
   _non_ring_atoms_become_nrings_0 = respect_ring_membership;
   _atoms_conserve_ring_membership = 0;
+  _ring_atoms_conserve_ring_membership = 0;
   _copy_bond_attributes = 0;
-  _only_aromatic_atoms_match_aromatic_atoms = 0;
+  _only_aromatic_atoms_match_aromatic_atoms = File_Scope_only_aromatic_atoms_match_aromatic_atoms;
 
   _atoms_in_molecule = 0;
+
+  _ncon = -1;
+  _min_ncon = -1;
+  _max_ncon = -1;
 
   _condense_explicit_hydrogens_to_anchor_atoms = molecule_to_query_always_condense_explicit_hydrogens_to_anchor_atoms;
 
@@ -159,6 +154,28 @@ Molecule_to_Query_Specifications::Molecule_to_Query_Specifications ()
     
   _convert_all_aromatic_atoms_to_generic_aromatic = 0;
 
+  _query_must_match_both_explicit_and_implicit_hydrogens = 0;
+
+  _preserve_saturation = 0;
+
+  _ignore_molecular_hydrogen_information = 0;
+
+  _interpret_atom_alias_as_smarts = 1;
+
+  _convert_explicit_hydrogens_to_match_any_atom_including_hydrogen = 0;
+
+  _substituents_only_at_isotopic_atoms = 0;
+
+  _isotopic_label_means = 0;
+
+  _set_element_hits_needed_during_molecule_to_query = 1;
+
+  _aromatic_only_matches_aromatic_aliphatic_only_matches_aliphatic = 0;
+
+  _preserve_smallest_ring_size = 0;
+
+  _bonds_preserve_ring_membership = 0;
+
   return;
 }
 
@@ -170,30 +187,6 @@ Molecule_to_Query_Specifications::~Molecule_to_Query_Specifications ()
 
   return;
 }
-
-
-
-
-
-
-
-//#ifdef __GNUG__
-//#endif
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 int
@@ -247,7 +240,11 @@ Molecule_to_Query_Specifications::_parse_directive (const_IWSubstring dir)    //
   }
   else if ("onlysubiso" == dir)
   {
-    _substitutions_only_at.create_from_smarts ("[!0*]");
+    _substituents_only_at_isotopic_atoms = 1;
+
+//  File_Scope_substituents_only_at_isotopic_atoms = 1;   // need to get this into the object
+
+    _substitutions_only_at.create_from_smarts ("[!0*]");    // this may not be necessary now
   }
   else if ("oama" == dir)
   {
@@ -309,9 +306,7 @@ Element_to_Smarts::build (const const_IWSubstring & buffer)
     return 0;
   }
 
-  int isotope_not_used;
-
-  _e = get_element_from_symbol (e, isotope_not_used);
+  _e = get_element_from_symbol_no_case_conversion(e);
   if (NULL == _e)
   {
     set_auto_create_new_elements (1);

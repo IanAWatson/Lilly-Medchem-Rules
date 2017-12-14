@@ -1,22 +1,5 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
+
 
 #define COMPILING_MDL_CC
 
@@ -25,6 +8,8 @@
 #include "aromatic.h"
 #include "chiral_centre.h"
 #include "iwstring_data_source.h"
+#include "string_data_source.h"
+#include "readmdl.h"
 
 int
 Molecule::_fill_empty_molecule_with_null_atoms (int na)
@@ -50,9 +35,10 @@ Molecule::_fill_empty_molecule_with_null_atoms (int na)
   of the record
 */
 
+template <typename T>
 int
-read_next_v30_record (iwstring_data_source & input,
-                      IWString & buffer)
+read_next_v30_record(T & input,
+                     IWString & buffer)
 {
   if (! input.next_record (buffer))
     return 0;
@@ -67,16 +53,16 @@ read_next_v30_record (iwstring_data_source & input,
       return 0;
     }
 
-    if (! cline.starts_with ("M  V30"))
+    if (! cline.starts_with("M  V30"))
     {
       cerr << "V30 continuation line doesn't start with 'M  V30', line " << input.lines_read() << endl;
       cerr << buffer;
       return  0;
     }
 
-    buffer.chop (1);    // remove the dash
+    buffer.chop(1);    // remove the dash
 
-    cline.remove_leading_chars (7);    // remove "M  V30 "
+    cline.remove_leading_chars(7);    // remove "M  V30 "
 
     buffer += cline;
   }
@@ -84,14 +70,24 @@ read_next_v30_record (iwstring_data_source & input,
   return 1;
 }
 
+//template int read_next_v30_record(String_Data_Source &, IWString &);
+template int read_next_v30_record<iwstring_data_source>(iwstring_data_source&, IWString&);
+template int Molecule::_read_mdl_atom_connection_table_v30<iwstring_data_source>(iwstring_data_source&, int&, MDL_File_Supporting_Material&);
+template int Molecule::_read_mdl_atom_connection_table_v30<String_Data_Source>(String_Data_Source&, int&, MDL_File_Supporting_Material&);
+template int Molecule::_read_v30_bond_list<iwstring_data_source>(iwstring_data_source&, int, int*, int*);
+template int Molecule::_read_v30_bond_list<String_Data_Source>(String_Data_Source&, int, int*, int*);
+template int read_next_v30_record<String_Data_Source>(String_Data_Source&, IWString&);
+
+template <typename T>
 int
-Molecule::_read_mdl_atom_connection_table_v30 (iwstring_data_source & input,
-                                               int & nb)
+Molecule::_read_mdl_atom_connection_table_v30(T & input,
+                                              int & nb, 
+                                              MDL_File_Supporting_Material & mdlfos)
 {
-  input.set_strip_trailing_blanks (1);
+  input.set_strip_trailing_blanks(1);
 
   IWString buffer;
-  if (! read_next_v30_record (input, buffer))
+  if (! read_next_v30_record(input, buffer))
   {
     cerr << "Molecule::_read_mdl_atom_connection_table_v30: cannot read first V30 file record\n";
     return 0;
@@ -104,13 +100,13 @@ Molecule::_read_mdl_atom_connection_table_v30 (iwstring_data_source & input,
     cerr << "Ignore possible error, continuing....\n";
   }
 
-  if (! read_next_v30_record (input, buffer))
+  if (! read_next_v30_record(input, buffer))
   {
     cerr << "Molecule::_read_mdl_atom_connection_table_v30: cannot read V30 counts record\n";
     return 0;
   }
 
-  if (! buffer.starts_with ("M  V30 COUNTS "))
+  if (! buffer.starts_with("M  V30 COUNTS "))
   {
     cerr << "Molecule::_read_mdl_atom_connection_table_v30: this should be the counts record, line " << input.lines_read() << endl;
     cerr << buffer << endl;
@@ -118,7 +114,7 @@ Molecule::_read_mdl_atom_connection_table_v30 (iwstring_data_source & input,
   }
 
   const_IWSubstring token;
-  if (! buffer.word (3, token))
+  if (! buffer.word(3, token))
   {
     cerr << "Molecule::_read_mdl_atom_connection_table_v30: cannot extract atom count from count record\n";
     cerr << buffer << endl;
@@ -126,7 +122,7 @@ Molecule::_read_mdl_atom_connection_table_v30 (iwstring_data_source & input,
   }
 
   int na;
-  if (! token.numeric_value (na) || na < 0)
+  if (! token.numeric_value(na) || na < 0)
   {
     cerr << "Molecule::_read_mdl_atom_connection_table_v30: invalid NA value '" << token << "' line " << input.lines_read() << endl;
     return 0;
@@ -135,20 +131,20 @@ Molecule::_read_mdl_atom_connection_table_v30 (iwstring_data_source & input,
   if (_elements_allocated < na)
     _fill_empty_molecule_with_null_atoms(na);
 
-  if (! buffer.word (4, token))
+  if (! buffer.word(4, token))
   {
     cerr << "Molecule::_read_mdl_atom_connection_table_v30: cannot extract bond count from count record\n";
     cerr << buffer << endl;
     return 0;
   }
 
-  if (! token.numeric_value (nb) || nb < 0)
+  if (! token.numeric_value(nb) || nb < 0)
   {
     cerr << "Molecule::_read_mdl_atom_connection_table_v30: invalid NB value '" << token << "' line " << input.lines_read() << endl;
     return 0;
   }
 
-  if (! read_next_v30_record (input, buffer))
+  if (! read_next_v30_record(input, buffer))
   {
     cerr << "Molecule::_read_mdl_atom_connection_table_v30: premature EOF\n";
     return 0;
@@ -158,7 +154,7 @@ Molecule::_read_mdl_atom_connection_table_v30 (iwstring_data_source & input,
 
   while ("M  V30 BEGIN ATOM" != buffer)
   {
-    if (! read_next_v30_record (input, buffer))
+    if (! read_next_v30_record(input, buffer))
     {
       cerr << "Molecule::_read_mdl_atom_connection_table_v30: premature EOF\n";
       return 0;
@@ -167,13 +163,13 @@ Molecule::_read_mdl_atom_connection_table_v30 (iwstring_data_source & input,
 
   for (int i = 0; i < na; i++)
   {
-    if (! read_next_v30_record (input, buffer))
+    if (! read_next_v30_record(input, buffer))
     {
       cerr << "Molecule::_read_mdl_atom_connection_table_v30: premature eof\n";
       return 0;
     }
 
-    if (! _parse_v30_atom_record (buffer))
+    if (! _parse_v30_atom_record(buffer, 1, mdlfos))
     {
       cerr << "Molecule::_read_mdl_atom_connection_table_v30: invalid atom record, line " << input.lines_read() << endl;
       cerr << buffer << endl;
@@ -183,7 +179,7 @@ Molecule::_read_mdl_atom_connection_table_v30 (iwstring_data_source & input,
 
 // There should be 'END ATOM' at the end of the atom set
 
-  if (! read_next_v30_record (input, buffer))
+  if (! read_next_v30_record(input, buffer))
   {
     cerr << "Molecule::_read_mdl_atom_connection_table_v30: premature eof\n";
     return 0;
@@ -221,8 +217,9 @@ Molecule::_read_mdl_atom_connection_table_v30 (iwstring_data_source & input,
 */
 
 int
-Molecule::_parse_v30_atom_record (const IWString & buffer,
-                                  int convert_symbol_to_element)
+Molecule::_parse_v30_atom_record(const IWString & buffer,
+                                 int convert_symbol_to_element,
+                                 MDL_File_Supporting_Material & mdlfos)
 {
 // The mandatory parts of the record
 
@@ -243,13 +240,13 @@ Molecule::_parse_v30_atom_record (const IWString & buffer,
 
   const_IWSubstring token;
 
-  while (buffer.nextword (token, i))
+  while (buffer.nextword(token, i))
   {
     ntokens++;
 
     if (1 == ntokens)     // ndx value
     {
-      if (! token.numeric_value (ndx) || ndx < 0 || ndx > _number_elements)
+      if (! token.numeric_value(ndx) || ndx < 0 || ndx > _number_elements)
       {
         cerr << "Molecule::_parse_v30_atom_record: invalid atom index '" << token << "', max " << _number_elements << endl;
         return 0;
@@ -261,7 +258,7 @@ Molecule::_parse_v30_atom_record (const IWString & buffer,
     {
 //    cerr << "Atomic symbol is '" << token << "'\n";
       zsymbol = token;
-      if (zsymbol.length() <= 2)
+/*    if (zsymbol.length() <= 2)
         ;
       else if (atomic_symbols_can_have_arbitrary_length())
         ;
@@ -269,11 +266,11 @@ Molecule::_parse_v30_atom_record (const IWString & buffer,
       {
         cerr << "Molecule::_parse_v30_atom_record: atomic symbol too long '" << zsymbol << "'\n";
         return 0;
-      }
+      }*/
     }
     else if (3 == ntokens)   // x coordinate
     {
-      if (! token.numeric_value (x))
+      if (! token.numeric_value(x))
       {
         cerr << "Molecule::_parse_v30_atom_record: invalid X coordinate\n";
         return 0;
@@ -281,7 +278,7 @@ Molecule::_parse_v30_atom_record (const IWString & buffer,
     }
     else if (4 == ntokens)   // y coordinate
     {
-      if (! token.numeric_value (y))
+      if (! token.numeric_value(y))
       {
         cerr << "Molecule::_parse_v30_atom_record: invalid Y coordinate\n";
         return 0;
@@ -289,43 +286,43 @@ Molecule::_parse_v30_atom_record (const IWString & buffer,
     }
     else if (5 == ntokens)   // z coordinate
     {
-      if (! token.numeric_value (z))
+      if (! token.numeric_value(z))
       {
         cerr << "Molecule::_parse_v30_atom_record: invalid Z coordinate\n";
         return 0;
       }
     }
-    else if (token.starts_with ("CHG="))
+    else if (token.starts_with("CHG="))
     {
-      token.remove_leading_chars (4);
-      if (! token.numeric_value (chg))
+      token.remove_leading_chars(4);
+      if (! token.numeric_value(chg))
       {
         cerr << "Molecule::_parse_v30_atom_record: invalid charge '" << token << "'\n";
         return 0;
       }
     }
-    else if (token.starts_with ("MASS="))
+    else if (token.starts_with("MASS="))
     {
-      token.remove_leading_chars (5);
-      if (! token.numeric_value (mass) || mass <= 0)
+      token.remove_leading_chars(5);
+      if (! token.numeric_value(mass) || mass <= 0)
       {
         cerr << "Molecule::_parse_v30_atom_record: invalid mass value '" << token << "'\n";
         return 0;
       }
     }
-    else if (token.starts_with ("RAD="))
+    else if (token.starts_with("RAD="))
     {
-      token.remove_leading_chars (4);
-      if (! token.numeric_value (rad) || rad < 0 || rad > 3)
+      token.remove_leading_chars(4);
+      if (! token.numeric_value(rad) || rad < 0 || rad > 3)
       {
         cerr << "Molecule::_parse_v30_atom_record: invalid radical value '" << token << "'\n";
         return 0;
       }
     }
-    else if (token.starts_with ("CFG="))
+    else if (token.starts_with("CFG="))
     {
-      token.remove_leading_chars (4);
-      if (! token.numeric_value (cfg) || cfg < 0 || cfg > 3)
+      token.remove_leading_chars(4);
+      if (! token.numeric_value(cfg) || cfg < 0 || cfg > 3)
       {
         cerr << "Molecule::_parse_v30_atom_record: invalid cfg value '" << token << "'\n";
         return 0;
@@ -349,7 +346,7 @@ Molecule::_parse_v30_atom_record (const IWString & buffer,
 
   if (convert_symbol_to_element)
   {
-    _things[ndx] = create_mdl_atom (zsymbol, mass, chg, rad);
+    _things[ndx] = mdlfos.create_mdl_atom(zsymbol, mass, chg, rad);
     if (NULL == _things[ndx])
     {
       cerr << "Molecule::_parse_v30_atom_record: cannot create atom\n";
@@ -357,13 +354,13 @@ Molecule::_parse_v30_atom_record (const IWString & buffer,
     }
   }
   else
-    _things[ndx] = create_mdl_atom("*", mass, chg, rad);   // just to get something there
+    _things[ndx] = mdlfos.create_mdl_atom("*", mass, chg, rad);   // just to get something there
 
-  _things[ndx]->setxyz (x, y, z);
+  _things[ndx]->setxyz(x, y, z);
 
   if (0 == cfg)
     ;
-  else if (! _mdl_atom_is_chiral_centre (ndx, cfg))
+  else if (! _mdl_atom_is_chiral_centre(ndx, cfg, mdlfos))
   {
     cerr << "Molecule::_parse_v30_atom_record: invalid chirality " << cfg << endl;
     cerr << buffer << endl;
@@ -373,8 +370,9 @@ Molecule::_parse_v30_atom_record (const IWString & buffer,
   return 1;
 }
 
+template <typename T>
 int
-Molecule::_read_v30_bond_list (iwstring_data_source & input,
+Molecule::_read_v30_bond_list (T & input,
                                int nb,
                                int * aromatic_atom,
                                int * aromatic_bond)
@@ -383,10 +381,10 @@ Molecule::_read_v30_bond_list (iwstring_data_source & input,
     return 1;
 
   if (_bond_list.elements_allocated() < nb)
-    _bond_list.resize (nb);
+    _bond_list.resize(nb);
 
   IWString buffer;
-  if (! read_next_v30_record (input, buffer))
+  if (! read_next_v30_record(input, buffer))
   {
     cerr << "Molecule::_read_v30_bond_list: cannot read first record\n";
     return 0;
@@ -394,7 +392,7 @@ Molecule::_read_v30_bond_list (iwstring_data_source & input,
 
   while ("M  V30 BEGIN BOND" != buffer)
   {
-    if (! read_next_v30_record (input, buffer))
+    if (! read_next_v30_record(input, buffer))
     {
       cerr << "Molecule::_read_v30_bond_list: premature EOF\n";
       return 0;
@@ -403,13 +401,13 @@ Molecule::_read_v30_bond_list (iwstring_data_source & input,
 
   for (int i = 0; i < nb; i++)
   {
-    if (! read_next_v30_record (input, buffer))
+    if (! read_next_v30_record(input, buffer))
     {
       cerr << "Molecule::_read_v30_bond_list: premature EOF\n";
       return 0;
     }
 
-    if (! _parse_v30_bond_record (buffer, aromatic_atom, aromatic_bond[i]))
+    if (! _parse_v30_bond_record(buffer, aromatic_atom, aromatic_bond[i]))
     {
       cerr << "Molecule::_read_v30_bond_list: invalid bond record, line " << input.lines_read() << endl;
       cerr << buffer << endl;
@@ -420,7 +418,7 @@ Molecule::_read_v30_bond_list (iwstring_data_source & input,
       aromatic_bond[i] = 1;
   }
 
-  if (! read_next_v30_record (input, buffer))
+  if (! read_next_v30_record(input, buffer))
   {
     if ("M  V30 END BOND" != buffer)
     {
@@ -449,13 +447,13 @@ Molecule::_parse_v30_bond_record (const const_IWSubstring & buffer,
 
   int i = 7;     // start tokenising after the "M  V30 ";
   const_IWSubstring token;
-  while (buffer.nextword (token, i))
+  while (buffer.nextword(token, i))
   {
     ntokens++;
 
     if (2 == ntokens)    // bond type
     {
-      if (! token.numeric_value (btype) || btype < 1)
+      if (! token.numeric_value(btype) || btype < 1)
       {
         cerr << "Molecule::_parse_v30_bond_record: invalid bond type '" << token << "'\n";
         return 0;
@@ -463,7 +461,7 @@ Molecule::_parse_v30_bond_record (const const_IWSubstring & buffer,
     }
     else if (3 == ntokens)  // A1
     {
-      if (! token.numeric_value (a1) || a1 < 0 || a1 > _number_elements)
+      if (! token.numeric_value(a1) || a1 < 0 || a1 > _number_elements)
       {
         cerr << "Molecule::_parse_v30_bond_record: invalid A1 specifier '" << token << "'\n";
         return 0;
@@ -472,17 +470,17 @@ Molecule::_parse_v30_bond_record (const const_IWSubstring & buffer,
     }
     else if (4 == ntokens)
     {
-      if (! token.numeric_value (a2) || a2 < 0 || a2 > _number_elements)
+      if (! token.numeric_value(a2) || a2 < 0 || a2 > _number_elements)
       {
         cerr << "Molecule::_parse_v30_bond_record: invalid A2 specifier '" << token << "'\n";
         return 0;
       }
       a2--;
     }
-    else if (token.starts_with ("CFG="))
+    else if (token.starts_with("CFG="))
     {
-      token.remove_leading_chars (4);
-      if (! token.numeric_value (cfg) || cfg < 0 || cfg > 3)
+      token.remove_leading_chars(4);
+      if (! token.numeric_value(cfg) || cfg < 0 || cfg > 3)
       {
         cerr << "Molecule::_parse_v30_bond_record: invalid cfg value '" << token << "'\n";
         return 0;
@@ -536,7 +534,7 @@ Molecule::_parse_v30_bond_record (const const_IWSubstring & buffer,
     return 0;
   }
 
-  if (! add_bond (a1, a2, btype, 1))     // 1 means partially built molecule
+  if (! add_bond(a1, a2, btype, 1))     // 1 means partially built molecule
   {
     if (are_bonded(a1, a2) && static_cast<bond_type_t>(btype) == bond_between_atoms(a1, a2)->btype())
       cerr << "molecule::_parse_v30_bond_record:ignoring duplicate bond specification\n";
@@ -556,7 +554,7 @@ Molecule::_parse_v30_bond_record (const const_IWSubstring & buffer,
     else if (3 == cfg)
       cfg = 6;
 
-    _mdl_set_bond_directionality (a1, a2, cfg);
+    _mdl_set_bond_directionality(a1, a2, cfg);
   }
 
   return 1;
@@ -568,7 +566,7 @@ Molecule::_parse_v30_bond_record (const const_IWSubstring & buffer,
 
 int
 write_v30_record (IWString & buffer,
-                  ostream & output)
+                  std::ostream & output)
 {
   if (buffer.length() <= 80)
   {
@@ -580,7 +578,7 @@ write_v30_record (IWString & buffer,
   int max_length = 80;
   while (buffer.length() > max_length)
   {
-    buffer.insert ("-\nM  V30 ", max_length - 1);
+    buffer.insert("-\nM  V30 ", max_length - 1);
     max_length += 80;
   }
 
@@ -588,120 +586,191 @@ write_v30_record (IWString & buffer,
 
   return output.good();
 }
+template int Molecule::write_molecule_mdl_v30<std::ostream>(std::ostream&, IWString const&, int) const;
 
 int
-Molecule::write_molecule_mdl_v30 (ostream & os, 
-                                  const IWString & comments,
-                                  int write_end_stuff) const
+Molecule::_convert_sgroups_to_elements(const resizable_array_p<IWString> & sgroup)
 {
-  os << _molecule_name << '\n';
-
-  os << "IWmolecule05289912212D 1   0.00000     0.00000      0\n";
-  os << comments << '\n';
-  os << "  0  0  0     0  0              0 V3000\n";
-  os << "M  V30 BEGIN CTAB\n";
-  os << "M  V30 COUNTS " << _number_elements << ' ' << _bond_list.number_elements() << " 0 0 " << (_chiral_centres.number_elements() > 0) << '\n';
-
-  _write_molecule_atom_list_v30 (os);
-  _write_molecule_bond_list_v30 (os);
-
-  if (write_end_stuff)
+  for (int i = 0; i < sgroup.number_elements(); ++i)
   {
-    os << "M  V30 END CTAB\n";
-    os << "M  END\n";
+    if (! _convert_sgroup_to_elements(*sgroup[i]))
+    {
+      cerr << "Molecule::_convert_sgroups_to_elements:cannot process SGROUP\n";
+      cerr << *sgroup[i] << '\n';
+      return 0;
+    }
   }
 
-  return os.good();
+  return 1;
+}
+
+static int
+get_atoms_in_set(const IWString & buffer,
+                 int & i,
+                 const const_IWSubstring & atoms_token,      // ATOMS=(1
+                 Set_of_Atoms & atoms,
+                 const int atoms_in_molecule)
+{
+  assert (atoms_token.starts_with("ATOMS=("));
+
+  const_IWSubstring token(atoms_token);
+  token.remove_leading_chars(7);
+
+  atom_number_t n;
+  if (! token.numeric_value(n) || n < 1)
+  {
+    cerr << "get_atoms_in_set::invalid atoms in set '" << atoms_token << "'\n";
+    return 0;
+  }
+
+  atoms.resize(n);
+
+  int got_last_token = 0;
+
+  while (buffer.nextword(token, i))
+  {
+    if (token.ends_with(')'))
+    {
+      got_last_token = 1;
+      token.chop();
+    }
+
+    atom_number_t x;
+    if (! token.numeric_value(x) || x < 1 || x > atoms_in_molecule)
+    {
+      cerr << "get_atoms_in_set:invalid atom number '" << token << "'\n";
+      return 0;
+    }
+
+    atoms.add(x-1);
+
+    if (got_last_token)
+      break;
+  }
+
+  if (! got_last_token)
+    cerr << "get_atoms_in_set::end of group not found\n";
+
+  if (n != atoms.number_elements())
+    cerr << "get_atoms_in_set:count mismatch, expected " << n << " atoms, got " << atoms.number_elements() << endl;
+
+//cerr << " atoms " << atoms << endl;
+
+  return atoms.number_elements();
+}
+
+/*
+  Will fail if there are multiple spaces in the label. For example LABEL="A   B"
+*/
+
+static int
+fetch_rest_of_quoted_label(const IWString & sgroup,
+                    int & i,
+                    IWString & label)
+{
+  assert (label.starts_with('"'));
+
+  label.remove_leading_chars(1);
+
+  const_IWSubstring token;
+
+  while (sgroup.nextword(token, i))
+  {
+    if (! token.ends_with('"'))
+    {
+      label.append_with_spacer(token);
+      continue;
+    }
+
+    token.chop(1);
+    label.append_with_spacer(token);
+    return 1;
+  }
+
+  cerr << "fetch_rest_of_quoted_label:did not get end of quoted label\n";
+  return 0;
 }
 
 int
-Molecule::_write_molecule_bond_list_v30 (ostream & os) const
+Molecule::_convert_sgroup_to_elements(const IWString & sgroup)
 {
-  os << "M  V30 BEGIN BOND\n";
+  const_IWSubstring token;
 
-  int nb = _bond_list.number_elements();
-  for (int i = 0; i < nb; i++)
+  int i = 0;
+  if (! sgroup.nextword(token, i) || ! sgroup.nextword(token, i))
+    return 0;
+
+  if ("SUP" != token)
+    return 1;
+
+  if (! sgroup.nextword(token, i))    // skip over external index
+    return 0;
+
+  IWString label;
+  Set_of_Atoms atoms;
+
+  while (sgroup.nextword(token, i))
   {
-    const Bond * b = _bond_list[i];
-    os << "M  V30 " << (i + 1);
+//  cerr << "Examining token '" << token << "'\n";
 
-    if (b->is_single_bond())
-      os << " 1 ";
-    else if (b->is_double_bond())
-      os << " 2 ";
-    else if (b->is_triple_bond())
-      os << " 3 ";
-    else if (b->is_aromatic())
-      os << " 4 ";
-    else
+    if (token.starts_with("ATOMS="))
     {
-      cerr << "Molecule::_write_molecule_bond_list_v30: what kind of bond is this " << b->btype() << '\n';
-      os << " ? ";
-    }
-
-    os << (b->a1() + 1) << ' ' << (b->a2() + 1);
-
-    if (b->is_wedge_up())
-      os << " CFG=1";
-    else if (b->is_wedge_down())
-      os << " CFG=3";
-    else if (b->is_wedge_either())
-      os << " CFG=2";
-
-    os << '\n';
-  }
-
-  os << "M  V30 END BOND\n";
-
-  return os.good();
-}
-
-int
-Molecule::_write_molecule_atom_list_v30 (ostream & os) const
-{
-  const Set_of_Atoms & unspecified = mdl_unspecified_chiral_atoms();
-
-  os << "M  V30 BEGIN ATOM\n";
-
-  int nc = _chiral_centres.number_elements();
-
-  for (int i = 0; i < _number_elements; i++)
-  {
-    const Atom * a = _things[i];
-
-    os << "M  V30 " << (i + 1) << ' ' << a->atomic_symbol() << ' ' << a->x() << ' ' << a->y() << ' ' << a->z() << " 0";
-
-    if (a->formal_charge())
-    {
-      os << " CHG=" << a->formal_charge();
-    }
-
-    if (a->is_isotope())
-    {
-      os << " ISO=" << a->isotope();
-    }
-
-    if (nc)    // still some chiral centres to process
-    {
-      for (int j = 0; j < _chiral_centres.number_elements(); j++)
+      if (! get_atoms_in_set(sgroup, i, token, atoms, _number_elements))
       {
-        const Chiral_Centre * cc = _chiral_centres[j];
-        if (i == cc->a())
-        {
-          os << " CFG=" << cc->mdl_stereo_centre_value();
-          nc--;     // one less chiral centre to process
-          break;
-        }
+        cerr << "Molecule::_convert_sgroup_to_elements:cannot fetch atoms\n";
+        return 0;
       }
     }
-
-    if (unspecified.contains (i))
-      os << " CFG=3";
-
-    os << '\n';
+    else if (token.starts_with("LABEL="))
+    {
+      token.remove_leading_chars(6);
+      label = token;
+      if (label.starts_with('"'))
+      {
+        fetch_rest_of_quoted_label(sgroup, i, label);
+      }
+    }
   }
 
-  os << "M  V30 END ATOM\n";
+  if (0 == label.length())     // not all SGROUP blocks have a label. Might be just for display
+  {
+//  cerr << "Molecule::_convert_sgroup_to_elements:no LABEL\n";
+//  cerr << sgroup << endl;
+//  return 0;
+    return 1;
+  }
 
-  return os.good();
+  if (0 == atoms.number_elements())
+  {
+    cerr << "Molecule::_convert_sgroup_to_elements:no ATOMS\n";
+    cerr << sgroup << endl;
+    return 0;
+  }
+
+  if (1 != atoms.number_elements())    // cannot handle these
+    return 1;
+
+  if (isdigit(label[0]))
+    return 1;
+
+  const Element * e = get_element_from_symbol_no_case_conversion(label);
+  if (NULL == e)
+  {
+    if (! auto_create_new_elements())
+    {
+      cerr << "Molecule::_convert_sgroup_to_elements:cannot create element for '" << label << "'\n";
+      return 0;
+    }
+
+    e = create_element_with_symbol(label);
+    if (NULL == e)
+    {
+      cerr << "Molecule::_convert_sgroup_to_elements:cannot create element '" << label << "'\n";
+      return 0;
+    }
+  }
+
+  _things[atoms[0]]->set_element(e);
+
+  return 1;
 }

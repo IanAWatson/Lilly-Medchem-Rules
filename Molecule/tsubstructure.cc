@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2012  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <assert.h>
 #include <iostream>
 #include <memory>
@@ -24,10 +6,11 @@
 
 #include "iw_tdt.h"
 #include "iwbits.h"
-#include "iw_auto_array.h"
 #include "cmdline.h"
+#include "report_progress.h"
 
 #include "molecule.h"
+#include "rwsubstructure.h"
 #include "path.h"
 #include "qry_wstats.h"
 #include "molecule_to_query.h"
@@ -37,17 +20,21 @@
 #include "aromatic.h"
 #include "output.h"
 #include "iwstandard.h"
+#include "charge_assigner.h"
+#include "donor_acceptor.h"
 #include "etrans.h"
 #include "smiles.h"
+#include "numass.h"
 #include "rmele.h"
-#include "rwsubstructure.h"
 
-//#define USE_IWMALLOC
-#ifdef USE_IWMALLOC
-#include "iwmalloc.h"
-#endif
+static Number_Assigner matched_structures_number_assigner;
+static Number_Assigner non_matched_structures_number_assigner;
 
 static Chemical_Standardisation chemical_standardisation;
+
+static Donor_Acceptor_Assigner donor_acceptor_assigner;
+
+static Charge_Assigner charge_assigner;
 
 static Element_Transformations element_transformations;
 
@@ -104,19 +91,24 @@ usage (int rc)
 //cerr << "  -m <number>    assign sequential numbers R(%d) to matches written\n";
   cerr << "  -m <file>      write matched structures to <file>\n";
   cerr << endl;
+//cerr << "  -n REPOrt      report (to the screen) non matches\n";
   cerr << "  -n SEPArate    write matches to each query to a separate stream\n";
   cerr << "  -n QDT         append query non-match details to molecule name\n";
+//cerr << "  -n <number>    assign sequential numbers R(%d) to non matches written\n";
   cerr << "  -n <file>      write non matching structures to <file>\n";
   cerr << endl;
   cerr << "  -q <query>     specify query file\n";
   cerr << "  -q F:file      specify file of queries\n";
   cerr << "  -q S:file      specify file of smarts\n";
   cerr << "  -q M:file      specify file of molecules\n";
+//cerr << "  -Q <file>      specify a file of queries (same as -q F:<file>)\n";
+//cerr << "  -h             queries are in same directory as -Q <file>\n";
   cerr << "  -s <smarts>    specify smarts for search\n";
+//cerr << "  -S <smarts>    specify smarts for search (use -s)\n";
   cerr << endl;
   cerr << "  -j <...>       options for labelling matched atoms. Enter '-j help' for details\n";
-//cerr << "  -J <tag>       output Daylight fingerprints with tag <TAG>\n";
-//cerr << "  -y <nbits>     specify the number of bits in the fingerprint file\n";
+  cerr << "  -J <tag>       output Daylight fingerprints with tag <TAG>\n";
+  cerr << "  -y <nbits>     specify the number of bits in the fingerprint file\n";
   cerr << "  -a             output hits as array\n";
   cerr << "  -Y <stem>      use <stem> as descriptor name stem\n";
   cerr << "  -c             remove chirality before doing any matching\n";
@@ -134,11 +126,10 @@ usage (int rc)
   cerr << "  -G <fname>     file for lists of matched atoms\n";
   cerr << "  -i <type>      specify input type, enter '-i help' for info\n";
   cerr << "  -o <type>      output type for all molecules written\n";
-#ifdef USE_IWMALLOC
-  display_standard_debug_options(cerr, 'd');
-#endif
   display_standard_aromaticity_options(cerr);
   display_standard_chemical_standardisation_options(cerr, 'g');
+//display_standard_charge_assigner_options(cerr, 'N');
+//cerr << "  -H <...>       donor acceptor options. Enter '-H help' for details\n";
   cerr << "  -X <element>   remove elements of type <element> before doing matches\n";
   cerr << "  -T ...         element transformations, enter '-T help' for info\n";
   cerr << "  -E <symbol>    create element with symbol <symbol>\n";
@@ -168,11 +159,16 @@ display_dash_M_options()
   cerr << "  -M time        report timing\n";
   cerr << "  -M report=nn   report progress every <nn> molecules processed\n";
   cerr << "  -M meach       match each query of a multi-component query - ignores operators\n";
+#ifdef DO_GETPSF
+  cerr << "  -M getpsf      special processing for Dan Robertson's getpsf script\n";
+#endif
   cerr << "  -M ncon=xxx    number of connections to matched atoms\n";
   cerr << "  -M dbe=xxx     distance between embeddings\n";
-  cerr << "  -M aeuao       Atom Environments match Unmatched Atoms Only - unmatched during matching\n";
+//cerr << "  -M aeuao       Atom Environments match Unmatched Atoms Only - unmatched during matching\n";
+  cerr << "  -M aecmm       Atom Environments Can Match Matched Atoms- matched during matching\n";
   cerr << "  -M imp2exp     make implicit Hydrogens explicit\n";
   cerr << "  -M Hmmin       H in a smarts means minimum of 1 Hydrogen\n";
+  cerr << "  -M vH          the v smarts directive includes implicit Hydrogens\n";
   cerr << "  -M stopm=nn    stop processing after <nn> molecules have matched\n";
   cerr << "  -M omlf        only make matches in the largest fragment\n";
   cerr << "  -M onlysubiso  isotopic atoms in query molecules indicate substitution points\n";
@@ -187,6 +183,7 @@ display_dash_M_options()
   cerr << "  -M DCF=fname   create a csib directcolorfile <fname>\n";
   cerr << "  -M CEH         Condense Explicit Hydrogens to anchor atom(s)\n";
   cerr << "  -M owdmm       only write descriptors for molecules that match\n";
+  cerr << "  -M anmatch     array output will be the number of hits (rather than column per query)\n";
 
   return;
 }
@@ -206,6 +203,8 @@ display_dash_j_options()
   cerr << "  -j qnum        label by query number\n";
   cerr << "  -j writeach=fname write individually labelled matches to <fname>\n";
   cerr << "                 each match written as a separate molecule\n";
+  cerr << "  -j qmatch      isotopic label will be number of times any query hits an atom. No other -j possible\n";
+  cerr << "  -j amap        use atom map numbers rather than isotopes\n";
 
   return;
 }
@@ -215,7 +214,7 @@ static int molecules_read = 0;
 static int molecules_which_match = 0;
 static int print_embeddings = 0;
 
-static int report = 0;
+static Report_Progress report_progress;
 
 static int work_as_filter  = 0;
 
@@ -223,11 +222,13 @@ static int work_as_filter  = 0;
   When the report option is used, this is its stream
 */
 
-static ofstream stream_for_report;
+static std::ofstream stream_for_report;
 
 static int default_fingerprint_nbits = 0;
 
 static int write_as_array = 0;
+
+static int array_output_is_number_of_matches = 0;
 
 static int only_write_array_for_molecules_with_hits = 0;
 
@@ -297,7 +298,7 @@ static int multiple_matches_each_query_counts_one = 0;
 
 static int min_hits_needed = 0;
 static int molecules_with_too_few_hits = 0;
-static int max_hits_needed = numeric_limits<int>::max();
+static int max_hits_needed = std::numeric_limits<int>::max();
 static int molecules_with_too_many_hits = 0;
 
 /*
@@ -343,6 +344,12 @@ static int positive_j_offset = 0;
 static int negative_j_offset = 0;
 
 /*
+  Aug 2017. Allow use of atom map numbers for matched atoms
+*/
+
+static int label_matched_atoms_via_atom_map_numbers = 0;
+
+/*
   Note that the directcolorfile implementation is flawed because we don't check
   on there being the same number of entries in the dcf file as whatever file it
   is being compared with
@@ -366,6 +373,20 @@ static int label_by_query_atom_number = 0;
 
 static int label_by_query_number = 0;
 
+/*
+  Dec 2013. For each molecule, we want to know how many of the queries hit a given atom
+*/
+
+static int increment_isotopic_labels_to_indicate_queries_matching = 0;
+
+/*
+  Feb 2003. Special thing for Dan Robertson
+*/
+
+#ifdef DO_GETPSF
+static IWString getpsf_directory;
+#endif
+
 static int make_implicit_hydrogens_explicit = 0;
 
 static int
@@ -373,7 +394,7 @@ write_mdl_v30_bond_list (Molecule & m,
                          const const_IWSubstring & query_name,
                          const Set_of_Atoms & e,
                          int * btmp,
-                         ostream & output)
+                         std::ostream & output)
 {
   int nb = m.nedges();
 
@@ -408,7 +429,7 @@ write_matched_atoms_as_mdl_v30_lists (Molecule & m,
                                 resizable_array_p<Substructure_Hit_Statistics> & queries,
                                 Substructure_Results * sresults,
                                 int * btmp,
-                                ostream & output)
+                                std::ostream & output)
 {
   int nq = queries.number_elements();
 
@@ -442,7 +463,7 @@ static int
 write_matched_atoms_as_mdl_v30_lists (Molecule & m,
                                 resizable_array_p<Substructure_Hit_Statistics> & queries,
                                 Substructure_Results * sresults,
-                                ostream & output)
+                                std::ostream & output)
 {
   int * btmp;
 
@@ -507,10 +528,31 @@ do_discard_hits_in_non_organic_fragments (Molecule_to_Match & target,
   return sresults.number_embeddings();
 }
 
+/*
+  We have two scenarios for fingerprint output. 
+    We are reading a file of molecules
+    We are reading a TDT file as a filter
+*/
 
 static int
-write_smiles_and_pcn (Molecule & m,
-                      ostream & output)
+do_fingerprint_output(int nq,
+                      const int * hits,
+                      std::ostream & output)
+{
+  return 1;
+}
+
+static int
+do_sparse_fingerprint_output(int nq,
+                             const int * hits,
+                             std::ostream & output)
+{
+  return 1;
+}
+
+static int
+write_smiles_and_pcn(Molecule & m,
+                     std::ostream & output)
 {
   output << "$SMI<" << m.smiles() << ">\n";
   output << "PCN<" << m.molecule_name() << ">\n";
@@ -519,10 +561,30 @@ write_smiles_and_pcn (Molecule & m,
 }
 
 static int
-do_hits_tag_output (Molecule & m,
-                    const resizable_array_p<Substructure_Hit_Statistics> & queries,
-                    const int * hits,
-                    ostream & output)
+do_fingerprint_output(Molecule & m,
+                      int nq,
+                      const int * hits,
+                      std::ostream & output)
+{
+  if (! work_as_filter)
+   write_smiles_and_pcn(m, output);
+
+  if (fingerprint_tag.starts_with("NC"))
+    (void) do_sparse_fingerprint_output(nq, hits, output);
+  else
+    (void) do_fingerprint_output(nq, hits, output);
+
+  if (! work_as_filter)
+    output << "|\n";
+
+  return output.good();
+}
+
+static int
+do_hits_tag_output(Molecule & m,
+                   const resizable_array_p<Substructure_Hit_Statistics> & queries,
+                   const int * hits,
+                   std::ostream & output)
 {
   if (! work_as_filter)
     write_smiles_and_pcn(m, output);
@@ -547,7 +609,7 @@ static int
 do_nhits_tag_output (Molecule & m,
                      int nq,
                      const int * hits,
-                     ostream & output)
+                     std::ostream & output)
 {
   if (! work_as_filter)
     write_smiles_and_pcn(m, output);
@@ -565,12 +627,25 @@ do_array_output (const IWString & mname,
                  int nhits,
                  int nq,
                  const int * hits,
-                 ostream & output)
+                 std::ostream & output)
 {
   if (only_write_array_for_molecules_with_hits && 0 == nhits)
     return 1;
 
   write_space_suppressed_string(mname, output);
+
+  if (array_output_is_number_of_matches)
+  {
+    int rc = 0;
+    for (int i = 0; i < nq; ++i)
+    {
+      rc += hits[i];
+    }
+
+    output << ' ' << rc << endl;
+
+    return 1;
+  }
 
   for (int i = 0; i < nq; i++)
   {
@@ -581,6 +656,52 @@ do_array_output (const IWString & mname,
 
   return output.good();
 }
+
+#ifdef DO_GETPSF
+static int
+do_getpsf (Molecule & m,
+           const Substructure_Results & sresults)
+{
+  int matoms = m.natoms();
+
+  IWString fname(getpsf_directory);
+  fname << m.name();
+  fname.truncate_at_first(' ');
+
+  std::ofstream output(fname.null_terminated_chars(), ios::out);
+  if (! output.good())
+  {
+    cerr << "Cannot open getpsf file '" << fname << "'\n";
+    return 0;
+  }
+
+  int * already_written = new_int(matoms); std::unique_ptr<int[]> free_already_written(already_written);
+
+  int ne = sresults.number_embeddings();
+
+  for (int i = 0; i < ne; i++)
+  {
+    const Set_of_Atoms * e = sresults.embedding(i);
+
+    int n = e->number_elements();
+
+    for (int j = 0; j < n; j++)
+    {
+      atom_number_t a = e->item(j);
+
+      if (already_written[a])
+        continue;
+
+      output << m.atomic_symbol(a) << (a + 1) << endl;
+
+      already_written[a] = 1;
+    }
+  }
+
+  return output.good();
+}
+
+#endif
 
 /*
   Apr 99. Bob Coner wanted the ability to get the matched atoms out in a 
@@ -593,7 +714,7 @@ do_array_output (const IWString & mname,
   single atom, etc.., etc...
 */
 
-static ofstream bob_coner_stream;
+static std::ofstream bob_coner_stream;
 
 static int
 write_bob_coner_special (const Substructure_Results * sresults,
@@ -682,6 +803,28 @@ write_directcolorfile (const Molecule & m,
   return 1;
 }
 
+static int
+do_increment_isotopic_labels_to_indicate_queries_matching (const Molecule & m,
+                                const Set_of_Atoms & embedding,
+                                const int na,
+                                int * atom_isotopic_label)
+{
+  const int matoms = m.natoms();
+
+  for (auto i = 0; i < na; ++i)
+  {
+    const atom_number_t j = embedding[i];
+
+    if (j < 0 || j >= matoms)
+      continue;
+
+    atom_isotopic_label[j]++;
+  }
+
+  return 1;
+}
+
+
 /*
   apply the labels for a single embedding
 */
@@ -700,6 +843,9 @@ apply_isotopic_labels_embedding (const Molecule & m,
   int na = embedding->number_elements();    // how many of the matched atoms do we process
   if (label_matched_atoms_stop > 0 && na > label_matched_atoms_stop)
     na = label_matched_atoms_stop;
+
+  if (increment_isotopic_labels_to_indicate_queries_matching)
+    return do_increment_isotopic_labels_to_indicate_queries_matching(m, *embedding, na, atom_isotopic_label);
 
   const Query_Atoms_Matched * qam;
   if (label_by_query_atom_number)
@@ -725,7 +871,7 @@ apply_isotopic_labels_embedding (const Molecule & m,
 
   for (int j = 0; j < na; j++)
   {
-    atom_number_t k = embedding->item(j);
+    const atom_number_t k = embedding->item(j);
     if (k >= 0 && k < matoms)
       ;
     else if (INVALID_ATOM_NUMBER == k)
@@ -736,8 +882,12 @@ apply_isotopic_labels_embedding (const Molecule & m,
       continue;
     }
 
-    if (0 != atom_isotopic_label[k])    // must have been set already
-      continue;
+    if (0 == atom_isotopic_label[k])    // definitely not already set
+      ;
+    else if (positive_j_offset || negative_j_offset)   // we cannot distinguish an isotope in the initial molecule from something added elsewhere here.
+      ;
+    else
+      continue;   // already set by a different query
 
     const Atom * ak = m.atomi(k);
 
@@ -750,6 +900,9 @@ apply_isotopic_labels_embedding (const Molecule & m,
         iso = ak->isotope() + positive_j_offset + negative_j_offset;
       else
         iso = label_matched_atoms + positive_j_offset + negative_j_offset;
+
+      if (iso < 0)
+        iso = 0;
     }
     else if (all_matched_atoms_get_same_isotope)
       iso = label_matched_atoms;
@@ -776,6 +929,20 @@ apply_isotopic_labels_embedding (const Molecule & m,
   return 1;
 }
 
+static void
+do_label_matched_atoms_via_atom_map_numbers(Molecule & m,
+                                const int * atom_isotopic_label)
+{
+  const int matoms = m.natoms();
+
+  for (int i = 0; i < matoms; ++i)
+  {
+    m.set_atom_map_number(i, atom_isotopic_label[i]);
+  }
+
+  return;
+}
+
 static int
 label_match_and_write_to_stream_for_individually_labelled_matches (Molecule & m,
                         int query_number,
@@ -787,7 +954,10 @@ label_match_and_write_to_stream_for_individually_labelled_matches (Molecule & m,
 
   apply_isotopic_labels_embedding(m, query_number, sresults, embedding_number, atom_isotopic_label);
 
-  m.set_isotopes (atom_isotopic_label);
+  if (label_matched_atoms_via_atom_map_numbers)
+    do_label_matched_atoms_via_atom_map_numbers(m, atom_isotopic_label);
+  else
+    m.set_isotopes(atom_isotopic_label);
 
   return stream_for_individually_labelled_matches.write(m);
 }
@@ -818,7 +988,7 @@ label_matches_and_write_to_stream_for_individually_labelled_matches (Molecule * 
   Molecule mcopy(*m);
   mcopy.set_name(m->name());
 
-  int * tmp = new int[mcopy.natoms()]; iw_auto_array<int> free_tmp(tmp);
+  int * tmp = new int[mcopy.natoms()]; std::unique_ptr<int[]> free_tmp(tmp);
 
   return label_matches_and_write_to_stream_for_individually_labelled_matches(mcopy, query_number, sresults, tmp);
 }
@@ -872,15 +1042,7 @@ do_single_query (Molecule_to_Match & target,
                  const Element ** element_labels,
                  int * atom_isotopic_label)
 {
-#ifdef USE_IWMALLOC
-  iwmalloc_check_all_malloced(stderr);
-#endif
-
   int nmatches = query->substructure_search(target, sresults);
-
-#ifdef USE_IWMALLOC
-  iwmalloc_check_all_malloced(stderr);
-#endif
 
   if (0 == nmatches)
     return 0;
@@ -897,14 +1059,10 @@ do_single_query (Molecule_to_Match & target,
   if (0 == multiple_matches_each_query_counts_one && nmatches >= report_multiple_matches && stream_for_multiple_matches.good())
     stream_for_multiple_matches.write(target.molecule());
 
-#ifdef USE_IWMALLOC
-  iwmalloc_check_all_malloced(stderr);
-#endif
-
   if (stream_for_individually_labelled_matches.active())
     label_matches_and_write_to_stream_for_individually_labelled_matches(target.molecule(), query_number, sresults);
     
-  if (label_matched_atoms || label_by_query_atom_number || label_by_query_number)
+  if (label_matched_atoms || label_by_query_atom_number || label_by_query_number || increment_isotopic_labels_to_indicate_queries_matching || positive_j_offset || negative_j_offset)
     (void) label_atoms_hit(target.molecule(), query_number, sresults, atom_isotopic_label);
   else if (matched_atoms_element)
     (void) transform_atoms_hit(sresults, element_labels);
@@ -982,6 +1140,11 @@ do_all_queries (Molecule & m,
   if (stream_for_directcolorfile.is_open())
     write_directcolorfile(m, *sresults, stream_for_directcolorfile);
 
+#ifdef DO_GETPSF
+  if (getpsf_directory.length())
+    do_getpsf(m, sresults[0]);
+#endif
+
   if (multiple_matches_each_query_counts_one && rc > 1)
   {
     if (verbose)
@@ -1001,16 +1164,14 @@ do_all_queries (Molecule & m,
     return 0;
   }
 
-  if (tag_for_nhits.length())
-    do_nhits_tag_output(m, nq, hits, cout);
+  if (default_fingerprint_nbits)
+    do_fingerprint_output(m, nq, hits, std::cout);
+  else if (tag_for_nhits.length())
+    do_nhits_tag_output(m, nq, hits, std::cout);
   else if (tag_for_hits.length())
-    do_hits_tag_output(m, queries, hits, cout);
+    do_hits_tag_output(m, queries, hits, std::cout);
   else if (write_as_array)
-    do_array_output(m.name(), rc, nq, hits, cout);
-
-#ifdef USE_IWMALLOC
-  iwmalloc_check_all_malloced(stderr);
-#endif
+    do_array_output(m.name(), rc, nq, hits, std::cout);
 
   if (element_labels)
   {
@@ -1024,10 +1185,13 @@ do_all_queries (Molecule & m,
 
   if (atom_isotopic_label)
   {
-    int matoms = m.natoms();
+    const int matoms = m.natoms();
     for (int i = 0; i < matoms; i++)
     {
-      m.set_isotope(i, atom_isotopic_label[i]);
+      if (label_matched_atoms_via_atom_map_numbers)
+        m.set_atom_map_number(i, atom_isotopic_label[i]);
+      else
+        m.set_isotope(i, atom_isotopic_label[i]);
     }
   }
 
@@ -1040,21 +1204,25 @@ tsubstructure (Molecule & m,
                Substructure_Results * sresults,
                int * queries_matched)
 {
-  if (report > 0 && 0 == molecules_read % report)
+  if (report_progress())
     cerr << "Processed " << molecules_read << " molecules, " << molecules_which_match << " molecules matched\n";
 
   int tsize = queries.number_elements();
   if (tsize < default_fingerprint_nbits)
     tsize = default_fingerprint_nbits;
 
-  int * tmp = new_int(tsize); iw_auto_array<int> free_tmp(tmp);
+  int * tmp = new_int(tsize); std::unique_ptr<int[]> free_tmp(tmp);
 
   int matoms = m.natoms();
 
   int * atom_isotopic_label;
 
-  if (label_matched_atoms || label_by_query_atom_number || label_by_query_number)
+  if (label_matched_atoms || label_by_query_atom_number || label_by_query_number || increment_isotopic_labels_to_indicate_queries_matching || negative_j_offset || positive_j_offset)
+  {
     atom_isotopic_label = new_int(matoms);
+    if (negative_j_offset|| positive_j_offset || increment_isotopic_labels_to_indicate_queries_matching)
+      m.get_isotopes(atom_isotopic_label);
+  }
   else
     atom_isotopic_label = NULL;
 
@@ -1077,10 +1245,6 @@ tsubstructure (Molecule & m,
   if (new_elements)
     delete [] new_elements;
 
-#ifdef USE_IWMALLOC
-  iwmalloc_check_all_malloced(stderr);
-#endif
-
   queries_matched[nmatched]++;
 
   if (verbose > 1 && queries.number_elements() > 1)
@@ -1092,6 +1256,8 @@ tsubstructure (Molecule & m,
   if (nmatched)
   {
     molecules_which_match++;
+    if (matched_structures_number_assigner.active())
+      matched_structures_number_assigner.process(m);
     if (write_matched_atoms_as_mdl_v30_atom_lists || write_matched_atoms_as_mdl_v30_bond_lists)
       write_matched_atoms_as_mdl_v30_lists(m, queries, sresults, stream_for_matching_structures.stream_for_type(SDF));
     else if (stream_for_matching_structures.good())
@@ -1101,6 +1267,8 @@ tsubstructure (Molecule & m,
   {
     if (report_non_matches)
       cerr << molecules_read << ": " << nmatched << " matches: " << m.name() << endl;
+    if (non_matched_structures_number_assigner.active())
+      non_matched_structures_number_assigner.process(m);
     if (stream_for_non_matching_structures.good())
       stream_for_non_matching_structures.write(m);
 
@@ -1125,6 +1293,12 @@ preprocess (Molecule & m)
 
   if (chemical_standardisation.active())
     chemical_standardisation.process(m);
+
+  if (charge_assigner.active())
+    charge_assigner.process(m);
+
+  if (donor_acceptor_assigner.active())
+    donor_acceptor_assigner.process(m);
 
   if (make_implicit_hydrogens_explicit)
     m.make_implicit_hydrogens_explicit();
@@ -1160,10 +1334,6 @@ tsubstructure (data_source_and_type<Molecule> & input,
 
     (void) tsubstructure(*m, queries, sresults, queries_matched);
 
-#ifdef USE_IWMALLOC
-  iwmalloc_check_all_malloced(stderr);
-#endif
-
     if (stop_processing_after_this_many_molecules_matching > 0 && molecules_which_match >= stop_processing_after_this_many_molecules_matching)
     {
       if (verbose)
@@ -1183,7 +1353,7 @@ tsubstructure_filter (const const_IWSubstring & smi,
                resizable_array_p<Substructure_Hit_Statistics> & queries,
                Substructure_Results * sresults,
                int * queries_matched,
-               ostream & output)
+               std::ostream & output)
 {
   Molecule m;
   if (! m.build_from_smiles(smi))
@@ -1212,7 +1382,7 @@ tsubstructure_filter (iwstring_data_source & input,
                resizable_array_p<Substructure_Hit_Statistics> & queries,
                Substructure_Results * sresults,
                int * queries_matched,
-               ostream & output)
+               std::ostream & output)
 {
   const_IWSubstring buffer;
   while (input.next_record(buffer))
@@ -1244,7 +1414,7 @@ tsubstructure_filter (const char * input_fname,
                resizable_array_p<Substructure_Hit_Statistics> & queries,
                Substructure_Results * sresults,
                int * queries_matched,
-               ostream & output)
+               std::ostream & output)
 {
   iwstring_data_source input(input_fname);
   if (! input.good())
@@ -1266,7 +1436,7 @@ tsubstructure (const char * input_fname,
   assert (NULL != input_fname);
 
   if (work_as_filter)
-    return tsubstructure_filter(input_fname, queries, sresults, queries_matched, cout);
+    return tsubstructure_filter(input_fname, queries, sresults, queries_matched, std::cout);
 
   data_source_and_type<Molecule> input(input_type, input_fname);
   if (! input.good())
@@ -1453,6 +1623,7 @@ parse_set_of_options (Command_Line & cl,
                       resizable_array_p<Substructure_Hit_Statistics> & queries,
                       const char * match_or_non_match,
                       int & report_matches,
+                      Number_Assigner & number_assigner,
                       int & append_query_details,
                       IWString & fname,
                       Molecule_Output_Object & output_stream)
@@ -1548,6 +1719,19 @@ parse_set_of_options (Command_Line & cl,
       if (verbose)
         cerr << "Matched atoms written as MDL V30 bond lists\n";
     }
+#ifdef NUMBER_ASSIGNER_NOT_USEFUL_HERE
+    else if (cl.value(flag, j, i))
+    {
+      if (! number_assigner.initialise(j))
+      {
+        cerr << "Number assigner initialisation failed\n";
+        return 0;
+      }
+      need_to_open_file = 1;
+      if (verbose)
+        cerr << match_or_non_match << "ed molecules assigned R(%d) numbers starting with " << j << endl;
+    }
+#endif
     else if (0 == fname.number_elements())    // not yet set
     {
       fname = tmp;
@@ -1602,7 +1786,7 @@ assign_name_if_needed (Substructure_Hit_Statistics & q,
 static int
 tsubstructure (int argc, char ** argv)
 {
-  Command_Line cl (argc, argv, "w:W:y:R:X:hj:J:E:rcls:S:t:A:K:bBd:fm:n:uvo:i:q:Q:ag:pkG:Y:N:H:M:x:T:");
+  Command_Line cl (argc, argv, "w:W:y:R:X:hj:J:E:rcls:S:t:A:K:bBfm:n:uvo:i:q:Q:ag:pkG:Y:N:H:M:x:T:");
 
   if (cl.unrecognised_options_encountered())
   {
@@ -1610,22 +1794,6 @@ tsubstructure (int argc, char ** argv)
   }
 
   verbose = cl.option_count('v');
-
-#ifdef USE_IWMALLOC
-  if (cl.option_present('d'))
-  {
-    if (! parse_standard_debug_options(cl, verbose, 'd'))
-    {
-      usage(21);
-    }
-  }
-#else
-  if (cl.option_present('d'))
-  {
-    cerr << "Unrecognised option -d (iwmalloc not compiled)\n";
-    usage(13);
-  }
-#endif
 
   if (! process_elements(cl, verbose))
   {
@@ -1643,6 +1811,24 @@ tsubstructure (int argc, char ** argv)
 
   if (! process_standard_aromaticity_options(cl, verbose))
     usage(6);
+
+  if (cl.option_present('N'))
+  {
+    if (! charge_assigner.construct_from_command_line(cl, verbose, 'N'))
+    {
+      cerr << "Cannot initialise charge assigner\n";
+      return 31;
+    }
+  }
+
+  if (cl.option_present('H'))
+  {
+    if (! donor_acceptor_assigner.construct_from_command_line(cl, 'H', verbose))
+    {
+      cerr << "Cannot initialise donor acceptor assigner (-H option)\n";
+      usage(5);
+    }
+  }
 
   int match_first = 0;
   if (cl.option_present('f'))
@@ -1921,6 +2107,12 @@ tsubstructure (int argc, char ** argv)
       else if ("aeuao" == m)
       {
         set_atom_environment_only_matches_unmatched_atoms(1);
+        set_query_environment_must_match_unmatched_atoms(1);
+      }
+      else if ("aecmm" == m)
+      {
+        set_atom_environment_only_matches_unmatched_atoms(0);
+        set_query_environment_must_match_unmatched_atoms(0);
       }
       else if ("imp2exp" == m)
       {
@@ -1930,17 +2122,24 @@ tsubstructure (int argc, char ** argv)
       {
         set_h_means_exactly_one_hydrogen(0);
       }
+      else if ("vH" == m)
+      {
+        set_global_setting_nbonds_includes_implicit_hydrogens(1);
+      }
       else if (m.starts_with("report="))
       {
         m.remove_leading_chars(7);
-        if (! m.numeric_value(report) || report < 1)
+        int r;
+        if (! m.numeric_value(r) || r < 1)
         {
           cerr << "The report option must be followed by a valid whole number\n";
           usage(4);
         }
 
         if (verbose)
-          cerr << "Will report progress every " << report << " molecules read\n";
+          cerr << "Will report progress every " << r << " molecules read\n";
+
+        report_progress.set_report_every(r);
       }
       else if ("meach" == m)
       {
@@ -1951,6 +2150,16 @@ tsubstructure (int argc, char ** argv)
         echo_query_stem = m;
         echo_query_stem.remove_leading_chars(5);
       }
+#ifdef DO_GETPSF
+      else if (m.starts_with("getpsf="))
+      {
+        getpsf_directory = m;
+        getpsf_directory.remove_leading_chars(7);
+
+        if (! getpsf_directory.ends_with('/'))
+          getpsf_directory += '/';
+      }
+#endif
       else if (m.starts_with("ncon="))
       {
         m.remove_leading_chars(5);
@@ -2101,6 +2310,30 @@ tsubstructure (int argc, char ** argv)
         if (verbose)
           cerr << "Will relax strict adherence to initial atom numbering\n";
       }
+      else if ("ama" == m)
+      {
+        set_only_aromatic_atoms_match_aromatic_atoms(1);
+        if (verbose)
+          cerr << "Molecule to query transformations such that only aromatic atoms match aromatic atoms\n";
+      }
+      else if (m.starts_with("rmm="))
+      {
+        m.remove_leading_chars(4);
+        unsigned int r;
+        if (! m.numeric_value(r) || r < 1)
+        {
+          cerr << "The report multiple matches value (rmm=) must be a whole +ve number '" << m << "' not recognised\n";
+          return 2;
+        }
+
+        set_report_multiple_hits_threshold(r);
+      }
+      else if ("anmatch" == m)
+      {
+        array_output_is_number_of_matches = 1;
+        if (verbose)
+          cerr << "Array output will be number of matches\n";
+      }
       else if ("help" == m)
       {
         display_dash_M_options();
@@ -2202,7 +2435,7 @@ tsubstructure (int argc, char ** argv)
       else if (j.starts_with('+'))
       {
         j++;     // '+' is not a valid part of a number
-        if (! j.numeric_value(positive_j_offset) || 0 == positive_j_offset)
+        if (! j.numeric_value(positive_j_offset) || positive_j_offset <= 0)
         {
           cerr << "With -j +nnn, the number, nnn must be non-zero\n";
           usage(44);
@@ -2213,7 +2446,7 @@ tsubstructure (int argc, char ** argv)
       }
       else if (j.starts_with('-'))
       {
-        if (! j.numeric_value(negative_j_offset) || 0 == negative_j_offset)
+        if (! j.numeric_value(negative_j_offset) || negative_j_offset <= 0)
         {
           cerr << "With -j -nnn, the number, nnn must be non-zero\n";
           usage(44);
@@ -2231,6 +2464,19 @@ tsubstructure (int argc, char ** argv)
           cerr << "Cannot open file for labelled matches '" << j << "'\n";
           return 0;
         }
+      }
+      else if ("qmatch" == j)
+      {
+        increment_isotopic_labels_to_indicate_queries_matching = 1;
+
+        if (verbose)
+          cerr << "Will increment isotopic labels by the number of queries hitting that atom\n";
+      }
+      else if ("amap" == j)
+      {
+        label_matched_atoms_via_atom_map_numbers = 1;
+        if (verbose)
+          cerr << "Will label matched atoms via atom map number\n";
       }
       else if ("help" == j)
       {
@@ -2267,6 +2513,10 @@ tsubstructure (int argc, char ** argv)
       ;
     else if (label_by_query_number)
       ;
+    else if (positive_j_offset || negative_j_offset)
+      ;
+    else if (increment_isotopic_labels_to_indicate_queries_matching)
+      ;
     else if (0 == label_matched_atoms && NULL == matched_atoms_element)
     {
       cerr << "Must specify '-j <number>' or '-j <element>' as a -j option\n";
@@ -2281,8 +2531,9 @@ tsubstructure (int argc, char ** argv)
 
     if ((positive_j_offset || negative_j_offset) && 0 == label_matched_atoms)
     {
-      cerr << "In order to isotopically offset matched atoms, an initial value for non-isotopic atoms is needed\n";
-      usage(29);
+      cerr << "Warning, positive (" << positive_j_offset << ") and/or negative (" << negative_j_offset << ") specified, but no label for non isotopic atoms. Any resulting negative isotopes ignored\n";
+//    cerr << "In order to isotopically offset matched atoms, an initial value for non-isotopic atoms is needed\n";
+//    usage(29);
     }
 
     if (label_by_query_atom_number && all_matched_atoms_get_same_isotope)
@@ -2498,7 +2749,7 @@ tsubstructure (int argc, char ** argv)
     IWString fname;
     cl.value('R', fname);
 
-    stream_for_report.open(fname.null_terminated_chars(), ios::out);
+    stream_for_report.open(fname.null_terminated_chars(), std::ios::out);
     if (! stream_for_report.good())
     {
       cerr << "Cannot open report file '" << fname << "'\n";
@@ -2519,6 +2770,7 @@ tsubstructure (int argc, char ** argv)
   IWString fname_for_m;
   if (! parse_set_of_options(cl, 'm', queries, "matches",
                               report_matches,
+                              matched_structures_number_assigner,
                               append_match_details_to_molecule_name,
                               fname_for_m,
                               stream_for_matching_structures))
@@ -2531,6 +2783,7 @@ tsubstructure (int argc, char ** argv)
   IWString fname_for_n;
   if (! parse_set_of_options(cl, 'n', queries, "non-matches",
                               report_non_matches,
+                              non_matched_structures_number_assigner,
                               append_non_match_details_to_molecule_name,
                               fname_for_n,
                               stream_for_non_matching_structures))
@@ -2549,7 +2802,7 @@ tsubstructure (int argc, char ** argv)
   {
     const char * g = cl.option_value('G');
 
-    bob_coner_stream.open(g, ios::out);
+    bob_coner_stream.open(g, std::ios::out);
     if (! bob_coner_stream.good())
     {
       cerr << "Cannot open matched atom stream '" << g << "'\n";
@@ -2700,17 +2953,19 @@ tsubstructure (int argc, char ** argv)
       cerr << "Query matches written as fingerprints to '" << cl.option_value('J') <<
               "' fingerprints size " << default_fingerprint_nbits << endl;
   }
-  else if (cl.option_present('a') || cl.option_present('Y'))     //  Will we write Daylight fingerprints or an array of hits
+  else if (cl.option_present('a') || cl.option_present('Y') || array_output_is_number_of_matches)     //  Will we write Daylight fingerprints or an array of hits
   {
     write_as_array = 1;
     if (verbose)
       cerr << "Will write hit counts as an array of int's\n";
 
-    cout << "Name";      // write the descriptor header line
+    std::cout << "Name";      // write the descriptor header line
 
     IWString descriptor_stem;
 
-    if (cl.option_present('Y'))
+    if (array_output_is_number_of_matches)
+      std::cout << " Matches";
+    else if (cl.option_present('Y'))
     {
       descriptor_stem = cl.string_value('Y');
       if (verbose)
@@ -2718,7 +2973,7 @@ tsubstructure (int argc, char ** argv)
 
       for (int i = 0; i < queries.number_elements(); i++)
       {
-        cout << ' ' << descriptor_stem << i;
+        std::cout << ' ' << descriptor_stem << i;
       }
     }
     else
@@ -2728,25 +2983,25 @@ tsubstructure (int argc, char ** argv)
         IWString c = queries[i]->comment();
   
         if (0 == c.length())
-          cout << " qry" << i;
+          std::cout << " qry" << i;
         else
         {
 //        c.truncate_at_first(' ');
           c.gsub(' ', '_');
-          cout << ' ' << c;
+          std::cout << ' ' << c;
         }
       }
     }
 
-    cout << endl;
+    std::cout << endl;
   }
 
 // This keeps track of the number of molecules which match I queries.
 
   int nqueries = queries.number_elements();
-  int * queries_matched = new_int(nqueries + 1); iw_auto_array<int> free_queries_matched(queries_matched);
+  int * queries_matched = new_int(nqueries + 1); std::unique_ptr<int[]> free_queries_matched(queries_matched);
 
-  Substructure_Results * sresults = new Substructure_Results[nqueries];
+  Substructure_Results * sresults = new Substructure_Results[nqueries]; std::unique_ptr<Substructure_Results[]> free_sresults(sresults);
 
   if (zoption > 0)
   {
@@ -2793,10 +3048,6 @@ tsubstructure (int argc, char ** argv)
     cerr << "Took " << execution_time << " seconds, " << (molecules_read / execution_time) << " molecules per second\n";
   }
 
-#ifdef USE_IWMALLOC
-  iwmalloc_check_all_malloced(stderr);
-#endif
-
   if (verbose)
   {
     for (int i = 0; i < nqueries + 1; i++)
@@ -2830,10 +3081,6 @@ tsubstructure (int argc, char ** argv)
     }
   }
 
-#ifdef USE_IWMALLOC
-  iwmalloc_check_all_malloced(stderr);
-#endif
-
   return rc;
 }
 
@@ -2846,14 +3093,6 @@ main (int argc, char ** argv)
   prog_name = argv[0];
 
   int rc = tsubstructure(argc, argv);
-
-#ifdef USE_IWMALLOC
-  iwmalloc_check_all_malloced(stderr);
-#endif
-
-#ifdef USE_IWMALLOC
-  iwmalloc_terse_malloc_status(stderr);
-#endif
 
   return rc;
 }

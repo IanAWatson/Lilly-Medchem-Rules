@@ -1,39 +1,21 @@
-/**************************************************************************
-
-    Copyright (C) 2012  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <iostream>
 #include <iomanip>
+#include <memory>
 #include <limits>
+#include <random>
+#include <algorithm>
 
-using namespace std;
+using std::cerr;
+using std::endl;
 
 #define RESIZABLE_ARRAY_IMPLEMENTATION
 #define IWQSORT_FO_IMPLEMENTATION
 #include "primes.h"
 #include "iwbits.h"
 #include "misc.h"
-#include "iw_auto_array.h"
 #include "iwqsort.h"
 
-//#define USE_IWMALLOC
-#ifdef USE_IWMALLOC
-#include "iwmalloc.h"
-#endif
+#include "timsort.hpp"
 
 #include "molecule.h"
 #include "path.h"
@@ -105,6 +87,17 @@ consider_isotopes_as_zero_and_non_zero ()
   return file_scope_consider_isotopes_as_zero_and_non_zero;
 }
 
+static int file_scope_use_version_two_initial_rank_assignment = 0;
+
+void
+set_unique_determination_version(const int s)
+{
+  if (s > 1)
+    file_scope_use_version_two_initial_rank_assignment = 1;
+  else
+    file_scope_use_version_two_initial_rank_assignment = 0;
+}
+
 static void
 get_bonds (const Atom * a,
            int & aromatic_bonds,
@@ -117,7 +110,7 @@ get_bonds (const Atom * a,
   double_bonds = 0;
   triple_bonds = 0;
 
-  int acon = a->number_elements();
+  const int acon = a->number_elements();
 
   Bond *const* rawb = a->rawdata();
 
@@ -134,6 +127,8 @@ get_bonds (const Atom * a,
       double_bonds++;
     else if (b->is_triple_bond())
       triple_bonds++;
+    else if (IS_COORDINATION_BOND(b->btype()))     // clearly wrong, but I don't want to slow everything down for coordination bonds
+      triple_bonds++;
     else
     {
       cerr << "What kind of bond is this!! " << (*b) << '\n';
@@ -144,13 +139,49 @@ get_bonds (const Atom * a,
   return;
 }
 
+#define SEEMS_FASTER_WITH_INTEL
+#ifdef SEEMS_FASTER_WITH_INTEL
+static int
+set_bond_score_in_ncon2 (const Atom * a,
+                         Target_Atom * p)
+{
+  const int acon = a->ncon();
+
+  Bond *const* rawb = a->rawdata();
+
+  int rc = 0;
+
+  for (int i = 0; i < acon; i++)
+  {
+    const Bond * b = rawb[i];
+
+    if (b->is_aromatic())
+      rc += 1000;
+    else if (b->is_single_bond())
+      rc += 100;
+    else if (b->is_double_bond())
+      rc += 10;
+    else if (b->is_triple_bond())
+      rc++;
+    else if (IS_COORDINATION_BOND(b->btype()))
+      rc++;
+  }
+  
+  p->set_ncon2(rc);
+
+  return rc;
+}
+#endif
+
+//#define SEEMS_FASTER_WITH_GCC
+#ifdef SEEMS_FASTER_WITH_GCC
 static int
 set_bond_score_in_ncon2 (const Atom * a,
                          Target_Atom * p)
 {
   int aromatic_bonds, single_bonds, double_bonds, triple_bonds;
 
-  get_bonds (a, aromatic_bonds, single_bonds, double_bonds, triple_bonds);
+  get_bonds(a, aromatic_bonds, single_bonds, double_bonds, triple_bonds);
 
   int rc = 1000 * aromatic_bonds + 100 * single_bonds + 10 * double_bonds + triple_bonds;
 
@@ -158,6 +189,7 @@ set_bond_score_in_ncon2 (const Atom * a,
 
   return rc;
 }
+#endif
 
 //#define DEBUG_TARGET_ATOM_COMPARITOR
 
@@ -205,6 +237,10 @@ target_atom_comparitor (Target_Atom * const * ppa1, Target_Atom * const * ppa2)
     else if (e1->atomic_symbol_hash_value() > e2->atomic_symbol_hash_value())
       return 1;
   }
+  else if (! e1->is_in_periodic_table())
+    return -1;
+  else if (! e2->is_in_periodic_table())
+    return 1;
   else if (e1->permanent_aromatic() == e2->permanent_aromatic())
     ;
   else if (e1->permanent_aromatic())
@@ -212,7 +248,7 @@ target_atom_comparitor (Target_Atom * const * ppa1, Target_Atom * const * ppa2)
   else
     return 1;
 
-  if (INVALID_ATOMIC_NUMBER == p1->atomic_number ())    // these are atoms that have been excluded from consideration, they are always considered equivalent
+  if (INVALID_ATOMIC_NUMBER == p1->atomic_number())    // these are atoms that have been excluded from consideration, they are always considered equivalent
     return 0;
 
   if (p1->ncon() < p2->ncon())
@@ -260,7 +296,7 @@ target_atom_comparitor (Target_Atom * const * ppa1, Target_Atom * const * ppa2)
 
 // Jan 2007. Restrict the case of ignoring implicit Hydrogens to heteroatoms
 // only. Otherwise molecules like
-// ............
+// C12=C(C3=C(C(=O)NC3=O)C3=C4C(=CC=C13)C=CC=C4)C1=C3N2CCCCNCC3=CC=C1  BRN
 // have different unique smiles from their default
 
   if (! consider_implicit_hydrogens_in_unique_smiles)
@@ -468,6 +504,7 @@ class Atom_and_Rank : public resizable_array<Atom_and_Rank *>
     int _index_of_atom(atom_number_t a) const;
 
     int _compare_by_chirality(const Atom_and_Rank * r2) const;
+    int _compare_by_chirality_for_timsort(const Atom_and_Rank * r2) const;
 
     int _identify_two_unresolved_connections(const unsigned int * rank,
                                                atom_number_t & a1, 
@@ -478,9 +515,9 @@ class Atom_and_Rank : public resizable_array<Atom_and_Rank *>
     ~Atom_and_Rank();
 
     int ok () const;
-    int debug_print (ostream &) const;
+    int debug_print (std::ostream &) const;
 
-    int terse_print_neighbour_ranks (ostream &) const;
+    int terse_print_neighbour_ranks (std::ostream &) const;
 
     int bt (int i) const { return _bt[i];}
 
@@ -500,6 +537,8 @@ class Atom_and_Rank : public resizable_array<Atom_and_Rank *>
     void establish_neighbours ();
 
     int compare (const Atom_and_Rank *) const;
+    int compare_for_timsort (const Atom_and_Rank *) const;
+    int compare_less (const Atom_and_Rank *) const;
 
 //  called whenever a neighboring atom has been classified, and is
 //  removed from the computation
@@ -723,7 +762,11 @@ Atom_and_Rank::is_connected_to (Atom_and_Rank * n,
 }
 
 //#define USING_QSORT
-#ifdef USING_QSORT
+
+#define USING_TIMSORT 1
+
+#if defined(USING_QSORT)
+#elif defined(USING_TIMSORT)
 #else
 class Int_Comparitor_Larger_fo
 {
@@ -747,7 +790,8 @@ Atom_and_Rank::establish_neighbours ()
   assert (NULL == _ranks_of_neighbours);
 
   if (_number_elements)
-    _ranks_of_neighbours = new_int(_number_elements);    // not necessary for it to be 0'd, aesthetics only
+    _ranks_of_neighbours = new int[_number_elements];
+//  _ranks_of_neighbours = new_int(_number_elements);    // not necessary for it to be 0'd, aesthetics only
 
   return;
 }
@@ -812,7 +856,7 @@ Atom_and_Rank::collect_neighbour_ranks ()
 
     if (r2 >= IWNPRIMES)   // only the first IWNPRIMES primes are in the header file
       ;
-    else if (numeric_limits<unsigned int>::max() / primes[r2] < (primes[r0] * primes[r1]))
+    else if (std::numeric_limits<unsigned int>::max() / primes[r2] < (primes[r0] * primes[r1]))
     {
       _prime_product_of_neighbours = primes[r0] * primes[r1] * primes[r2];
       return;
@@ -857,8 +901,10 @@ Atom_and_Rank::collect_neighbour_ranks ()
     _sum_of_neighbour_ranks += _ranks_of_neighbours[i];
   }
 
-#ifdef USING_QSORT
+#if defined(USING_QSORT)
   qsort(_ranks_of_neighbours, _number_elements, sizeof(int), (int (*) (const void *, const void *)) int_comparitor_larger);
+#elif defined(USING_TIMSORT)
+  gfx::timsort (_ranks_of_neighbours, _ranks_of_neighbours + _number_elements);
 #else
   ::iwqsort (_ranks_of_neighbours, _number_elements, int_comparitor_larger_fo);
 #endif
@@ -910,7 +956,7 @@ Atom_and_Rank::ok () const
 }
 
 int
-Atom_and_Rank::debug_print (ostream & os) const
+Atom_and_Rank::debug_print (std::ostream & os) const
 {
   os << "Atom " << _a << ", " << _number_elements << " neighbours, rank " << _rank << '\n';
   if (_number_elements < _ncon)
@@ -937,7 +983,7 @@ Atom_and_Rank::debug_print (ostream & os) const
 }
 
 int
-Atom_and_Rank::terse_print_neighbour_ranks (ostream & os) const
+Atom_and_Rank::terse_print_neighbour_ranks (std::ostream & os) const
 {
   if (_prime_product_of_neighbours)
     os << "prime p = " << _prime_product_of_neighbours;
@@ -953,7 +999,7 @@ Atom_and_Rank::terse_print_neighbour_ranks (ostream & os) const
   return os.good();
 }
 
-#ifdef USING_QSORT
+#if defined(USING_QSORT)
 
 static int
 atom_and_rank_comparitor (Atom_and_Rank * const * pai1,
@@ -970,6 +1016,24 @@ atom_and_rank_comparitor (Atom_and_Rank * const * pai1,
     return 1;
 }
 
+
+#elif defined(USING_TIMSORT)
+
+class Atom_and_Rank_Comparitor_Timsort
+{
+  private:
+  public:
+    int operator () (const Atom_and_Rank * pai1, const Atom_and_Rank * pai2) const
+                                        {
+                                          int r1 = pai1->rank();
+                                          int r2 = pai2->rank();
+                                          if (r1 < r2)
+                                            return 1;
+                                          return 0;
+                                        }
+};
+
+static Atom_and_Rank_Comparitor_Timsort arc_timsort;
 
 #else
 
@@ -992,6 +1056,7 @@ class Atom_and_Rank_Comparitor
 
 static Atom_and_Rank_Comparitor arc;
 #endif
+
 
 //#define DEBUG_COMPARE
 
@@ -1059,6 +1124,73 @@ Atom_and_Rank::compare (const Atom_and_Rank * r2) const
   return _compare_by_chirality(r2);
 }
 
+int
+Atom_and_Rank::compare_for_timsort (const Atom_and_Rank * r2) const
+{
+#ifdef DEBUG_COMPARE
+  cerr << "Comparing " << _a << " with " << r2->_a << '\n';
+  debug_print(cerr);
+  cerr << "and\n";
+  r2->debug_print(cerr);
+#endif
+
+// first check whether they are differentiated by their current rank
+
+  if (_rank < r2->_rank)
+    return 1;
+  if (_rank > r2->_rank)
+    return 0;
+
+// They are not distinguished by their existing rank, check their neighbours
+
+  if (_number_elements < r2->_number_elements)
+    return 1;
+  if (_number_elements > r2->_number_elements)
+    return 0;
+
+// They both have the same number of neighbours. Compare products, even
+// if not computed
+
+  if (_prime_product_of_neighbours < r2->_prime_product_of_neighbours)
+    return 1;
+  if (_prime_product_of_neighbours > r2->_prime_product_of_neighbours)
+    return 0;
+
+  if (0 == _prime_product_of_neighbours && 0 == r2->_prime_product_of_neighbours)   // neither one is computed
+    ;
+  else 
+    return _compare_by_chirality_for_timsort(r2);
+
+// prime products were not computed. Check the sums
+
+  if (_sum_of_neighbour_ranks < r2->_sum_of_neighbour_ranks)
+    return 1;
+  if (_sum_of_neighbour_ranks > r2->_sum_of_neighbour_ranks)
+    return 0;
+
+  if (0 == _sum_of_neighbour_ranks)    // part of a subset, no neighbours computed
+    return 0;
+
+// At this stage, there is nothing left but an element by element comparison
+
+  for (int i = 0; i < _number_elements; i++)
+  {
+    if (_ranks_of_neighbours[i] < r2->_ranks_of_neighbours[i])
+      return 1;
+    else if (_ranks_of_neighbours[i] > r2->_ranks_of_neighbours[i])
+      return 0;
+  }
+
+#ifdef DEBUG_COMPARE
+  cerr << "What about chirality " << _considering_chirality << '\n';
+#endif
+
+  return _compare_by_chirality_for_timsort(r2);
+}
+
+
+
+
 //#define DEBUG_COMPARE_BY_CHIRAL_INFLUENCE
 
 /*
@@ -1123,6 +1255,62 @@ Atom_and_Rank::_compare_by_chirality (const Atom_and_Rank * r2) const
 }
 
 int
+Atom_and_Rank::_compare_by_chirality_for_timsort (const Atom_and_Rank * r2) const
+{
+#ifdef DEBUG_COMPARE_BY_CHIRAL_INFLUENCE
+  cerr << "Comparing chirality " << _considering_chirality << ", " << _chirality_score << " vs " << r2->_chirality_score << '\n';
+#endif
+
+  if (! _considering_chirality)
+    return 0;
+
+  if (_chirality_score == r2->_chirality_score)
+    ;
+  else if (_chirality_score < r2->_chirality_score)
+    return 1;
+  else
+    return 0;
+
+// Maybe resolved by configuration of neighbours
+
+  int ncs = _neighbour_chirality_score.number_elements();
+
+#ifdef DEBUG_COMPARE_BY_CHIRAL_INFLUENCE
+  cerr << "Comparing " << ncs << " and " << r2->_neighbour_chirality_score.number_elements() << " neighbour chirality scores\n";
+#endif
+
+  if (ncs == r2->_neighbour_chirality_score.number_elements())
+    ;
+  else if (ncs > r2->_neighbour_chirality_score.number_elements())
+    return 1;
+  else
+    return 0;
+
+  if (0 == ncs)
+    return 0;
+
+  for (int i = 0; i < ncs; i++)
+  {
+    int n1 = _neighbour_chirality_score[i];
+    int n2 = r2->_neighbour_chirality_score[i];
+
+//  cerr << "   comparing neighbour chirality score " << n1 << " and " << n2 << '\n';
+
+    if (n1 == n2)
+      continue;
+
+    if (n1 < n2)
+      return 1;
+
+    return 0;
+  }
+
+// If we come to here, we cannot resolve them.
+
+  return 0;
+}
+
+int
 Atom_and_Rank::chiral_score (const unsigned int * rank) const
 {
   assert (NULL != _chiral_centre);
@@ -1139,10 +1327,10 @@ static unsigned int
 get_rank_for_connection (const unsigned int * rank, atom_number_t a)
 {
   if (CHIRAL_CONNECTION_IS_IMPLICIT_HYDROGEN == a)
-    return numeric_limits<unsigned int>::max(); 
+    return std::numeric_limits<unsigned int>::max(); 
 
   if (CHIRAL_CONNECTION_IS_LONE_PAIR == a)
-    return numeric_limits<unsigned int>::max() - 1;
+    return std::numeric_limits<unsigned int>::max() - 1;
 
   return  rank[a];
 }
@@ -1274,28 +1462,6 @@ Atom_and_Rank::compute_chirality_score (const unsigned int * rank)
   return;
 }
 
-#ifdef USING_QSORT
-static int
-atom_and_neighbour_rank_comparitor (Atom_and_Rank * const * pai1,
-                                    Atom_and_Rank * const * pai2)
-{
-  Atom_and_Rank * a1 = *pai1;
-  Atom_and_Rank * a2 = *pai2;
-
-  return a1->compare(a2);
-}
-#else
-
-class Atom_and_Neighbour_Rank_Comparitor
-{
-  private:
-  public:
-    int operator() (const Atom_and_Rank * pai1, const Atom_and_Rank * pai2) const { return (pai1)->compare(pai2);}
-};
-
-static Atom_and_Neighbour_Rank_Comparitor atom_and_neighbour_rank_comparitor;
-#endif
-
 class Unique_Determination : public resizable_array_p<Atom_and_Rank>
 {
   private:
@@ -1368,6 +1534,11 @@ class Unique_Determination : public resizable_array_p<Atom_and_Rank>
 
     Atom_and_Rank ** _atom_xref;
 
+//  With larger molecules, we run into serious problems sorting a partially
+//  sorted array, so we shuffle
+
+    std::minstd_rand _rng;
+
 //  private functions;
   
     int _allocate_atom_arrays (int, int);
@@ -1375,7 +1546,8 @@ class Unique_Determination : public resizable_array_p<Atom_and_Rank>
 
     int _initialise (Molecule &, const int *);
 
-    void _assign_initial_ranks ();
+    void _assign_initial_ranks();
+    void _assign_initial_ranks_v2();
     void _assign_initial_ranks (const int * include_atom);
     void _initialise_rank_in_use ();
     void _reassign_ranks ();
@@ -1496,7 +1668,7 @@ class Unique_Determination : public resizable_array_p<Atom_and_Rank>
     ~Unique_Determination ();
 
     int ok () const;
-    int debug_print (ostream &) const;
+    int debug_print (std::ostream &) const;
 
     int symmetry (int, int *) const;    // return previously computed values
     int symmetry (Molecule *, int *, const int *);
@@ -1533,38 +1705,41 @@ Unique_Determination::Unique_Determination ()
 
   _rank_delta = AR_TRIPLE_BOND + 1;
 
+  std::random_device rd;
+
+  _rng.seed(3172776704);    // just used for shuffling, so proper randomisation not important
+
   return;
 }
+
+/*
+  To cut down on the number of allocations, we allocate one large array and have
+  the sub-arrays be part of that.
+*/
 
 int
 Unique_Determination::_allocate_atom_arrays (int matoms,
                                              int size_ma9)
 {
-#ifdef USE_IWMALLOC
-  iwmalloc_check_all_malloced(stderr);
-#endif
-
   assert (matoms > 0);
 
   _matoms = matoms;
 
   _ma9 = size_ma9;
 
-  _rank = new unsigned int[_matoms];
+  assert (sizeof(int) == sizeof(unsigned int));
 
-  _rank_in_use = new int[_ma9];
+  _rank = new unsigned int[_matoms + _ma9 + _matoms + _matoms + _matoms];
+
+  _rank_in_use    = reinterpret_cast<int *>(_rank + _matoms);
+  _canonical_rank = reinterpret_cast<int *>(_rank + _matoms + _ma9);
+  _symmetry       = reinterpret_cast<int *>(_rank + _matoms + _ma9 + _matoms);
+  _old_rank       =                         _rank + _matoms + _ma9 + _matoms + _matoms;
   
-  _canonical_rank = new_int(_matoms, -1);
-  
-  _symmetry = new_int(_matoms, -1);
-  
-  _old_rank = new unsigned int[_matoms];
+  std::fill_n(_canonical_rank, _matoms, -1);
+  std::fill_n(_symmetry, _matoms, -1);
 
   _atom_xref = new Atom_and_Rank *[_matoms];
-
-#ifdef USE_IWMALLOC
-  iwmalloc_check_all_malloced(stderr);
-#endif
 
   return 1;
 }
@@ -1582,16 +1757,13 @@ Unique_Determination::_free_all_arrays ()
   if (NULL != _rank)
   {
     delete [] _rank;
-    delete [] _rank_in_use;
-    delete []_canonical_rank;
-    delete []_symmetry;
-    delete []_old_rank;
+//  delete [] _rank_in_use;
+//  delete []_canonical_rank;
+//  delete []_symmetry;
+//  delete []_old_rank;
+
     delete []_atom_xref;
   }
-
-#ifdef USE_IWMALLOC
-  cerr << "After Unique_Determination destructor\n";
-#endif
 
   return 1;
 }
@@ -1609,7 +1781,7 @@ Unique_Determination::ok () const
 }
 
 int
-Unique_Determination::debug_print (ostream & os) const
+Unique_Determination::debug_print (std::ostream & os) const
 {
   os << "Details on Unique_Determination object, for " << _number_elements << " atoms, " << _nactive << " active\n";
   os << "use chirality " << _use_chirality << " include_chiral_info_in_smiles " << _include_chiral_info_in_smiles << endl;
@@ -1619,7 +1791,7 @@ Unique_Determination::debug_print (ostream & os) const
     const Atom_and_Rank * ar = _things[i];
     atom_number_t a = ar->atom_number();
 
-    os << "I = " << setw(3) << i << " atom " << setw(3) << a << " (" << _m->atomic_symbol(a) << ") rank = " <<
+    os << "I = " << std::setw(3) << i << " atom " << std::setw(3) << a << " (" << _m->atomic_symbol(a) << ") rank = " <<
            ar->rank() << " (" << _rank_in_use[ar->rank()] << ')';
     os << " ncon = " << ar->number_elements();
     if (_symmetry && _symmetry[a] >= 0)    // equals 0 is illegal
@@ -2409,9 +2581,14 @@ Unique_Determination::_reassign_ranks ()
   else if (_use_chirality)
     _compute_chirality_scores();
 
-#ifdef USING_QSORT
+#if defined(USING_QSORT)
+  std::shuffle (_things, _things + _nactive, _rng);
   qsort(_things, _nactive, sizeof(Atom_and_Rank *), (int (*) (const void *, const void *)) atom_and_rank_comparitor);
+#elif defined(USING_TIMSORT)
+  gfx::timsort(_things, _things + _nactive, arc_timsort);
 #else
+  if (_nactive > 20)
+    std::shuffle (_things, _things + _nactive, _rng);
   ::iwqsort (_things, _nactive, arc);
 #endif
 
@@ -2559,6 +2736,42 @@ Unique_Determination::_ranks_changed ()
   return rc;
 }
 
+//#undef USING_TIMSORT
+
+#if defined(USING_QSORT)
+static int
+atom_and_neighbour_rank_comparitor (Atom_and_Rank * const * pai1,
+                                    Atom_and_Rank * const * pai2)
+{
+  Atom_and_Rank * a1 = *pai1;
+  Atom_and_Rank * a2 = *pai2;
+
+  return a1->compare(a2);
+}
+#elif defined(USING_TIMSORT)
+class Atom_and_Neighbour_Rank_Comparitor_Timsort
+{
+  private:
+  public:
+    int operator() (const Atom_and_Rank * pai1, const Atom_and_Rank * pai2) const { return (pai1)->compare_for_timsort(pai2);}
+};
+
+static Atom_and_Neighbour_Rank_Comparitor_Timsort atom_and_neighbour_rank_comparitor_timsort;
+
+#else
+
+class Atom_and_Neighbour_Rank_Comparitor
+{
+  private:
+  public:
+    int operator() (const Atom_and_Rank * pai1, const Atom_and_Rank * pai2) const { return (pai1)->compare(pai2);}
+};
+
+static Atom_and_Neighbour_Rank_Comparitor atom_and_neighbour_rank_comparitor;
+
+#endif
+
+
 //#define DEBUG_EXPAND
 
 /*
@@ -2600,9 +2813,14 @@ Unique_Determination::_expand (int collect_neighbours)
 
 // we must now sort them according to their neighbour ranks
 
-#ifdef USING_QSORT
+#if defined(USING_QSORT)
+  std::shuffle (_things, _things + _nactive, _rng);
   qsort(_things, _nactive, sizeof(Atom_and_Rank *), (int (*) (const void *, const void *)) atom_and_neighbour_rank_comparitor);
+#elif defined(USING_TIMSORT)
+  gfx::timsort(_things, _things + _nactive, atom_and_neighbour_rank_comparitor_timsort);
 #else
+  if (_nactive > 10)
+    std::shuffle (_things, _things + _nactive, _rng);
   ::iwqsort (_things, _nactive, atom_and_neighbour_rank_comparitor);
 #endif
 
@@ -2624,7 +2842,15 @@ Unique_Determination::_expand (int collect_neighbours)
     Atom_and_Rank * rp = _things[i - 1];
     Atom_and_Rank * r  = _things[i];
 
+#if defined(USING_TIMSORT)
+    int tmp = rp->compare_for_timsort(r);
+#else
     int tmp = r->compare(rp);
+#endif
+
+#ifdef DEBUG_EXPAND
+    cerr << " i = " << i << " rank " << r->rank() << " rp rank " << rp->rank() << " tmp " << tmp << endl;
+#endif
 
     rp->set_rank(next_rank_to_assign);   // change its rank after we invoke compare()
     _rank_in_use[next_rank_to_assign]++;
@@ -2693,12 +2919,10 @@ Unique_Determination::_initialise (Molecule & m,
 
   if (NULL != include_atom)
     _assign_initial_ranks(include_atom);
+  else if (file_scope_use_version_two_initial_rank_assignment)
+    _assign_initial_ranks_v2();
   else
     _assign_initial_ranks();
-
-#ifdef USE_IWMALLOC
-  iwmalloc_check_all_malloced (stderr);
-#endif
 
 #ifdef DEBUG_ASSIGN_INITIAL_RANKS
   for (int i = 0; i < _matoms; i++)
@@ -2874,7 +3098,7 @@ Unique_Determination::_expand_around_cis_trans_bonds()
 {
   int matoms = _m->natoms();
 
-  unsigned int * rank_delta = new unsigned int[matoms]; iw_auto_array<unsigned int> free_rank_delta(rank_delta);
+  unsigned int * rank_delta = new unsigned int[matoms]; std::unique_ptr<unsigned int[]> free_rank_delta(rank_delta);
 
   set_vector(rank_delta, matoms, static_cast<unsigned int>(0));
 
@@ -2930,7 +3154,7 @@ Unique_Determination::_expand_around_cis_trans_bonds()
 }
 
 int
-Unique_Determination::_expand_around_cis_trans_bond (atom_number_t a1,
+Unique_Determination::_expand_around_cis_trans_bond(atom_number_t a1,
                                 atom_number_t a2,
                                 unsigned int * rank_delta)
 {
@@ -2965,10 +3189,10 @@ Unique_Determination::_expand_around_cis_trans_bond (atom_number_t a1,
   if (! _identify_directionally_attached_bonds(_things[a2], bne, bse))
     return 0;
 
-  int matoms = _m->natoms();
+//int matoms = _m->natoms();
 
   int rnw;
-  atom_number_t anw;
+//atom_number_t anw;
   if (NULL != bnw)
   {
     nw = bnw->other(a1);
@@ -2981,7 +3205,7 @@ Unique_Determination::_expand_around_cis_trans_bond (atom_number_t a1,
   }
 
   int rsw;
-  atom_number_t asw;
+//atom_number_t asw;
   if (NULL != bsw)
   {
     se = bsw->other(a1);
@@ -2994,7 +3218,7 @@ Unique_Determination::_expand_around_cis_trans_bond (atom_number_t a1,
   }
 
   int rne;
-  atom_number_t ane;
+//atom_number_t ane;
   if (NULL != bne)
   {
     ne = bne->other(a1);
@@ -3007,7 +3231,7 @@ Unique_Determination::_expand_around_cis_trans_bond (atom_number_t a1,
   }
 
   int rse;
-  atom_number_t ase;
+//atom_number_t ase;
   if (NULL != bse)
   {
     se = bse->other(a1);
@@ -3019,8 +3243,8 @@ Unique_Determination::_expand_around_cis_trans_bond (atom_number_t a1,
     rse = -1;
   }
 
-  int ra1 = _get_rank(a1);
-  int ra2 = _get_rank(a2);
+//int ra1 = _get_rank(a1);
+//int ra2 = _get_rank(a2);
 
   if (rnw >= 0 && rne >= 0)
   {
@@ -3264,6 +3488,575 @@ Unique_Determination::_initialise_rank_in_use ()
   return;
 }
 
+#define COMPILE_IN_FASTER_VERSION
+#ifdef COMPILE_IN_FASTER_VERSION
+
+/*
+  for the initial sort, we collect as much info about the atom as we can into one of these objects.
+  We have three invariants, which are computed different ways, so as to lessen the probability
+  of collisions
+*/
+
+class Atom_Info
+{
+  private:
+    uint64_t _invariant[3];
+    atom_number_t _atom_number;
+    resizable_array<int> _list_of_ring_sizes;
+
+  public:
+
+    int initialise(Molecule & m, const atom_number_t zatom);
+    int initialise(Molecule & m, const atom_number_t zatom, const Chiral_Centre * c);
+
+    atom_number_t atom_number() const { return _atom_number;}
+
+    int compare(const Atom_Info & rhs) const;
+
+    template <typename O> int debug_print(O & output) const;
+};
+
+#ifdef AT_HAS_CONSTRUCTOR
+Atom_Info::Atom_Info()
+{
+}
+#endif
+
+template <typename O>
+int
+Atom_Info::debug_print(O & output) const
+{
+  output << "Atom_Info::debug_print:atom " << _atom_number;
+  for (int i = 0; i < 3; ++i)
+  {
+    output << ' ' << _invariant[i];
+  }
+
+  for (int i = 0; i < _list_of_ring_sizes.number_elements(); ++i)
+  {
+    output << ' ' << _list_of_ring_sizes[i];
+  }
+
+  output << '\n';
+
+  return 1;
+}
+
+int
+Atom_Info::compare(const Atom_Info & rhs) const
+{
+//#define DEBUG_ATOM_INFO_CMP
+#ifdef DEBUG_ATOM_INFO_CMP
+  cerr << "CMP  ";
+  debug_print(cerr);
+  cerr << "WITH ";
+  rhs.debug_print(cerr);
+#endif
+
+  for (int i = 0; i < 3; ++i)
+  {
+    if (_invariant[i] == rhs._invariant[i])
+      ;
+    else if (_invariant[i] < rhs._invariant[i])
+      return -1;
+    else
+      return 1;
+  }
+
+//cerr << "Atom_Info::compare:not resolve by invariants\n";
+
+  const int n1 = _list_of_ring_sizes.number_elements();
+  const int n2 = rhs._list_of_ring_sizes.number_elements();
+
+  if (0 == n1 && 0 == n2)    // neither atom in a ring
+    return 0;
+  
+  if (0 == n1)     // probably never happens because rbc is part of the invariant
+    return -1;
+  if (0 == n2)     // probably never happens because rbc is part of the invariant
+    return 1;
+
+#ifdef DEBUG_RING_SIZE
+  cerr << "RS1";
+  for (int i = 0; i< n1; ++i)
+  {
+    cerr << ' ' << _list_of_ring_sizes[i];
+  }
+  cerr << endl;
+  cerr << "RS2";
+  for (int i = 0; i< n2; ++i)
+  {
+    cerr << ' ' << rhs._list_of_ring_sizes[i];
+  }
+  cerr << endl;
+#endif
+
+//if (n1 < n2)
+//  return -1;
+//else if (n1 > n2)
+//  return 1;
+
+  const int sr1 = _list_of_ring_sizes[0];
+  const int sr2 = rhs._list_of_ring_sizes[0];
+
+  if (sr1 < sr2)
+  {
+    if (! rhs._list_of_ring_sizes.contains(sr1))
+      return -1;
+
+    if (! _list_of_ring_sizes.contains(sr2))
+      return 1;
+  }
+  else if (sr1 > sr2)
+  {
+    if (! _list_of_ring_sizes.contains(sr2))
+      return 1;
+
+    if (! rhs._list_of_ring_sizes.contains(sr1))
+      return -1;
+  }
+
+  return 0;
+
+  if (! _list_of_ring_sizes.contains(rhs._list_of_ring_sizes[0]))
+    return -1;
+  if (! rhs._list_of_ring_sizes.contains(_list_of_ring_sizes[0]))
+    return 1;
+  return 0;
+
+
+  int n = n1 <= n2 ? n1 : n2;
+
+  for (int i = 0; i < n; ++i)
+  {
+    if (_list_of_ring_sizes[i] < rhs._list_of_ring_sizes[i])
+      return -1;
+    if (_list_of_ring_sizes[i] > rhs._list_of_ring_sizes[i])
+      return  1;
+  }
+
+  return 0;
+}
+
+static int
+bond_and_atom_score(Molecule & m,
+                    const atom_number_t zatom,
+                    int & rbc,
+                    uint64_t & zsum)
+{
+  const Atom * a = m.atomi(zatom);
+
+  const int acon = a->ncon();
+
+  rbc = 0;
+
+  Bond *const* rawb = a->rawdata();
+
+  int rc = 0;
+
+  for (int i = 0; i < acon; i++)
+  {
+    const Bond * b = rawb[i];
+
+    const atom_number_t j = b->other(zatom);
+
+    const Atom * aj = m.atomi(j);
+
+    if (b->is_aromatic())
+    {
+      rc += 1000;
+      zsum += 11 * aj->element()->atomic_symbol_hash_value() + 2 * aj->ncon();
+      rbc++;
+    }
+    else if (b->is_single_bond())
+    {
+      rc += 100;
+      zsum += 3 * aj->element()->atomic_symbol_hash_value() + 2 * aj->ncon();
+      if (b->nrings())
+        rbc++;
+    }
+    else if (b->is_double_bond())
+    {
+      rc += 10;
+      zsum += 5 * aj->element()->atomic_symbol_hash_value() + 2 * aj->ncon();
+      if (b->nrings())
+        rbc++;
+    }
+    else if (b->is_triple_bond())
+    {
+      rc++;
+      zsum += 7 * aj->element()->atomic_symbol_hash_value() + 2 * aj->ncon();
+      if (b->nrings())
+        rbc++;
+    }
+    else if (IS_COORDINATION_BOND(b->btype()))
+    {
+      rc++;
+      zsum += 13 * aj->element()->atomic_symbol_hash_value() + 2 * aj->ncon();
+      if (b->nrings())
+        rbc++;
+    }
+  }
+  
+  return rc;
+}
+
+int
+Atom_Info::initialise(Molecule & m,
+                      const atom_number_t zatom,
+                      const Chiral_Centre * c)
+{
+  _atom_number = zatom;
+
+  const Atom * a = m.atomi(zatom);
+
+  const int acon = a->ncon();
+
+  int rbc = 0;
+  uint64_t zsum = 0;
+
+  const int bs = bond_and_atom_score(m, zatom, rbc, zsum);
+
+  _invariant[0] = a->element()->atomic_symbol_hash_value() + 82828282 * zsum;
+
+  const int arom = m.is_aromatic(zatom);
+
+  uint64_t x1 = 10000000000 * acon + 288578282 * rbc                + 26012422 * a->formal_charge() - 1942 * bs;
+  uint64_t x2 = 21928000000 * rbc  + 911971781 * a->formal_charge() + 10970988 * acon + 19204 * bs;
+
+  x1 -= 9076 * arom;
+  x2 += 58 * arom;
+
+  if (0 == a->isotope())
+    ;
+  else if (include_isotopic_information_in_unique_smiles())
+  {
+    x1 += 571 * a->isotope();
+    x2 += 82122 * a->isotope();
+  }
+
+  if (consider_implicit_hydrogens_in_unique_smiles)
+  {
+    const int ih = m.implicit_hydrogens(zatom);
+
+    x1 += 1972 * ih;
+    x2 -= 82221 * ih;
+  
+//  if (a->implicit_hydrogens_known())    bad idea
+//    x2 -= 5;
+  }
+
+  if (NULL != c)
+  {
+    x1 -= 821 * bs;
+    x2 += 741 * acon;
+  }
+
+  if (0 == rbc)
+  {
+    _invariant[1] = x1;
+    _invariant[2] = x2;
+
+     return 1;
+  }
+
+  const int nr = m.nrings();
+
+  for (int i = 0; i < nr; ++i)
+  {
+    const Ring * r = m.ringi(i);
+    if (r->contains(zatom))
+      _list_of_ring_sizes.add_if_not_already_present(r->number_elements());
+  }
+
+  for (int i = 0; i < m.non_sssr_rings(); ++i)
+  {
+    const Ring * r = m.non_sssr_ring(i);
+
+    if (r->contains(zatom))
+      _list_of_ring_sizes.add_if_not_already_present(r->number_elements());
+  }
+
+  x1 -=  731 * _list_of_ring_sizes[0];
+  x1 += 4222 * _list_of_ring_sizes[0];
+
+  _invariant[1] = x1;
+  _invariant[2] = x2;
+
+  return 1;
+}
+
+int
+Atom_Info::initialise(Molecule & m,
+                      const atom_number_t zatom)
+{
+  _atom_number = zatom;
+
+  const Atom * a = m.atomi(zatom);
+
+  const int acon = a->ncon();
+
+  int rbc = 0;
+  uint64_t zsum = 0;
+
+  const int bs = bond_and_atom_score(m, zatom, rbc, zsum);
+
+  _invariant[0] = a->element()->atomic_symbol_hash_value() + 82828282 * zsum;
+
+  const int arom = m.is_aromatic(zatom);
+
+  uint64_t x1 = 10000000000 * acon + 288578282 * rbc                + 26012422 * a->formal_charge() - 1942 * bs;
+  uint64_t x2 = 21928000000 * rbc  + 911971781 * a->formal_charge() + 10970988 * acon + 19204 * bs;
+
+  x1 -= 9076 * arom;
+  x2 += 58 * arom;
+
+  if (0 == a->isotope())
+    ;
+  else if (include_isotopic_information_in_unique_smiles())
+  {
+    x1 += 571 * a->isotope();
+    x2 += 82122 * a->isotope();
+  }
+
+  if (consider_implicit_hydrogens_in_unique_smiles)
+  {
+    const int ih = m.implicit_hydrogens(zatom);
+
+    x1 += 1972 * ih;
+    x2 -= 82221 * ih;
+  
+//  if (a->implicit_hydrogens_known())       bad idea, breaks things
+//    x2 -= 5;
+  }
+
+  if (include_chiral_info_in_smiles())
+  {
+    const Chiral_Centre * c = m.chiral_centre_at_atom(zatom);
+    if (NULL != c)
+    {
+      x1 -= 821 * bs;
+      x2 += 741 * acon;
+    }
+  }
+
+  if (0 == rbc)
+  {
+    _invariant[1] = x1;
+    _invariant[2] = x2;
+
+     return 1;
+  }
+
+  List_of_Ring_Sizes rs1, rs2;
+  m.ring_sizes_for_atom(zatom, rs1);
+  m.ring_sizes_for_non_sssr_rings(zatom, rs2);
+
+  for (int i = 0; i < rs1.number_elements(); ++i)
+  {
+    _list_of_ring_sizes.add(rs1[i]);
+  }
+
+  x1 -= 731 * rs1[0];
+  x2 += 4222 * rs1[0];
+
+  for (int i = 0; i < rs2.number_elements(); ++i)
+  {
+    _list_of_ring_sizes.add(rs2[i]);
+  }
+
+  _invariant[1] = x1;
+  _invariant[2] = x2;
+
+  return 1;
+}
+
+//#define DEBUG_TARGET_ATOM_COMPARITOR
+
+/*
+   The first part of the ranking is to order the atoms. We use a molecule target to
+   do that.
+*/
+
+static int
+atom_info_comparitor(Atom_Info * const * ppa1, Atom_Info * const * ppa2)
+{
+  const Atom_Info *p1 = *ppa1;
+  const Atom_Info *p2 = *ppa2;
+
+  return p1->compare(*p2);
+}
+
+/*
+  Use a molecule_to_Match object to order the atoms in the molecule.
+  This is kind of sub-optimal in that we have to do extra
+  comparisons after the sort to assign the ranks
+
+  the SINGLE_ARRAY business is strange.
+
+  Timing seems to vary with compiler, and usually individual allocations
+  rather than a while array, are faster! Not sure why...
+*/
+
+void
+Unique_Determination::_assign_initial_ranks_v2()
+{
+  assert (0 == _number_elements);
+
+  this->resize(_matoms);
+
+//#define SINGLE_ARRAY
+#ifdef SINGLE_ARRAY
+  Atom_Info * x = new Atom_Info[_matoms]; std::unique_ptr<Atom_Info[]> free_x;
+
+  resizable_array<Atom_Info *> target;
+#else
+  resizable_array_p<Atom_Info> target;
+#endif
+
+  target.resize(_matoms);
+
+  int molecule_contains_chirality = 0;
+  _nchiral = 0;
+
+  assert (_include_chiral_info_in_smiles == include_chiral_info_in_smiles());
+
+  if (include_chiral_info_in_smiles() && (_nchiral = _m->chiral_centres()) > 0)
+  {
+    for (int i = 0; i < _matoms; i++)
+    {
+#ifdef SINGLE_ARRAY
+      Atom_Info * a = x + i;
+#else
+      Atom_Info * a = new Atom_Info();
+#endif
+
+      const Chiral_Centre * c = _m->chiral_centre_at_atom(i);
+
+      a->initialise(*_m, i, c);
+
+      target.add(a);
+    }
+  }
+  else
+  {
+    for (int i = 0; i < _matoms; i++)
+    {
+#ifdef SINGLE_ARRAY
+      Atom_Info * a = x + i;
+#else
+      Atom_Info * a = new Atom_Info();
+#endif
+
+      a->initialise(*_m, i, NULL);
+
+      target.add(a);
+    }
+  }
+
+  molecule_contains_chirality = _nchiral;
+
+  target.sort(atom_info_comparitor);
+
+#ifdef DEBUG_ASSIGN_INITIAL_RANKS
+  cerr << "After sorting targets\n";
+  for (int i = 0; i < _matoms; i++)
+  {
+    const Atom_Info * t = target[i];
+    const atom_number_t a = t->atom_number();
+    cerr << "i = " << i << " is atom " << a << " (" << _m->smarts_equivalent_for_atom(a) << ")" << endl;
+  }
+#endif
+
+  _initialise_rank_in_use();
+
+  int rank_to_assign = 0;
+
+  for (int i = 0; i < _matoms; i++)
+  {
+    int tmp;
+    if (i > 0)    // only compare with previous if there is a previous
+      tmp = atom_info_comparitor(&(target[i]), &(target[i - 1]));
+    else
+      tmp = 0;
+
+    if (tmp < 0)
+    {
+      cerr << "Atoms out of order\n";
+      target[i]->debug_print(cerr);
+      target[i - 1]->debug_print(cerr);
+    }
+    assert (tmp >= 0);    // the array is supposed to be sorted
+
+    if (tmp > 0)     // different from one before, increment rank
+      rank_to_assign += _rank_delta;
+
+    const atom_number_t a = target[i]->atom_number();
+
+    Atom_and_Rank * r = new Atom_and_Rank(a, rank_to_assign, _m->ncon(a));
+
+    if (molecule_contains_chirality)
+    {
+      r->set_chirality(_m->chiral_centre_at_atom(a));
+      if (r->chiral_centre())
+        molecule_contains_chirality--;
+    }
+
+    add(r);
+    _atom_xref[a] = r;
+    _rank_in_use[rank_to_assign]++;
+  }
+
+#ifdef DEBUG_ASSIGN_INITIAL_RANKS
+  for (int i = 0; i < _matoms; i++)
+  {
+    if (NULL == _atom_xref[i])
+    {
+      cerr << "Yipes, the point for atom " << i << " is null\n";
+    }
+  }
+#endif
+
+// Now add connections to each atom
+
+  for (int i = 0; i < _matoms; i++)
+  {
+    Atom_and_Rank * r = _things[i];
+    atom_number_t a = r->atom_number();
+
+    const Atom * ai = _m->atomi(a);
+
+    int acon = ai->ncon();
+
+    for (int j = 0; j < acon; j++)
+    {
+      const Bond * b = ai->item(j);
+
+      if (! include_directional_bonding_information_in_unique_smiles)
+        ;
+      else if (b->is_double_bond() && b->part_of_cis_trans_grouping())
+        _cis_trans_bonds++;
+
+      atom_number_t k = b->other(a);
+
+      r->is_connected_to(_atom_xref[k], b);
+    }
+
+    _things[i]->establish_neighbours();
+  }
+
+  _nactive = _matoms;
+
+#ifdef DEBUG_ASSIGN_INITIAL_RANKS
+  cerr << "After establishing initial ranks\n";
+  debug_print(cerr);
+#endif
+
+  return;
+}
+
+#endif
+
 /*
   Use a molecule_to_Match object to order the atoms in the molecule.
   This is kind of sub-optimal in that we have to do extra
@@ -3271,7 +4064,7 @@ Unique_Determination::_initialise_rank_in_use ()
 */
 
 void
-Unique_Determination::_assign_initial_ranks ()
+Unique_Determination::_assign_initial_ranks()
 {
   assert (0 == _number_elements);
 
@@ -3762,11 +4555,6 @@ Unique_Determination::canonical_order (Molecule & m,
 
   (void) _initialise(m, include_atom);
 
-#ifdef USE_IWMALLOC
-    iwmalloc_check_all_malloced(stderr);
-    cerr << "Entering Unique_Determination::canonical_order\n";
-#endif
-
   if (_matoms < 2)
     return 1;
 
@@ -3778,18 +4566,13 @@ Unique_Determination::canonical_order (Molecule & m,
   cerr << "Canonical order is\n";
   for (int i = 0; i < _matoms; i++)
   {
-    cerr << "Atom " << i << " (" << setw(2) << m.atomic_symbol(i) << " " <<
+    cerr << "Atom " << i << " (" << std::setw(2) << m.atomic_symbol(i) << " " <<
             m.ncon(i) << " connections, " << m.nbonds(i) << " bonds ) " << 
             canonical_rank[i] << " symmetry " << _symmetry[i];
     if (NULL != include_atom)
       cerr << " inc " << include_atom[i];
     cerr << '\n';
   }
-#endif
-
-#ifdef USE_IWMALLOC
-    iwmalloc_check_all_malloced(stderr);
-    cerr << "Returning from Unique_Determination::canonical_order\n";
 #endif
 
   return rc;
@@ -3801,25 +4584,19 @@ Molecule::compute_canonical_ranking (Symmetry_Class_and_Canonical_Rank & sccr,
 {
   assert (ok());
 
+  if (0 == _number_elements)
+    return 1;
+
   compute_aromaticity_if_needed();
 
   if (! sccr.arrays_allocated())
     sccr.allocate_arrays(_number_elements);
-
-#ifdef USE_IWMALLOC
-    iwmalloc_check_all_malloced(stderr);
-    cerr << "Prior to call to uniq.canonical_order\n";
-#endif
 
   Unique_Determination unqd;
 
   int rc = unqd.canonical_order(*this, sccr.canonical_rank(), include_atom);
 
   unqd.symmetry(_number_elements, sccr.symmetry_class());    // must do this after the canonical ranking
-
-#ifdef USE_IWMALLOC
-    iwmalloc_check_all_malloced(stderr);
-#endif
 
   return rc;
 }
@@ -3856,8 +4633,23 @@ Molecule::canonical_ranks (int * r)
 }
 
 const int *
+Molecule::canonical_ranks ()
+{
+  if (0 == _number_elements)
+    return NULL;
+
+  if (! _symmetry_class_and_canonical_rank.arrays_allocated())
+    compute_canonical_ranking();
+
+  return _symmetry_class_and_canonical_rank.canonical_rank();
+}
+
+const int *
 Molecule::symmetry_classes () 
 {
+  if (0 == _number_elements)
+    return NULL;
+
   if (! _symmetry_class_and_canonical_rank.arrays_allocated())
     compute_canonical_ranking();
 
@@ -3907,7 +4699,7 @@ Molecule::number_symmetry_classes ()
   const int * symmc = symmetry_classes();     // force symmetry perception
 
   const int array_size = _number_elements + 1;
-  int * tmp = new_int(array_size); iw_auto_array<int> free_tmp(tmp);
+  int * tmp = new_int(array_size); std::unique_ptr<int[]> free_tmp(tmp);
 
   for (int i = 0; i < _number_elements; i++)
   {
@@ -3983,7 +4775,7 @@ Molecule::bond_symmetry_class_large_memory (int * s)
 
   const int * symm = _symmetry_class_and_canonical_rank.symmetry_class();
 
-  int * tmp = new_int((ns + 1) * (ns + 1), -1); iw_auto_array<int> free_tmp(tmp);
+  int * tmp = new_int((ns + 1) * (ns + 1), -1); std::unique_ptr<int[]> free_tmp(tmp);
 
   int nb = _bond_list.number_elements();
 

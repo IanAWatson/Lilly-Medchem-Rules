@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2012  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 /*
   This function initialises an array of elements.
 */
@@ -23,8 +5,11 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <iostream>
-using namespace std;
+#include <limits>
 #include <assert.h>
+
+using std::cerr;
+using std::endl;
 
 #ifdef IW_USE_TBB_SCALABLE_ALLOCATOR
 #include "tbb/scalable_allocator.h"
@@ -55,7 +40,7 @@ set_explicit_hydrogens_need_square_brackets_in_smiles (int s)
 {
   explicit_hydrogens_need_square_brackets_in_smiles = s;
 
-  if (elements.number_elements())
+  if (elements.number_elements())    // will pretty much always be the case
   {
     Element * h = const_cast<Element *> (get_element_from_atomic_number (1));
     assert (NULL != h);
@@ -94,32 +79,33 @@ set_display_strange_chemistry_messages(int s)
   display_strange_chemistry_messages = s;
 }
 
+/*
+  Search the non periodic table elements. 
+  If this ever becomes slow, use a hash
+*/
+
 const Element *
 get_element_from_long_symbols (const char * asymbol,
                                int nchars)
 {
+//#define DEBUG_GET_ELEMENT_FROM_LONG_SYMBOLS
 #ifdef DEBUG_GET_ELEMENT_FROM_LONG_SYMBOLS
-  cerr << "Getting element for '";
-  for (int i = 0; i < nchars; i++)
-  {
-    cerr << asymbol[i];
-  }
-  cerr << "'\n";
+  cerr << "get_element_from_long_symbols: getting element for '";
+  cerr.write(asymbol, nchars);
+  cerr << "' nchars " << nchars << "\n";
 #endif
+
+  const_IWSubstring tmp(asymbol, nchars);
 
   for (int i = HIGHEST_ATOMIC_NUMBER + 1; i < elements.number_elements(); i++)
   {
-    const Element * e = elements[i];
-
-//  if (0 == e->symbol().strncmp (asymbol, nchars))
-//    cerr << "Found match with '" << e->symbol() << "'\n";
-
-    if (0 == e->symbol().strncmp (asymbol, nchars))
-      return e;
+    if (tmp == elements[i]->symbol())
+      return elements[i];
   }
 
   return NULL;
 }
+
 
 /*
   Make sure the hash table is correct.
@@ -137,9 +123,20 @@ get_element_from_long_symbols (const char * asymbol,
 static const Element * ehash[SIZE_OF_ELEMENT_HASH_TABLE];
 
 static int
-element_symbol_hash_function (const char * s,
-                              int nchars)
+element_symbol_hash_function(const char * s,
+                             const int nchars)
 {
+  if (nchars > 2)
+  {
+    if (_atomic_symbols_can_have_arbitrary_length)
+      return -1;
+
+    cerr << "element_symbol_hash_function:invalid atomic symbol '";
+    cerr.write(s, nchars);
+    cerr << "'\n";
+    return -1;
+  }
+
   int rc = *s - 'A';
 
   if (rc >= 0 && rc < 26)    // is an uppercase letter
@@ -155,7 +152,7 @@ element_symbol_hash_function (const char * s,
     if (tmp >= 0 && tmp <= 9)     // 2nd char is a digit
       return 26 + 36 * rc + 26 + tmp;
 
-    tmp = s[1] - 'A';    // 2nd char is an uppercase letter, treat as lowercase
+    tmp = s[1] - 'A';    // 2nd char is an uppercase letter, treat as lowercase (hmmm, is this such a good idea?)
     if (tmp >= 0 && tmp < 26)
       return 26 + 36 * rc + tmp;
 
@@ -169,20 +166,17 @@ element_symbol_hash_function (const char * s,
 
   rc = *s - 'a';
 
-  if (rc >= 0 && rc < 26 && 1 == nchars)  
+  if (rc >= 0 && rc < 26 && 1 == nchars)   // single lowercase letter
     return 26 + 36 * 26 + 3 + rc;          // at the end of the list
 
-  if (_atomic_symbols_can_have_arbitrary_length)    // two character arbitrary symbol, 'qq' for example
-    return -1;
-
-  cerr << "Illegal atomic symbol '";
+  cerr << "Illegal atomic symbol (len " << nchars << ") '";
   cerr.write(s, nchars);
   cerr << "' hash = " << rc << endl;
   return 26+36*26;
 }
 
 int
-print_element_hash_table (std::ostream & os)
+print_element_hash_table(std::ostream & os)
 {
   for (int i = 0; i < SIZE_OF_ELEMENT_HASH_TABLE; i++)
   {
@@ -207,7 +201,7 @@ symbol_for_atomic_symbol_hash_value (int h,
     return 0;
   }
 
-  cerr << "What is the element for hash " << h << endl;
+//cerr << "What is the element for hash " << h << endl;
 
   if (h < 26)
   {
@@ -229,7 +223,7 @@ symbol_for_atomic_symbol_hash_value (int h,
 
   if (h >= 26 + 36 * 26 + 3)
   {
-    s.add ('a' + h - (26 + 36 * 26 + 3));
+    s.add('a' + h - (26 + 36 * 26 + 3));
     return 1;
   }
 
@@ -240,14 +234,43 @@ symbol_for_atomic_symbol_hash_value (int h,
 
   assert (h >= 0 && h < 26);
 
-  s.add ('A' + h);
+  s.add('A' + h);
 
   if (c2 < 26)
-    s.add ('a' + c2);
+    s.add('a' + c2);
   else
-    s.add ('0' + c2 - 26);
+    s.add('0' + c2 - 26);
 
   return 1;
+}
+
+/*
+  We are relying on the idea that most symbols will be short
+*/
+
+static int
+element_symbol_hash_function_arbitrary_length (const char * s,
+                                               const int nchars)
+{
+  uint64_t rc = SIZE_OF_ELEMENT_HASH_TABLE;
+
+  for (int i = 0; i < nchars; ++i)
+  {
+    rc = 256 * rc + static_cast<unsigned int>(s[i]);
+//  cerr << " element_symbol_hash_function_arbitrary_length i " << i << " rc " << rc << endl;
+  }
+
+  if (rc < SIZE_OF_ELEMENT_HASH_TABLE)    // make sure it is out of range
+    return std::numeric_limits<int>::max() - rc;
+
+  uint64_t m = static_cast<int>(std::numeric_limits<int>::max());
+
+  while (rc > m)    // seems unlikely
+  {
+    rc = rc / 2;
+  }
+
+  return static_cast<int>(rc);
 }
 
 static void
@@ -260,19 +283,56 @@ init_elements (void)
     ehash[i] = NULL;
   }
 
-  elements.resize (HIGHEST_ATOMIC_NUMBER + 20);
+  elements.resize(HIGHEST_ATOMIC_NUMBER + 20);
 
   for (int i = 0; i <= HIGHEST_ATOMIC_NUMBER; i++)
   {
-    elements.add (new Element (i));
+    elements.add(new Element(i));
+    elements.last_item()->set_unique_id(elements.number_elements());
   }
 
   return;
 }
 
 /*
+  Common operation is to see if a symbol is a valid hashed element
+*/
+
+static int
+check_valid_element_via_hash (const char * s, int nchars,
+                              const Element * & result)
+{
+  const int hash = element_symbol_hash_function(s, nchars);
+
+#ifdef DEBUG_CHECK_VALID_ELEMENT_VIA_HASH
+  cerr << "check_valid_element_via_hash '";
+  cerr.write(s, nchars);
+  cerr << "' hash " << hash;
+  if (hash < 0 || hash >= SIZE_OF_ELEMENT_HASH_TABLE)
+    cerr << " out of range\n";
+  else if (NULL == ehash[hash])
+    cerr << " no element\n";
+  else
+    cerr << " element " << ehash[hash]->symbol() << endl;
+#endif
+
+  if (hash < 0)
+    return 0;
+
+  if (hash >= SIZE_OF_ELEMENT_HASH_TABLE)
+    return 0;
+
+  if (NULL == ehash[hash])
+    return 0;
+
+  result = ehash[hash];
+
+  return nchars;
+}
+
+/*
   In order to get the elements created automatically, let's make a class
-  which will get instantiated
+  which will get instantiated. 
 */
 
 class element_creator
@@ -303,7 +363,7 @@ static element_creator foo;      // the constructor will cause the elements to b
 void
 Element::_default_values (atomic_number_t i)
 {
-  assert (PLAUSIBLE_ATOMIC_NUMBER (i) || NOT_AN_ELEMENT == i); 
+  assert (PLAUSIBLE_ATOMIC_NUMBER(i) || NOT_AN_ELEMENT == i); 
 
   _atomic_number  = i;
   _atomic_mass    = static_cast<atomic_mass_t>(0.0);
@@ -319,6 +379,8 @@ Element::_default_values (atomic_number_t i)
   _atomic_symbol_hash_value = -1;
 
   _permanent_aromatic = 0;
+
+  _natural_peptide = 0;
 
   switch (i)
   {
@@ -369,6 +431,7 @@ Element::_default_values (atomic_number_t i)
       _needs_square_brackets = 0;
       _normal_valence = 3;
       _exact_mass     = 11.0093054;
+      _outer_shell_electrons = 3;
       break;
 
     case 6:
@@ -390,7 +453,7 @@ Element::_default_values (atomic_number_t i)
       _atomic_mass    = static_cast<atomic_mass_t>(14.00674);
       _needs_square_brackets = 0;
       _normal_valence = 3;
-      add_alternate_valence (5);
+      add_alternate_valence(5);
       _organic = 1;
       _outer_shell_electrons = 5;
       _exact_mass            = 14.003074002;
@@ -471,8 +534,8 @@ Element::_default_values (atomic_number_t i)
       _atomic_mass    = static_cast<atomic_mass_t>(30.973762);
       _needs_square_brackets = 0;
       _normal_valence = 3;
-      add_alternate_valence (5);
-      add_alternate_valence (6);   // added Jul 2000 for Natural Products
+      add_alternate_valence(5);
+      add_alternate_valence(6);   // added Jul 2000 for Natural Products
       _organic = 1;
       _outer_shell_electrons = 5;
       _exact_mass     = 30.9737620;
@@ -488,9 +551,9 @@ Element::_default_values (atomic_number_t i)
       _atomic_mass    = static_cast<atomic_mass_t>(32.065);
       _needs_square_brackets = 0;
       _normal_valence = 2;
-      add_alternate_valence (4);   // added 11 Jun 96
-      add_alternate_valence (6);
-//    add_alternate_valence (8);   // omit, Feb 2004
+      add_alternate_valence(4);   // added 11 Jun 96
+      add_alternate_valence(6);
+//    add_alternate_valence(8);   // omit, Feb 2004
       _outer_shell_electrons = 6;
       _organic = 1;
       _exact_mass     = 31.97207070;
@@ -502,7 +565,7 @@ Element::_default_values (atomic_number_t i)
       _atomic_mass    = static_cast<atomic_mass_t>(35.4527);
       _normal_valence = 1;
       _needs_square_brackets = 0;
-      add_alternate_valence (7);
+      add_alternate_valence(7);
       _outer_shell_electrons = 7;
       _organic = 1;
       _exact_mass     = 34.968852721;
@@ -642,8 +705,8 @@ Element::_default_values (atomic_number_t i)
       _normal_isotope = 80;
       _atomic_mass    = static_cast<atomic_mass_t>(79.904);
       _normal_valence = 1;
-      add_alternate_valence (5);   // 4 and 7 exist sometimes too
-      add_alternate_valence (7);   // 4 and 7 exist sometimes too
+      add_alternate_valence(5);   // 4 and 7 exist sometimes too
+      add_alternate_valence(7);   // 4 and 7 exist sometimes too
       _needs_square_brackets = 0;
       _outer_shell_electrons = 7;
       _organic = 1;
@@ -777,9 +840,9 @@ Element::_default_values (atomic_number_t i)
       _atomic_mass    = static_cast<atomic_mass_t>(126.90447);
       _needs_square_brackets = 0;
       _normal_valence = 1;
-      add_alternate_valence (3);
-      add_alternate_valence (5);
-      add_alternate_valence (7);
+      add_alternate_valence(3);
+      add_alternate_valence(5);
+      add_alternate_valence(7);
       _outer_shell_electrons = 7;
       _organic = 1;
       _exact_mass     = 126.904473;
@@ -1054,11 +1117,13 @@ Element::_default_values (atomic_number_t i)
     case 93:
       _symbol = "Np";
       _normal_isotope = 237;
+      _atomic_mass = static_cast<atomic_mass_t>(237.0);
       break;
 
     case 94:
       _symbol = "Pu";
       _normal_isotope = 244;
+      _atomic_mass = static_cast<atomic_mass_t>(244.0);
       break;
 
     case 95:
@@ -1088,42 +1153,49 @@ Element::_default_values (atomic_number_t i)
     case 99:
       _symbol = "Es";
       _normal_isotope = 252;
+      _atomic_mass = static_cast<atomic_mass_t>(252);
       break;
 
     case 100:
       _symbol = "Fm";
       _normal_isotope = 257;
+      _atomic_mass = static_cast<atomic_mass_t>(257);
       break;
 
     case 101:
       _symbol = "Md";
       _normal_isotope = 258;
+      _atomic_mass = static_cast<atomic_mass_t>(258);
       break;
 
     case 102:
       _symbol = "No";
       _normal_isotope = 259;
+      _atomic_mass = static_cast<atomic_mass_t>(259);
       break;
 
     case 103:
       _symbol = "Lr";
       _normal_isotope = 262;
+      _atomic_mass = static_cast<atomic_mass_t>(262);
       break;
 
     case 104:
       _symbol = "Rf";     // Rutherfordium
-      _normal_isotope = 261;
+      _normal_isotope = 267;
+      _atomic_mass = static_cast<atomic_mass_t>(267);
       break;
 
     case 105:
       _symbol = "Db";      // Dubnium
-      _normal_isotope = 262;
+      _normal_isotope = 268;
       _atomic_mass = static_cast<atomic_mass_t>(262.1141);
       break;
 
     case 106:
       _symbol = "Sg";      //Seaborgium
-      _normal_isotope = 266;
+      _normal_isotope = 271;
+      _atomic_mass = static_cast<atomic_mass_t>(271);
       break;
 
     case 107:
@@ -1134,27 +1206,68 @@ Element::_default_values (atomic_number_t i)
 
     case 108:
       _symbol = "Hs";     // Hassium
-      _normal_isotope = 277;
+      _normal_isotope = 270;
+      _atomic_mass = static_cast<atomic_mass_t>(270);
       break;
 
     case 109:
       _symbol = "Mt";     // Meitnerium
       _normal_isotope = 276;
+      _atomic_mass = static_cast<atomic_mass_t>(276);
       break;
 
     case 110:
       _symbol = "Ds";     // Darmstadtium
-      _normal_isotope = 281;    // unknown
+      _normal_isotope = 281;
+      _atomic_mass = static_cast<atomic_mass_t>(281);
       break;
 
     case 111:
       _symbol = "Rg";     // Roentgenium
       _normal_isotope = 280;
+      _atomic_mass = static_cast<atomic_mass_t>(280);
       break;
 
     case 112:
       _symbol = "Cn";     // Copernicium
       _normal_isotope = 285;
+      _atomic_mass = static_cast<atomic_mass_t>(285);
+      break;
+
+    case 113:
+      _symbol = "Nh";
+      _normal_isotope = 284;
+      _atomic_mass = static_cast<atomic_mass_t>(284);
+      break;
+
+    case 114:
+      _symbol = "Fl";
+      _normal_isotope = 289;
+      _atomic_mass = static_cast<atomic_mass_t>(289);
+      break;
+
+    case 115:
+      _symbol = "Mc";
+      _normal_isotope = 288;
+      _atomic_mass = static_cast<atomic_mass_t>(288);
+      break;
+
+    case 116:
+      _symbol = "Lv";
+      _normal_isotope = 293;
+      _atomic_mass = static_cast<atomic_mass_t>(293);
+      break;
+
+    case 117:
+      _symbol = "Ts";
+      _normal_isotope = 294;
+      _atomic_mass = static_cast<atomic_mass_t>(294);
+      break;
+
+    case 118:
+      _symbol = "Og";
+      _normal_isotope = 294;
+      _atomic_mass = static_cast<atomic_mass_t>(294);
       break;
 
     case NOT_AN_ELEMENT:
@@ -1178,7 +1291,7 @@ Element::_default_values (atomic_number_t i)
   if (_symbol.length() > 2)    // cannot hash these
     return;
 
-  _atomic_symbol_hash_value = element_symbol_hash_function (_symbol.rawchars(), _symbol.length());
+  _atomic_symbol_hash_value = element_symbol_hash_function(_symbol.rawchars(), _symbol.length());
 
 //cerr << "Hash value for '" << _symbol << "' is " << _atomic_symbol_hash_value << endl;
 
@@ -1194,9 +1307,9 @@ void
 Element::_set_symbol (const char * symbol)
 {
   if (NULL == symbol)
-    _set_symbol (NULL, 0);
+    _set_symbol(NULL, 0);
   else
-    _set_symbol (symbol, static_cast<int>(strlen (symbol)));
+    _set_symbol(symbol, static_cast<int>(strlen(symbol)));
 
   return;
 }
@@ -1206,7 +1319,7 @@ Element::_set_symbol (const char * symbol, int nchars)
 {
   if (NULL == symbol || 0 == nchars)
   {
-    _symbol.resize (0);
+    _symbol.resize(0);
     _atomic_symbol_hash_value = -1;
 
     return;
@@ -1214,9 +1327,9 @@ Element::_set_symbol (const char * symbol, int nchars)
 
   if (nchars <= 2)   // the most common case
   {
-    _symbol.set (symbol, nchars);
+    _symbol.set(symbol, nchars);
 
-    _atomic_symbol_hash_value = element_symbol_hash_function (_symbol.rawchars(), _symbol.length());
+    _atomic_symbol_hash_value = element_symbol_hash_function(_symbol.rawchars(), _symbol.length());
 
     if (_atomic_symbol_hash_value < 0)
       return;
@@ -1231,13 +1344,13 @@ Element::_set_symbol (const char * symbol, int nchars)
 
   if (_atomic_symbols_can_have_arbitrary_length)
   {
-    _symbol.set (symbol, nchars);
-    _atomic_symbol_hash_value = -1;
+    _symbol.set(symbol, nchars);
+    _atomic_symbol_hash_value = element_symbol_hash_function_arbitrary_length(symbol, nchars);
     return;
   }
 
   cerr << "Element::_set_symbol:invalid symbol '";
-  cerr.write (symbol, nchars);
+  cerr.write(symbol, nchars);
   cerr << "'\n";
 
   _atomic_symbol_hash_value = -1;
@@ -1248,14 +1361,14 @@ Element::_set_symbol (const char * symbol, int nchars)
 void
 Element::_set_symbol (const const_IWSubstring & symbol )
 {
-  _set_symbol (symbol.rawchars(), symbol.nchars());
+  _set_symbol(symbol.rawchars(), symbol.nchars());
 
   return;
 }
 
 Element::Element (int i)
 {
-  _default_values (i);
+  _default_values(i);
 
   return;
 }
@@ -1271,34 +1384,40 @@ Element::_non_periodic_table_element_constructor (const char * s,
   assert (NULL != s);
   assert (nchars > 0);
 
-  _default_values (NOT_AN_ELEMENT);
-  _set_symbol (s, nchars);
+  _default_values(NOT_AN_ELEMENT);
+  _set_symbol(s, nchars);
 
-  if (1 == nchars && islower (*s))
+  if (1 == nchars && islower(*s))
     _needs_square_brackets = 0;
   else
     _needs_square_brackets = 1;
+
+#ifdef DEBUG_NPTEC
+  cerr << "Element::_non_periodic_table_element_constructor: created ";
+  cerr.write(s, nchars);
+  cerr << " hash " << _atomic_symbol_hash_value << endl;
+#endif
 
   return;
 }
 
 Element::Element (const char * symbol)
 {
-  _non_periodic_table_element_constructor (symbol, static_cast<int>(::strlen (symbol)));
+  _non_periodic_table_element_constructor(symbol, static_cast<int>(::strlen(symbol)));
 
   return;
 }
 
 Element::Element (const char * symbol, int nchars)
 {
-  _non_periodic_table_element_constructor (symbol, nchars);
+  _non_periodic_table_element_constructor(symbol, nchars);
 
   return;
 }
 
 Element::Element (const const_IWSubstring & symbol)
 {
-  _non_periodic_table_element_constructor (symbol.rawchars(), symbol.length());
+  _non_periodic_table_element_constructor(symbol.rawchars(), symbol.length());
 
   return;
 }
@@ -1310,7 +1429,7 @@ Element::Element (const const_IWSubstring & symbol)
 
 Element::~Element()
 {
-  assert (ok());
+//assert(ok());    very important to leave this out, since some elements are not initialised - gaps in the sequence
 
   return;
 }
@@ -1318,9 +1437,9 @@ Element::~Element()
 int
 Element::debug_print (std::ostream & os) const
 {
-  assert (os.good());
+  assert(os.good());
 
-  os << "Element info (" << this << "), atomic number " << _atomic_number << " symbol '" << _symbol << "'\n";
+  os << "Element info (" << this << "), atomic number " << _atomic_number << " symbol '" << _symbol << "', unique id " << _unique_id << endl;
 
   if (! ok())
     os << "Element NOT ok\n";
@@ -1344,7 +1463,7 @@ debug_print_all_elements (std::ostream & os)
   for (int i = 0; i < nelements; i++)
   {
     os << "Element number " << i << endl;
-    elements[i]->debug_print (os);
+    elements[i]->debug_print(os);
   }
 
   return;
@@ -1360,19 +1479,20 @@ debug_print_all_elements (std::ostream & os)
 */
 
 const Element *
-get_element_from_symbol (const char *name, int nchars, int & isotope)
+get_element_from_symbol(const char *name, int nchars, int & isotope)
 {
   assert (NULL != name);
+  assert (nchars > 0);
 
 // Get any isotopic specification
 
   isotope = 0;
-  while (isdigit (*name))
+  while (isdigit(*name) && nchars > 0)
   {
     isotope = 10 * isotope + (*name - '0');
     name++;
     nchars--;
-    assert (isotope <= 999);
+    assert(isotope <= 999);
   }
 
   if (0 == nchars)
@@ -1380,40 +1500,42 @@ get_element_from_symbol (const char *name, int nchars, int & isotope)
 
 #ifdef DEBUG_GET_ELEMENT_FROM_SYMBOL
   cerr << "Creating element from '";
-  for (int i = 0; i < nchars; i++)
-  {
-    cerr << name[i];
-  }
+  cerr.write(name, nchars);
   cerr << "'\n";
 #endif
 
-  if (nchars <= 2)   // good
-    ;
-  else if (_atomic_symbols_can_have_arbitrary_length)
-    return get_element_from_long_symbols (name, nchars);
-  else    // long symbols not enabled
-    return NULL;
-
   char tmp[4];
-  tmp[0] = toupper (*name);
-  if (1 == nchars)
-    tmp[1] = '\0';
-  else
+
+  if (1 == nchars || '@' == name[1] || 'H' == name[1] || '+' == name[1] || '-' == name[1])    // the most common cases
   {
-    tmp[1] = name[1];
-    if (isupper (tmp[1]))
-      tmp[1] = tolower (tmp[1]);
-    tmp[2] = '\0';
+    tmp[0] = toupper(*name);
+    const int hash = element_symbol_hash_function(tmp, 1);
+    if (hash < 0 || hash >= SIZE_OF_ELEMENT_HASH_TABLE)
+      return NULL;
+
+    return ehash[hash];
   }
 
-  int hash = element_symbol_hash_function (tmp, nchars);
+// Two or more characters
 
-//cerr << "Hash '" << tmp << "' is " << hash << endl;
-//cerr << "Element there is " << ehash[hash] << endl;
+  if (2 == nchars)
+  {
+    tmp[0] = toupper(*name);
+    tmp[1] = name[1];
+    if (isupper(tmp[1]))
+      tmp[1] = tolower(tmp[1]);             // change if we ever want to have elements like qQ or QQ
 
-  const Element * rc = ehash[hash];
+    const int hash = element_symbol_hash_function(tmp, 2);
+    if (hash < 0 || hash >= SIZE_OF_ELEMENT_HASH_TABLE)
+      return 0;
 
-  return rc;
+    return ehash[hash];
+  }
+
+  if (_atomic_symbols_can_have_arbitrary_length)
+    return get_element_from_long_symbols(name, nchars);
+
+  return NULL;
 }
 
 /*
@@ -1424,8 +1546,8 @@ get_element_from_symbol (const char *name, int nchars, int & isotope)
 //#define DEBUG_GET_ELEMENT_FROM_SYMBOL
 
 const Element *
-get_element_from_symbol_no_case_conversion (const char * s,
-                                            int nchars)
+get_element_from_symbol_no_case_conversion(const char * s,
+                                           const int nchars)
 {
   if (0 == nchars)
   {
@@ -1433,55 +1555,59 @@ get_element_from_symbol_no_case_conversion (const char * s,
     return NULL;
   }
 
-  int hash = element_symbol_hash_function (s, nchars);
+  if (nchars <= 2)
+  {
+    const int hash = element_symbol_hash_function(s, nchars);
 
 #ifdef DEBUG_GET_ELEMENT_FROM_SYMBOL
-  cerr << "Hash value " << hash;
-  if (NULL == ehash[hash])
-    cerr << ", no element defined\n";
-  else
-    cerr << " element '" << ehash[hash]->symbol() << endl;
+    cerr << "Hash value " << hash;
+    if (NULL == ehash[hash])
+      cerr << ", no element defined\n";
+    else
+      cerr << " element '" << ehash[hash]->symbol() << endl;
 #endif
 
-  assert (hash >= 0 && hash < SIZE_OF_ELEMENT_HASH_TABLE);
+    if (hash >= 0 && hash < SIZE_OF_ELEMENT_HASH_TABLE)
+      return ehash[hash];
+  }
 
-  return ehash[hash];
+  return get_element_from_long_symbols(s, nchars);
 }
 
 const Element *
-get_element_from_symbol_no_case_conversion (const char * s)
+get_element_from_symbol_no_case_conversion(const char * s)
 {
-  return get_element_from_symbol_no_case_conversion (s, static_cast<int>(::strlen (s)));
+  return get_element_from_symbol_no_case_conversion(s, static_cast<int>(::strlen(s)));
 }
 
 const Element *
-get_element_from_symbol_no_case_conversion (const const_IWSubstring & s)
+get_element_from_symbol_no_case_conversion(const const_IWSubstring & s)
 {
-  return get_element_from_symbol_no_case_conversion (s.rawchars(), s.length());
+  return get_element_from_symbol_no_case_conversion(s.rawchars(), s.length());
 }
 
 const Element *
-get_element_from_symbol_no_case_conversion (const IWString & s)
+get_element_from_symbol_no_case_conversion(const IWString & s)
 {
-  return get_element_from_symbol_no_case_conversion (s.rawchars(), s.length());
+  return get_element_from_symbol_no_case_conversion(s.rawchars(), s.length());
 }
 
 const Element *
 get_element_from_symbol (const char *name, int & isotope)
 {
-  return get_element_from_symbol (name, static_cast<int>(::strlen (name)), isotope);
+  return get_element_from_symbol(name, static_cast<int>(::strlen(name)), isotope);
 }
 
 const Element *
 get_element_from_symbol (const const_IWSubstring & name, int & isotope)
 {
-  return get_element_from_symbol (name.rawchars(), name.nchars(), isotope);
+  return get_element_from_symbol(name.rawchars(), name.nchars(), isotope);
 }
 
 const Element *
 get_element_from_symbol (const IWString & name, int & isotope)
 {
-  return get_element_from_symbol (name.rawchars(), name.length(), isotope);
+  return get_element_from_symbol(name.rawchars(), name.length(), isotope);
 }
 
 /*
@@ -1495,7 +1621,7 @@ get_element_from_symbol (char name, int & isotope)
 {
   IWString tmp = name;
 
-  return get_element_from_symbol (tmp, isotope);
+  return get_element_from_symbol(tmp, isotope);
 }
 
 int
@@ -1503,9 +1629,10 @@ element_from_long_smiles_string (const char * asymbol,
                                  int nchars,
                                  const Element * & result)
 {
+//#define DEBUG_ELEMENT_FROM_LONG_SMILES_STRING
 #ifdef DEBUG_ELEMENT_FROM_LONG_SMILES_STRING
   cerr << "Getting element '";
-  cerr.write (asymbol, nchars);
+  cerr.write(asymbol, nchars);
   cerr << "'\n";
 #endif
 
@@ -1523,7 +1650,7 @@ element_from_long_smiles_string (const char * asymbol,
   if (close_square_bracket < 0)
   {
     cerr << "get_element_from_symbol:no closing square bracket '";
-    cerr.write (asymbol, nchars);
+    cerr.write(asymbol, nchars);
     cerr << "'\n";
     return 0;
   }
@@ -1534,32 +1661,56 @@ element_from_long_smiles_string (const char * asymbol,
     return 0;
   }
 
-// It could be a regular element. This is messy, and not correct. Let's hope
-// someone never really wants to mix the two kinds of symbols in one programme
+// It could be a regular element. This is messy and not robust.
 
-  if (1 == close_square_bracket && isalpha (asymbol[0]))
+  if (1 == close_square_bracket && isalpha(asymbol[0]))
   {
-    _atomic_symbols_can_have_arbitrary_length = 0;
-    int rc = element_from_smiles_string (asymbol, nchars, result);
-    _atomic_symbols_can_have_arbitrary_length = 1;
-    return rc;
+    char tmp[4];
+    tmp[0] = toupper(asymbol[0]);
+    if (check_valid_element_via_hash(tmp, 1, result))
+      return 1;
+  }
+  else if (close_square_bracket > 1 && isalpha(asymbol[0]) && ('@' == asymbol[1] || 'H' == asymbol[1] || isdigit(asymbol[1]) || '+' == asymbol[1] || '-' == asymbol[1] || ']' == asymbol[1]))
+  {
+    char tmp[4];
+    tmp[0] = toupper(asymbol[0]);
+    if (check_valid_element_via_hash(tmp, 1, result))
+      return 1;
+  }
+  else if (2 == close_square_bracket && isupper(asymbol[0]) && islower(asymbol[1]))
+  {
+    if (check_valid_element_via_hash(asymbol, 2, result))
+      return 2;
   }
 
-  if (2 == close_square_bracket && isupper (asymbol[0]) && islower (asymbol[1]))
+#ifdef DEBUG_ELEMENT_FROM_LONG_SMILES_STRING
+  cerr << "LINE " << __LINE__ << endl;
+#endif
+
+// Not recognised as a regular element
+
+  if ('D' == asymbol[0] && close_square_bracket > 1 && ! isalpha(asymbol[1]) && interpret_d_as_deuterium())
   {
-    _atomic_symbols_can_have_arbitrary_length = 0;
-    int rc = element_from_smiles_string (asymbol, nchars, result);
-    _atomic_symbols_can_have_arbitrary_length = 1;
-    return rc;
+    cerr << "element_from_long_smiles_string:Deuterium detected, but isotope info not returned\n";
+    result = get_element_from_atomic_number(1);
+    return 1;
+  }
+  else if ('T' == asymbol[0] && close_square_bracket > 1 && ! isalpha(asymbol[1]) && interpret_t_as_tritium())
+  {
+    cerr << "element_from_long_smiles_string:Tritium detected, but isotope info not returned\n";
+    result = get_element_from_atomic_number(1);
+    return 1;
   }
 
-  result = get_element_from_long_symbols (asymbol, close_square_bracket);
+//cerr << "LINE " << __LINE__ << " get_element_from_long_symbols\n";
+  result = get_element_from_long_symbols(asymbol, close_square_bracket);
   if (NULL != result)
     return close_square_bracket;
 
-  Element * e = new Element (asymbol, close_square_bracket);
+  Element * e = new Element(asymbol, close_square_bracket);
 
-  elements.add (e);
+  elements.add(e);
+  elements.last_item()->set_unique_id(elements.number_elements());
 
   result = e;
 
@@ -1576,13 +1727,13 @@ element_from_long_smiles_string (const char * asymbol,
 
 int
 element_from_smiles_string (const char * smiles,
-                            int nchars,
+                            const int nchars,
                             const Element * & result)
 {
   assert (NULL != smiles);
 
   if (_atomic_symbols_can_have_arbitrary_length)
-    return element_from_long_smiles_string (smiles, nchars, result);
+    return element_from_long_smiles_string(smiles, nchars, result);
 
 #ifdef DEBUG_ELEMENT_FROM_SMILES_STRING
   cerr << "Fetching element '" << smiles[0];
@@ -1601,31 +1752,40 @@ element_from_smiles_string (const char * smiles,
 
   ele[0] = toupper(smiles[0]);
 
+  int nc;
   if (nchars > 1 && islower(smiles[1]))       // Cu for example
   {
     ele[1] = smiles[1];
     ele[2] = '\0';
-    nchars = 2;
+    nc = 2;
   }
   else                 // U, nH N+ O2-
   {
     ele[1] = '\0';
-    nchars = 1;
+    nc = 1;
   }
 
-  int hash = element_symbol_hash_function (ele, nchars);
+  if (check_valid_element_via_hash(ele, nc, result))
+    return nc;
 
-#ifdef DEBUG_ELEMENT_FROM_SMILES_STRING
-  cerr << "ele '" << ele << "' nchars = " << nchars << " hash " << hash << " ehash " << ehash[hash] << endl;
-#endif
+// Feb 2014. What if elements like R0 and A0 have been autocreated
 
-  if (ehash[hash])
+  if (nchars > 1 && isdigit(smiles[1]))
   {
-    result = ehash[hash];
-    return nchars;
+    ele[1] = smiles[1];
+    ele[2] = '\0';
+    int h = element_symbol_hash_function(ele, 2);
+    if (ehash[h])
+    {
+      result = ehash[h];
+      return 2;
+    }
+
+    ele[1] = '\0';
+    nc = 1;
   }
 
-//cerr << "Still no match, auto create = " << auto_create_new_elements() << endl;
+//cerr << "Still no match, auto create = " << auto_create_new_elements() << " element is '" << ele << "', nc " << nc << endl;
 
   if (! auto_create_new_elements())
     return 0;    // no match found
@@ -1634,7 +1794,7 @@ element_from_smiles_string (const char * smiles,
 // is a hydrogen isotope. Not very efficient, but too much code to change
 // otherwise
 
-  if (1 == nchars)
+  if (1 == nc)
   {
     if ('D' == smiles[0] && interpret_d_as_deuterium())
       return 0;
@@ -1644,11 +1804,11 @@ element_from_smiles_string (const char * smiles,
 
 // We can create any previously unknown elements
     
-  result = create_element_with_symbol (ele);
+  result = create_element_with_symbol(ele);
 
 //cerr << "Created element from '" << ele << "'\n";
 
-  return nchars;
+  return nc;
 }
 
 /*
@@ -1672,9 +1832,9 @@ element_from_smarts_string (const char * smiles, int characters_to_process,
   char ele[3];
   int nchars;
 
-  ele[0] = toupper (smiles[0]);
+  ele[0] = toupper(smiles[0]);
 
-  if (characters_to_process > 1 && islower (smiles[1]))
+  if (characters_to_process > 1 && islower(smiles[1]))
   {
     ele[1] = smiles[1];
     ele[2] = '\0';
@@ -1692,9 +1852,9 @@ element_from_smarts_string (const char * smiles, int characters_to_process,
 
 //cerr << "From smarts '" << smiles << "' (" << characters_to_process << " chars), ele is '" << ele << "'\n";
 
-  int hash = element_symbol_hash_function (ele, nchars);
+  int hash = element_symbol_hash_function(ele, nchars);
 
-//cerr << "Hash value is " << hash << endl;
+//cerr << "Hash value is " << hash << " ehash " << ehash[hash] << endl;
 
   if (NULL == ehash[hash])      // no element of that kind yet
     return 0;
@@ -1767,17 +1927,17 @@ Element::append_smiles_symbol (IWString & smiles,
   if (isotope && include_isotopes_in_smiles)
   {
 //  cerr << "Adding isotope " << isotope << " to '" << smiles << "'\n";
-    smiles.append_number (isotope);
+    smiles.append_number(isotope);
   }
 
 #ifdef DEBUG_APPEND_SMILES_SYMBOL
-  if (IS_AROMATIC_ATOM (arom))
+  if (IS_AROMATIC_ATOM(arom))
     cerr << "Adding '" << _aromatic_symbol << "' to smiles\n";
   else
     cerr << "Adding '" << _symbol << "'\n";
 #endif
 
-  if (IS_AROMATIC_ATOM (arom))
+  if (IS_AROMATIC_ATOM(arom))
     smiles += _aromatic_symbol;
   else
     smiles += _symbol;
@@ -1805,6 +1965,12 @@ Element::atomic_mass() const
 const Element *
 create_element_with_symbol (const char * symbol, int nchars)
 {
+#ifdef DEBUG_CREATE_ELEMENT_WITH_SYMBOL
+  cerr << "create_element_with_symbol processing '";
+  cerr.write(symbol,nchars);
+  cerr << endl;
+#endif
+
   if (nchars <= 0)
   {
     cerr << "create_element_with_symbol:no symbol\n";
@@ -1817,57 +1983,68 @@ create_element_with_symbol (const char * symbol, int nchars)
     return NULL;
   else
   {
-    const Element * e = get_element_from_long_symbols (symbol, nchars);
+    const Element * e = get_element_from_long_symbols(symbol, nchars);
     if (NULL != e)
       return e;
 
-    return new Element (symbol, nchars);
+    Element * rc = new Element(symbol, nchars);
+    elements.add(rc);
+    elements.last_item()->set_unique_id(elements.number_elements());
+
+#ifdef DEBUG_CREATE_ELEMENT_WITH_SYMBOL
+    cerr << "create_element_with_symbol: created from ";
+    cerr.write(symbol, nchars);
+    cerr << " uid " << elements.last_item()->unique_id() << endl;
+#endif
+
+    return rc;
   }
 
-  const Element * e = get_element_from_symbol_no_case_conversion (symbol, nchars);
+  const Element * e = get_element_from_symbol_no_case_conversion(symbol, nchars);
   if (NULL != e)
   {
     cerr << "create_element_with_symbol: cannot create new element with symbol '";
-    cerr.write (symbol, nchars) << "', already present\n";
+    cerr.write(symbol, nchars) << "', already present\n";
 
-    e->debug_print (cerr);
+    e->debug_print(cerr);
 
     return NULL;
   }
 
   Element * rc = NULL;
 
-  if (nchars > 1 && isupper (symbol[1]))    // symbols cannot have uppercase 2nd characters
+  if (nchars > 1 && isupper(symbol[1]))    // symbols cannot have uppercase 2nd characters
   {
-    IWString tmp (symbol, nchars);
-    tmp[1] = tolower (tmp[1]);
+    IWString tmp(symbol, nchars);
+    tmp[1] = tolower(tmp[1]);
 
-    rc = new Element (tmp.rawchars(), nchars);
+    rc = new Element(tmp.rawchars(), nchars);
   }
   else
-    rc = new Element (symbol, nchars);
+    rc = new Element(symbol, nchars);
 
-  elements.add (rc);
+  elements.add(rc);
+  elements.last_item()->set_unique_id(elements.number_elements());
 
   return rc;
 }
 
 const Element *
-create_element_with_symbol (const char * symbol)
+create_element_with_symbol(const char * symbol)
 {
-  return create_element_with_symbol (symbol, static_cast<int>(::strlen (symbol)));
+  return create_element_with_symbol(symbol, static_cast<int>(::strlen(symbol)));
 }
 
 const Element *
 create_element_with_symbol (const const_IWSubstring & symbol)
 {
-  return create_element_with_symbol (symbol.rawchars(), symbol.nchars());
+  return create_element_with_symbol(symbol.rawchars(), symbol.nchars());
 }
 
 const Element *
 create_element_with_symbol (const IWString & symbol)
 {
-  return create_element_with_symbol (symbol.rawchars(), symbol.nchars());
+  return create_element_with_symbol(symbol.rawchars(), symbol.nchars());
 }
 
 int
@@ -1875,7 +2052,7 @@ Element::alternate_valence (int i) const
 {
   assert (ok());
 
-  assert (_alternate_valence.ok_index (i));
+  assert (_alternate_valence.ok_index(i));
 
   return _alternate_valence[i];
 }
@@ -1888,7 +2065,7 @@ Element::is_valid_valence (int v) const
   if (_normal_valence == v)
     return 1;
 
-  return _alternate_valence.contains (v);
+  return _alternate_valence.contains(v);
 }
 
 int
@@ -2010,7 +2187,7 @@ read_ptable (const const_IWSubstring & buffer)
     return 1;
 
   const_IWSubstring sym;
-  buffer.word (0, sym);
+  buffer.word(0, sym);
 
   if (sym.length() > 2)
   {
@@ -2018,9 +2195,9 @@ read_ptable (const const_IWSubstring & buffer)
     return 1;
   }
 
-  Element * e = const_cast<Element *> (get_element_from_symbol_no_case_conversion (sym));
+  Element * e = const_cast<Element *>(get_element_from_symbol_no_case_conversion(sym));
   if (NULL == e)
-    e  = const_cast<Element *> (create_element_with_symbol (sym));
+    e  = const_cast<Element *>(create_element_with_symbol(sym));
 
   if (NULL == e)
   {
@@ -2031,7 +2208,7 @@ read_ptable (const const_IWSubstring & buffer)
   if (1 == nw)    // just a definition of an element
     return 1;
 
-  return e->read_ptable_record (buffer);
+  return e->read_ptable_record(buffer);
 }
 
 static int
@@ -2039,12 +2216,12 @@ read_ptable (iwstring_data_source & input)
 {
   const_IWSubstring buffer;
 
-  while (input.next_record (buffer))
+  while (input.next_record(buffer))
   {
-    if (buffer.starts_with ('#'))
+    if (buffer.starts_with('#'))
       continue;
 
-    if (! read_ptable (buffer))
+    if (! read_ptable(buffer))
     {
       cerr << "Fatal error processing PTABLE record, line " << input.lines_read() << endl;
       cerr << buffer << endl;
@@ -2058,14 +2235,14 @@ read_ptable (iwstring_data_source & input)
 static int
 read_ptable_file (const const_IWSubstring & fname)
 {
-  iwstring_data_source input (fname);
+  iwstring_data_source input(fname);
   if (! input.ok())
   {
     cerr << "Cannot open ptable file '" << fname << "'\n";
     return 0;
   }
 
-  return read_ptable (input);
+  return read_ptable(input);
 }
       
 int
@@ -2091,24 +2268,24 @@ display_standard_element_options (std::ostream & os)
 #include "cmdline.h"
 
 int
-process_elements (const Command_Line & cl,
-                  int verbose,
-                  char eflag)
+process_elements(const Command_Line & cl,
+                 int verbose,
+                 char eflag)
 {
   int j = 0;
   const_IWSubstring c;
-  while (cl.value (eflag, c, j++))
+  while (cl.value(eflag, c, j++))
   {
     if ('*' == c || "autocreate" == c)
     {
-      set_auto_create_new_elements (1);
+      set_auto_create_new_elements(1);
       continue;
     }
 
-    if (c.starts_with ("PTABLE="))
+    if (c.starts_with("PTABLE="))
     {
-      c.remove_leading_chars (7);
-      if (! read_ptable_file (c))
+      c.remove_leading_chars(7);
+      if (! read_ptable_file(c))
       {
         cerr << "Cannot process ptable directive 'PTABLE=" << c << "'\n";
         return 0;
@@ -2117,29 +2294,29 @@ process_elements (const Command_Line & cl,
       continue;
     }
 
-    if (c.starts_with ("O:"))
+    if (c.starts_with("O:"))
     {
-      c.remove_leading_chars (2);
+      c.remove_leading_chars(2);
 
 #ifdef STUFF_FOR_SAMPLE_ID
       if ("SAMID" == c)
       {
-        make_organic (3);      // lithium
-        make_organic (11);     // sodium
-        make_organic (12);     // magnesium
-        make_organic (14);     // silicon
-        make_organic (19);     // potassium
-        make_organic (20);     // calcium
-        make_organic (34);     // selenium
+        make_organic(3);      // lithium
+        make_organic(11);     // sodium
+        make_organic(12);     // magnesium
+        make_organic(14);     // silicon
+        make_organic(19);     // potassium
+        make_organic(20);     // calcium
+        make_organic(34);     // selenium
         continue;
       }
 #endif
 
-      Element * e = const_cast<Element *> (get_element_from_symbol_no_case_conversion (c));
+      Element * e = const_cast<Element *>(get_element_from_symbol_no_case_conversion(c));
       if (NULL == e)
-        e = const_cast<Element *> (create_element_with_symbol (c));
+        e = const_cast<Element *>(create_element_with_symbol(c));
 
-      e->set_organic (1);
+      e->set_organic(1);
 
       continue;
     }
@@ -2147,29 +2324,29 @@ process_elements (const Command_Line & cl,
     else if ("anylength" == c)
     {
       _atomic_symbols_can_have_arbitrary_length = 1;
-      set_auto_create_new_elements (1);
+      set_auto_create_new_elements(1);
       continue;
     }
 
-    else if (c.starts_with ("nsqb="))
+    else if (c.starts_with("nsqb="))
     {
-      c.remove_leading_chars (5);
+      c.remove_leading_chars(5);
 
-      Element * e = const_cast<Element *> (get_element_from_symbol_no_case_conversion (c));
+      Element * e = const_cast<Element *>(get_element_from_symbol_no_case_conversion(c));
       if (NULL == e)
-        e = const_cast<Element *> (create_element_with_symbol (c));
+        e = const_cast<Element *>(create_element_with_symbol(c));
 
-      e->set_needs_square_brackets (1);
+      e->set_needs_square_brackets(1);
       continue;
     }
 
     if ("help" == c)
     {
-      display_standard_element_options (cerr);
-      exit (1);
+      display_standard_element_options(cerr);
+      exit(1);
     }
 
-    const Element * e = create_element_with_symbol (c);
+    const Element * e = create_element_with_symbol(c);
 
     if (NULL == e)
     {
@@ -2183,7 +2360,7 @@ process_elements (const Command_Line & cl,
 //#define DEBUG_EXTRA_ELEMENT_CREATION
 #ifdef DEBUG_EXTRA_ELEMENT_CREATION
     IWString tmp;
-    e->append_smiles_symbol (tmp, NOT_AROMATIC);
+    e->append_smiles_symbol(tmp, NOT_AROMATIC);
     cerr << "Smiles symbol for new element is '" << tmp << "', atomic number " <<
             e->atomic_number() << endl;
 #endif
@@ -2211,7 +2388,7 @@ Element::read_ptable_record (const const_IWSubstring & buffer)
   int i = 0;
   const_IWSubstring token;
 
-  buffer.nextword (token, i);
+  buffer.nextword(token, i);
 
   int nchars = token.length();
 
@@ -2228,16 +2405,16 @@ Element::read_ptable_record (const const_IWSubstring & buffer)
 
 // Second token is a comma separated list of valences, with the first one being the normal valence - implement this some time
 
-  (void) buffer.nextword (token, i);
+  (void) buffer.nextword(token, i);
 
   if (2 == nw)
     return 1;
 
 // Next token is the atomic weight
 
-  (void) buffer.nextword (token, i);
+  (void) buffer.nextword(token, i);
 
-  if (! token.numeric_value (_atomic_mass) || _atomic_mass < 0.0)
+  if (! token.numeric_value(_atomic_mass) || _atomic_mass < 0.0)
   {
     cerr << "Element::read_ptable_record: invalid atomic mass '" << token << "'\n";
     return 0;
@@ -2253,7 +2430,7 @@ Element::read_ptable_record (const const_IWSubstring & buffer)
 
   So, we don't bother copying all the different valences.
   We don't copy _permanent_aromatic
-  We definitely don't change the atomic symbol hash value
+  We definitely don't change the atomic symbol hash value or unique_id
 */
 
 void

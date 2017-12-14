@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include "ostream_and_type.h"
 
 #include "molecule.h"
@@ -35,15 +17,15 @@ ofstream_and_type::_default_values ()
 
 ofstream_and_type::ofstream_and_type ()
 {
-  _default_values ();
+  _default_values();
 }
 
 ofstream_and_type::ofstream_and_type (int output_type)
 {
-  if (_default_values ())
+  if (_default_values())
     return;
 
-  if (! set_type (output_type))
+  if (! set_type(output_type))
     return;
 
   _valid = 1;
@@ -53,25 +35,25 @@ ofstream_and_type::ofstream_and_type (int output_type)
 
 ofstream_and_type::ofstream_and_type (int output_type, const char * fname)
 {
-  if (!_default_values ())
+  if (!_default_values())
     return;
 
-  if (! set_type (output_type))
+  if (! set_type(output_type))
     return;
 
-  if (open (fname))
+  if (open(fname))
     _valid = 1;
 }
 
 ofstream_and_type::ofstream_and_type (int output_type, IWString & fname)
 {
-  if (!_default_values ())
+  if (!_default_values())
     return;
 
-  if (! set_type (output_type))
+  if (! set_type(output_type))
     return;
 
-  if (open (fname.null_terminated_chars ()))
+  if (open(fname.null_terminated_chars()))
     _valid = 1;
 }
 
@@ -86,13 +68,13 @@ ofstream_and_type::~ofstream_and_type ()
 int
 ofstream_and_type::set_type (int t)
 {
-  if (valid_file_type (_output_type))
+  if (valid_file_type(_output_type))
   {
     cerr << "ofstream_and_type::set_type: file type already set to " << _output_type << endl;
     return 0;
   }
 
-  if (! valid_file_type (t))
+  if (! valid_file_type(t))
   {
     cerr << "ofstream_and_type::set_type: type " << t << " is invalid\n";
     return 0;
@@ -108,37 +90,37 @@ ofstream_and_type::set_type (int t)
 int
 ofstream_and_type::open (const char * fname)
 {
-  if ('>' == *fname && strlen (fname) > 1 && '>' == fname[1])
+  if ('>' == *fname && strlen(fname) > 1 && '>' == fname[1])
   {
     fname += 2;
-    ofstream::open (fname, ios::app);
+    std::ofstream::open(fname, std::ios::app);
   }
   else
-    ofstream::open (fname, ios::out);
+    std::ofstream::open(fname, std::ios::out);
 
-  if (good ())
+  if (good())
     _fname = fname;
 
-//cerr << "ofstream_and_type: opened '" << fname << "' good = " << good () << endl;
+//cerr << "ofstream_and_type: opened '" << fname << "' good = " << good() << endl;
 
-  return good ();
+  return good();
 }
 
 int
 ofstream_and_type::open (IWString & fname)
 {
-  if (fname.starts_with (">>"))
+  if (fname.starts_with(">>"))
   {
-    fname.remove_leading_chars (2);
-    ofstream::open (fname.chars (), ios::app);
+    fname.remove_leading_chars(2);
+    std::ofstream::open(fname.chars(), std::ios::app);
   }
   else
-    ofstream::open (fname.chars (), ios::out);
+    std::ofstream::open(fname.chars(), std::ios::out);
 
-  if (good ())
+  if (good())
     _fname = fname;
 
-  return good ();
+  return good();
 }
 
 int
@@ -147,16 +129,16 @@ ofstream_and_type::write_molecule (Molecule * m)
   if (! _valid)
     return 0;
 
-  if (! good ())
+  if (! good())
   {
     _valid = 0;
     return 0;
   }
 
   if (_verbose)
-    cerr << _molecules_written + 1 << " writing '" << m->name () << "'\n";
+    cerr << _molecules_written + 1 << " writing '" << m->name() << "'\n";
 
-  if (! m->write_molecule (*this, _output_type))
+  if (! m->write_molecule(*this, _output_type))
     return 0;
 
   _molecules_written++;
@@ -169,19 +151,19 @@ ofstream_and_type::write_molecules (const resizable_array_p<Molecule> & molecule
   if (! _valid)
     return 0;
 
-  if (! good ())
+  if (! good())
   {
     _valid = 0;
     return 0;
   }
 
   int rc = 0;
-  for (int i = 0; i < molecules.number_elements (); i++)
+  for (int i = 0; i < molecules.number_elements(); i++)
   {
     Molecule * m = molecules[i];
-    assert (OK_MOLECULE (m));
+    assert (OK_MOLECULE(m));
 
-    if (! m->write_molecule (*this, _output_type))
+    if (! m->write_molecule(*this, _output_type))
       return rc;
 
     rc++;

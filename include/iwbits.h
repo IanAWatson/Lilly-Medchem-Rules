@@ -1,27 +1,10 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef IW_BITS_BASE_H
 #define IW_BITS_BASE_H
 
 #include <iostream>
 
-using namespace std;
+using std::cerr;
+using std::endl;
 
 #define IW_BITS_PER_WORD 32
 #define IW_BITS_PER_BYTE 8
@@ -35,7 +18,7 @@ class const_IWSubstring;
 
 static const unsigned char one_bit_8[8] = {128, 64, 32, 16, 8, 4, 2, 1};
 
-#ifdef __i386__
+#if defined(__i386__) || defined(__x86_64)
 static const unsigned int one_bit_32[] = {
   0x00000080,
   0x00000040,
@@ -175,11 +158,11 @@ class IW_Bits_Base
     ~IW_Bits_Base ();
 
     int ok () const;
-    int debug_print (ostream &) const;
+    int debug_print (std::ostream &) const;
 
     int allocate_space_for_bits (int);
 
-    int construct_from_array_of_ints (const int *, int);
+    template <typename T> int construct_from_array_of_ints (const T *, int);
     int construct_from_array_of_bits (const unsigned char *, const int);
     int construct_from_array_of_chars (const unsigned char *, int, char = '1', char = '0');
     int construct_from_daylight_ascii_bit_rep (const char *, const int);
@@ -218,9 +201,9 @@ class IW_Bits_Base
 
     bool any_bits_set () const;   // doesn't count, just checks whole words for non zero values - fast
 
-    int  printon (ostream &, const char = '1', const char = '0', int = 0) const;
+    int  printon (std::ostream &, const char = '1', const char = '0', int = 0) const;
 
-    int  printon_fast (ostream & os, int include_space) const;    // uses '1' and '0' only
+    int  printon_fast (std::ostream & os, int include_space) const;    // uses '1' and '0' only
 
     int  append_string_form (IWString &, const char = '1', const char = '0', int = 0) const;
     int  append_string_form_fast (IWString & buffer, int include_space) const;
@@ -230,8 +213,8 @@ class IW_Bits_Base
     int daylight_ascii_representation (IWString &) const;
     int daylight_ascii_representation_including_nset_info (IWString &) const;
 
-    int write_daylight_ascii_representation (ostream & output, const IWString & tag) const;
-    int write_daylight_ascii_representation (ostream & output) const;
+    int write_daylight_ascii_representation (std::ostream & output, const IWString & tag) const;
+    int write_daylight_ascii_representation (std::ostream & output) const;
 
     int  set_vector (int *) const;
     int  set_vector (int *, int) const;
@@ -295,7 +278,7 @@ typedef float similarity_type_t;
 //extern similarity_type_t tanimoto         (IW_Bits_Base *, IW_Bits_Base *);
 extern similarity_type_t fraction_matched (IW_Bits_Base *, IW_Bits_Base *);
 
-extern int print_bits (ostream & os, const void * bits, int nbits,
+extern int print_bits (std::ostream & os, const void * bits, int nbits,
                        const char t = '1', const char f = '0', int = 0);
 
 #ifdef _WIN32
@@ -309,7 +292,7 @@ extern int write_fixed_size_counted_fingerprint (const int * c,
                                       int n,
                                       int nset,
                                       int bits_in_original_fingerprint,
-                                      ostream & output);
+                                      std::ostream & output);
 extern int append_fixed_size_counted_fingerprint (const int * c,
                                       int n,
                                       int nset,

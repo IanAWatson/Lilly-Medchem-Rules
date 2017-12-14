@@ -1,29 +1,7 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
+#include <memory>
 
 #include "misc.h"
-#include "iw_auto_array.h"
-
-#ifdef USE_IWMALLOC
-#include "iwmalloc.h"
-#endif
 
 #define COMPILING_MDL_CC
 
@@ -38,7 +16,7 @@
 #include "mdl_atom_record.h"
 #include "molecule_to_query.h"
 
-static int convert_a_and_q_atoms_to_atom_lists = 0;
+static int convert_a_and_q_atoms_to_atom_lists = 1;
 
 void
 set_convert_a_and_q_atoms_to_atom_lists (int s)
@@ -52,6 +30,14 @@ void
 set_convert_not_atom_lists_to_organic_lists (int s)
 {
   convert_not_atom_lists_to_organic_lists = s;
+}
+
+static int mdl_molecule_discard_chirality = 0;
+
+void
+set_mdl_molecule_discard_chirality(const int s)
+{
+  mdl_molecule_discard_chirality = s;
 }
 
 MDL_Molecule::MDL_Molecule()
@@ -76,15 +62,15 @@ MDL_Molecule::_parse_atom_alias(iwstring_data_source & input,
 {
   assert (buffer.starts_with("A  "));
 
-  const_IWSubstring tmp (buffer);
+  const_IWSubstring tmp(buffer);
 
-  tmp.remove_leading_chars (3);
+  tmp.remove_leading_chars(3);
 
   tmp.strip_leading_blanks();
 
   atom_number_t zatom;
 
-  if (! tmp.numeric_value (zatom) || zatom < 1)
+  if (! tmp.numeric_value(zatom) || zatom < 1)
   {
     cerr << "MDL_Molecule::_parse_atom_alias: invalid atom number specification '" << buffer << "'\n";
     return 0;
@@ -98,7 +84,7 @@ MDL_Molecule::_parse_atom_alias(iwstring_data_source & input,
     return 0;
   }
 
-  _mdl_atom[zatom]->set_alias (tmp);
+  _mdl_atom[zatom]->set_alias(tmp);
 
   return 1;
 }
@@ -109,9 +95,9 @@ MDL_Molecule::_parse_M_record (iwstring_data_source & input,
                                ::resizable_array_p<ISIS_Link_Atom> & ltmp,
                                int & fatal)
 {
-  if (buffer.starts_with ("A  "))
+  if (buffer.starts_with("A  "))
   {
-    if (! _parse_atom_alias (input, buffer))
+    if (! _parse_atom_alias(input, buffer))
     {
       fatal = 1;
       return 0;
@@ -120,9 +106,9 @@ MDL_Molecule::_parse_M_record (iwstring_data_source & input,
     return 1;
   }
 
-  if (buffer.starts_with ("M  ALS"))
+  if (buffer.starts_with("M  ALS"))
   {
-    if (! _parse_atom_list (buffer))
+    if (! _parse_atom_list(buffer))
     {
       fatal = 1;
       return 0;
@@ -131,9 +117,9 @@ MDL_Molecule::_parse_M_record (iwstring_data_source & input,
     return 1;
   }
 
-  if (buffer.starts_with ("M  LIN"))
+  if (buffer.starts_with("M  LIN"))
   {
-    if (! _parse_link_record (buffer, ltmp))
+    if (! _parse_link_record(buffer, ltmp))
     {
       fatal = 1;
       return 0;
@@ -142,17 +128,17 @@ MDL_Molecule::_parse_M_record (iwstring_data_source & input,
     return 1;;
   }
 
-  if (buffer.starts_with ("M  CHG"))
+  if (buffer.starts_with("M  CHG"))
   {
     Aprop atom_properties[MAX_PAIRS];
 
     int tokens;
-    if (! fill_atom_property_array (buffer, tokens, atom_properties))
+    if (! fill_atom_property_array(buffer, tokens, atom_properties))
       return 0;
 
     if (0 == tokens)
       ;
-    else if (! mdl_add_m_formal_charge (tokens, atom_properties))
+    else if (! mdl_add_m_formal_charge(tokens, atom_properties))
     {
       fatal = 1;
       return 0;
@@ -161,18 +147,18 @@ MDL_Molecule::_parse_M_record (iwstring_data_source & input,
     return 1;
   }
   
-  if (buffer.starts_with ("M  ISO"))
+  if (buffer.starts_with("M  ISO"))
   {
     Aprop atom_properties[MAX_PAIRS];
 
     int tokens;
 
-    if (! fill_atom_property_array (buffer, tokens, atom_properties))
+    if (! fill_atom_property_array(buffer, tokens, atom_properties))
       return 0;
 
     if (0 == tokens)
       ;
-    else if (! mdl_add_m_isotope (tokens, atom_properties))
+    else if (! mdl_add_m_isotope(tokens, atom_properties))
     {
       fatal = 1;
       return 0;
@@ -181,15 +167,15 @@ MDL_Molecule::_parse_M_record (iwstring_data_source & input,
     return 1;
   }
 
-  if (buffer.starts_with ("M  UNS"))
+  if (buffer.starts_with("M  UNS"))
   {
     Aprop atom_properties[MAX_PAIRS];
 
     int tokens;
-    if (! fill_atom_property_array (buffer, tokens, atom_properties))
+    if (! fill_atom_property_array(buffer, tokens, atom_properties))
       return 0;
 
-    if (! _set_unsaturation_specifications (atom_properties, tokens))
+    if (! _set_unsaturation_specifications(atom_properties, tokens))
     {
       fatal = 1;
       return 0;
@@ -197,15 +183,15 @@ MDL_Molecule::_parse_M_record (iwstring_data_source & input,
     return 1;
   }
 
-  if (buffer.starts_with ("M  SUB"))
+  if (buffer.starts_with("M  SUB"))
   {
     Aprop atom_properties[MAX_PAIRS];
 
     int tokens;
-    if (! fill_atom_property_array (buffer, tokens, atom_properties))
+    if (! fill_atom_property_array(buffer, tokens, atom_properties))
       return 0;
 
-    if (! _set_substitution_specifications (atom_properties, tokens))
+    if (! _set_substitution_specifications(atom_properties, tokens))
     {
       fatal = 1;
       return 0;
@@ -214,15 +200,15 @@ MDL_Molecule::_parse_M_record (iwstring_data_source & input,
     return 1;
   }
 
-  if (buffer.starts_with ("M  RBC"))
+  if (buffer.starts_with("M  RBC"))
   {
     Aprop atom_properties[MAX_PAIRS];
 
     int tokens;
-    if (! fill_atom_property_array (buffer, tokens, atom_properties))
+    if (! fill_atom_property_array(buffer, tokens, atom_properties))
       return 0;
 
-    if (! _set_ring_bond_specifications (atom_properties, tokens))
+    if (! _set_ring_bond_specifications(atom_properties, tokens))
     {
       fatal = 1;
       return 0;
@@ -237,7 +223,7 @@ MDL_Molecule::_parse_M_record (iwstring_data_source & input,
 }
 
 int
-MDL_Molecule::_parse_atom_list (const IWString & buffer)
+MDL_Molecule::_parse_atom_list(const IWString & buffer)
 {
   assert (buffer.starts_with("M  ALS"));
   
@@ -270,13 +256,13 @@ int
 MDL_Molecule::_parse_link_record (const IWString & buffer,
                                   ::resizable_array_p<ISIS_Link_Atom> & ltmp)
 {
-  assert (buffer.starts_with ("M  LIN"));
+  assert (buffer.starts_with("M  LIN"));
 
   Link_Atom * l = new Link_Atom;
 
   atom_number_t a;
 
-  if (! l->initialise_from_mdl_record (buffer, Molecule::natoms(), a))
+  if (! l->initialise_from_mdl_record(buffer, Molecule::natoms(), a))
   {
     cerr << "MDL_Molecule::_parse_link_record:invalid link record '" << buffer << "'\n";
     delete l;
@@ -291,8 +277,8 @@ MDL_Molecule::_parse_link_record (const IWString & buffer,
 
 // The bond types either side of the link atom must be the same
 
-  const MDL_Bond_Data * b1 = mdl_bond_between_atoms (a, l->a1());
-  const MDL_Bond_Data * b2 = mdl_bond_between_atoms (a, l->a2());
+  const MDL_Bond_Data * b1 = mdl_bond_between_atoms(a, l->a1());
+  const MDL_Bond_Data * b2 = mdl_bond_between_atoms(a, l->a2());
 
   if (b1->btype() != b2->btype())
   {
@@ -324,7 +310,7 @@ MDL_Molecule::_parse_link_record (const IWString & buffer,
     return 0;
   }
 
-  l->set_mdl_atom_data (_mdl_atom[a]);
+  l->set_mdl_atom_data(_mdl_atom[a]);
 
   remove_atom(a);    // the explicit link atom is no longer needed
 
@@ -370,15 +356,24 @@ MDL_Molecule::remove_atom(atom_number_t zatom)
 
   _mdl_atom.remove_item(zatom);
 
+#ifdef DEBUG_MDL_MOLECULE_REMOVE_ATOM
+  cerr << "MDL_Molecule::remove_atom: removing atom " << zatom << " " << smarts_equivalent_for_atom(zatom) << endl;
+#endif
+
   Molecule::remove_atom(zatom);
 
-//cerr << "After removing atom " << zatom << " '" << smiles() << "'\n";
+  Molecule::invalidate_fragment_membership();
+
+#ifdef DEBUG_MDL_MOLECULE_REMOVE_ATOM
+  cerr << "After removing atom " << zatom << " " << smiles() << " natoms = " << natoms() << endl;
+  cerr << this << endl;
+#endif
 
   return 1;
 }
 
 int
-MDL_Molecule::remove_atoms (const int * to_remove)
+MDL_Molecule::remove_atoms(const int * to_remove)
 {
   int rc = 0;
 
@@ -410,10 +405,23 @@ MDL_Molecule::read_molecule_ds(iwstring_data_source & input,
   else if (MDL == input_type)
     ;
   else
-    return Molecule::read_molecule_ds(input, input_type);
+  {
+    if (! Molecule::read_molecule_ds(input, input_type))
+      return 0;
+
+    return 1;
+  }
 
   return MDL_Molecule::read_molecule_mdl_ds(input);
 }
+
+/*
+  Sept 2014. Beware, automatically creating the A element means that if
+  there is a smarts like [AH] as an atom alias, it will break, because
+  the Aliphatic atom smarts token will get interpreted as element A.
+  We should think of a different way of handling these elements when
+  encountered...
+*/
 
 static const Element * element_a = NULL;
 static const Element * element_q = NULL;
@@ -427,15 +435,15 @@ do_create_special_elements_for_mdl_stuff()
   if (0 == isave)
     set_auto_create_new_elements(1);
 
-  element_a = get_element_from_symbol_no_case_conversion ("A");
+  element_a = get_element_from_symbol_no_case_conversion("A");
   if (NULL == element_a)
     element_a = create_element_with_symbol("A");
 
-  element_q = get_element_from_symbol_no_case_conversion ("Q");
+  element_q = get_element_from_symbol_no_case_conversion("Q");
   if (NULL == element_q)
     element_q = create_element_with_symbol("Q");
 
-  element_l = get_element_from_symbol_no_case_conversion ("L");
+  element_l = get_element_from_symbol_no_case_conversion("L");
   if (NULL == element_l)
     element_l = create_element_with_symbol("L");
 
@@ -454,12 +462,6 @@ int
 MDL_Molecule::read_molecule_mdl_ds (iwstring_data_source & input,
                                     int return_on_m_end)
 {
-#ifdef USE_IWMALLOC
-  cerr << "MDL_Molecule at " << this << endl;
-
-  iwmalloc_check_all_malloced (stderr);
-#endif
-
   if (NULL == element_a)
     do_create_special_elements_for_mdl_stuff();
 
@@ -499,7 +501,7 @@ MDL_Molecule::read_molecule_mdl_ds (iwstring_data_source & input,
 
   int na, nb;
 
-  if (2 != int3d (buffer, na, nb))
+  if (2 != int3d(buffer, na, nb))
   {
     cerr << "MDL_Molecule::read_molecule_ds: error from int3d '" << buffer << "'\n";
     cerr << "Line " << input.lines_read() << endl;
@@ -507,12 +509,14 @@ MDL_Molecule::read_molecule_mdl_ds (iwstring_data_source & input,
   }
 
   if (0 == na && 0 == nb && buffer.contains("V3000"))
-    return _read_v3000 (input);
+    return _read_v3000(input);
 
   assert (na >= 0 && (nb >= 0));
 
   if (! allocate_arrays(na, nb))
     return 0;
+
+  MDL_File_Supporting_Material * mdlfos = global_default_MDL_File_Supporting_Material();
 
   MDL_Atom_Record mdlar;
 
@@ -541,13 +545,19 @@ MDL_Molecule::read_molecule_mdl_ds (iwstring_data_source & input,
       return 0;
     }
 
+    a->set_atom_map(mdlar.atom_map());
+
     Molecule::add(a);
 
     _mdl_atom[i]->extract_info_from_mdl_file_record(mdlar);
 
+//  cerr << " atom " << i << " chirality " << mdlar.astere() << endl;
+
     if (0 == mdlar.astere())     // the most common case, no chirality
       ;
-    else if (! _mdl_atom_is_chiral_centre (Molecule::natoms() - 1, mdlar.astere()))
+    else if (mdl_molecule_discard_chirality)
+      ;
+    else if (! _mdl_atom_is_chiral_centre(Molecule::natoms() - 1, mdlar.astere(), *mdlfos))
     {
       cerr << "MDL_Molecule::read_molecule_ds:invalid chirality on line " << input.lines_read() << endl;
       cerr << buffer << endl;
@@ -567,7 +577,7 @@ MDL_Molecule::read_molecule_mdl_ds (iwstring_data_source & input,
       return 0;
     }
 
-    if (! mdlbr.build(buffer, na))
+    if (! mdlbr.build(buffer, na, *mdlfos))
     {
       cerr << "MDL_Molecule::read_molecule_ds:invalid bond record, line " << input.lines_read() << endl;
       cerr << buffer << endl;
@@ -586,9 +596,9 @@ MDL_Molecule::read_molecule_mdl_ds (iwstring_data_source & input,
 
     Molecule::add_bond(mdlbr.a1(), mdlbr.a2(), bt_for_molecule, 1);
 
-    if (mdlbr.directionality())
+    if (mdlbr.bond_stereo())
     {
-      _mdl_set_bond_directionality(mdlbr.a1(), mdlbr.a2(), mdlbr.directionality());
+      _mdl_set_bond_directionality(mdlbr.a1(), mdlbr.a2(), mdlbr.bond_stereo());
       wedge_bonds_present++;
     }
   }
@@ -598,12 +608,14 @@ MDL_Molecule::read_molecule_mdl_ds (iwstring_data_source & input,
 
   if (ignore_all_chiral_information_on_input())
     Molecule::remove_all_chiral_centres();
+  else if (mdl_molecule_discard_chirality)
+    ;
   else if (wedge_bonds_present)
     discern_chirality_from_wedge_bonds();
 
   if (0 == chiral_centres())    // none to worry about
     ;
-  else if (_complete_chiral_centres_from_mdl_files())    // good
+  else if (_complete_chiral_centres_from_mdl_files(*mdlfos))    // good
     ;
   else               // OOPS, bad chirality info
   {
@@ -675,6 +687,11 @@ MDL_Molecule::read_molecule_mdl_ds (iwstring_data_source & input,
       const IWString & s = atomic_symbol(i);
 
       mdla->convert_a_or_q_atoms_to_atom_list(s);
+
+      const IWString & a = mdla->alias();
+
+      if (a.length())
+        mdla->convert_a_or_q_atoms_to_atom_list(a);
     }
   }
 
@@ -702,7 +719,7 @@ MDL_Molecule::read_molecule_mdl_ds (iwstring_data_source & input,
 const ISIS_Atom_List *
 MDL_Molecule::atom_list_for_atom (atom_number_t a) const
 {
-  assert (ok_atom_number (a));
+  assert (ok_atom_number(a));
 
   const ISIS_Atom_List & rc = _mdl_atom[a]->atom_list();
 
@@ -775,11 +792,119 @@ MDL_Molecule::_set_ring_bond_specifications (const Aprop * atom_properties,
   return 1;
 }
 
+/*int
+MDL_Molecule::initialise_mqs (Molecule_to_Query_Specifications & mqs) const
+{
+  if (NULL == _hcount)    // we've never been initialised
+    return 1;
 
+  int matoms = natoms();
 
+  mqs.set_hcount(_hcount, matoms);
+  mqs.set_h0designator(_h0designator, matoms);
+  mqs.set_unsaturation(_unsaturated, matoms);
+  mqs.set_substitution(_substitution, matoms);
+  mqs.set_ring_bonds(_ring_bond, matoms);
 
+  if (_atom_alias.number_elements())
+    mqs.set_atom_alias(_atom_alias);
 
+  if (_link_atom.number_elements())
+    mqs.set_link_atoms(_link_atom);
 
+  if (NULL != _bond_topology)
+    mqs.set_bond_topology (_bond_topology, nedges());
+
+  return 1;
+}*/
+
+/*
+  Removing atoms is very complex because we need to keep track of all the info in the arrays
+*/
+
+/*int
+MDL_Molecule::remove_atoms (const int * to_remove)
+{
+  int matoms = natoms();
+
+  int ne = nedges();
+
+  int * bond_being_lost = new_int(ne); std::unique_ptr<int[]> free_bond_being_lost(bond_being_lost);
+
+  for (int i = 0; i < ne; i++)
+  {
+    const Bond * b = bondi(i);
+
+    if (to_remove[b->a1()] || to_remove[b->a2()])
+      bond_being_lost[i] = 1;
+  }
+
+  int * atom_cross_reference = new_int(matoms); std::unique_ptr<int[]> free_atom_cross_reference(atom_cross_reference);
+
+  Molecule::remove_atoms(to_remove);
+
+  int ato = 0;
+  for (int i = 0; i < matoms; i++)
+  {
+    if (to_remove[i])
+    {
+      atom_cross_reference[i] = INVALID_ATOM_NUMBER;
+      continue;
+    }
+
+    if (ato != i)
+    {
+      _hcount[ato] = _hcount[i];
+      _h0designator[ato] = _hcount[i];
+      _unsaturated[ato] = _unsaturated[i];
+      _substitution[ato] = _substitution[i];
+      _ring_bond[ato] = _ring_bond[i];
+    }
+    atom_cross_reference[i] = ato;
+    ato++;
+  }
+
+  int bto = 0;
+  for (int i = 0; i < ne; i++)
+  {
+    if (bond_being_lost[i])
+      continue;
+
+    if (bto != i)
+    {
+      _bond_type_read_in[bto] = _bond_type_read_in[i];
+      _bond_topology[bto] = _bond_topology[i];
+    }
+    
+    bto++;
+  }
+
+  for (int i = _atom_alias.number_elements() - 1; i >= 0; i--)
+  {
+    int a = _atom_alias[i]->atom_number();
+
+    if (to_remove[a])
+    {
+      _atom_alias.remove_item(i);
+      continue;
+    }
+  }
+
+  for (int i = _atom_list.number_elements() - 1; i >=0; i--)
+  {
+    atom_number_t a = _atom_list[i]->atom_number();
+
+    if (to_remove[a])
+      _atom_list.remove_item(i);
+  }
+
+  for (int i = 0; i < _link_atom.number_elements(); i++)
+  {
+    _link_atom[i]->adjust_atom_numbers(atom_cross_reference);
+  }
+
+  return 1;
+}*/
 
 /*
   When we remove explicit hydrogens, we can increment the min_hcount value
@@ -869,8 +994,8 @@ MDL_Molecule::MDL_Molecule(const Molecule & m) : Molecule(m)
   return;
 }
 
-MDL_Molecule::MDL_Molecule (const MDL_Molecule & m) : Molecule (m),
-                                                MDL_File_Data (m)
+MDL_Molecule::MDL_Molecule (const MDL_Molecule & m) : Molecule(m),
+                                                MDL_File_Data(m)
 {
   return;
 }
@@ -881,19 +1006,23 @@ MDL_Molecule::MDL_Molecule (const MDL_Molecule & m) : Molecule (m),
 */
 
 int
-MDL_Molecule::change_R_groups_to_substitutions (Element_Matcher & rgroup)
+MDL_Molecule::change_R_groups_to_substitutions (Element_Matcher & rgroup,
+                                                int enable_hydrogen_substituent)
 {
   int matoms = natoms();
+
+  for (int i = 0; i < matoms; i++)
+  {
+    _mdl_atom[i]->set_substitution(ncon(i));
+  }
 
   int rc = 0;
 
   for (int i = 0; i < matoms; i++)
   {
-    const Atom * ai = atomi (i);
+    const Atom * ai = atomi(i);
 
     const Element * e = ai->element();
-
-    _mdl_atom[i]->set_substitution(ai->ncon());
 
     if (! rgroup.matches(e))
       continue;
@@ -903,10 +1032,18 @@ MDL_Molecule::change_R_groups_to_substitutions (Element_Matcher & rgroup)
 
     atom_number_t j = ai->other(i, 0);
 
-//  cerr << "Processing R group, bonded to atom " << j << endl;
+//  cerr << "Processing R group, bonded to atom " << j << ", has " << ncon(j) << " connections\n";
 
-    _mdl_atom[j]->set_min_ncon(ncon(j));
-    _mdl_atom[j]->set_substitution(0);
+    if (enable_hydrogen_substituent)
+    {
+      _mdl_atom[j]->set_min_ncon(ncon(j) - 1);
+      _mdl_atom[j]->set_substitution(0);
+    }
+    else
+    {
+      _mdl_atom[j]->set_min_ncon(ncon(j));
+      _mdl_atom[j]->set_substitution(0);
+    }
 
     _substitution_points.add(j);
 
@@ -919,7 +1056,56 @@ MDL_Molecule::change_R_groups_to_substitutions (Element_Matcher & rgroup)
   }
 
   if (0 == rc)
-    cerr << "None of the rgroup element matches matched '" << name() << "'\n";
+    cerr << "MDL_Molecule::change_R_groups_to_substitutions:none of the rgroup element matches matched '" << name() << "'\n";
+
+  return rc;
+}
+
+int
+MDL_Molecule::change_R_groups_to_match_any_atom (Element_Matcher & rgroup,
+                                                 int only_substituents_at_matched_atoms)
+{
+  const auto a = get_element_from_symbol_no_case_conversion("A");     // match any atom
+
+  const int matoms = natoms();
+
+  int rc = 0;
+
+  for (int i = 0; i < matoms; i++)
+  {
+    const Atom * ai = atomi(i);
+
+    const Element * e = ai->element();
+
+    if (! rgroup.matches(e))
+      continue;
+
+    Molecule::set_element(i, a);
+
+    _mdl_atom[i]->set_min_ncon(ncon(i));
+    _mdl_atom[i]->set_substitution(0);
+    if (only_substituents_at_matched_atoms)
+      _substitution_points.add(i);
+
+    if (0 == ai->ncon())    // very hard to imagine
+      continue;
+
+//  If we are searching a target with explicit Hydrogen atoms, we need to adjust hcount for our attached atom.
+//  If not searching a target with explicit H atoms, this just makes the query a little less specific
+
+    const atom_number_t c = ai->other(i, 0);
+
+    const int h = _mdl_atom[c]->hcount();
+
+    if (h > 0)
+      _mdl_atom[c]->set_min_hcount(h-1);    // remember the +1 business
+    _mdl_atom[c]->set_hcount(0);
+
+    rc++;
+  }
+
+  if (0 == rc)
+    cerr << "MDL_Molecule::change_R_groups_to_match_any_atom:none of the rgroup element matches matched '" << name() << "'\n";
 
   return rc;
 }
@@ -954,7 +1140,7 @@ MDL_Molecule::only_allow_substitutions_at_isotopic_atoms(const Molecule_to_Query
     else if (16 == atomic_number(i))   // can have any valence it wants
       ;
     else
-      cerr << "MDL_Molecule::only_allow_substitutions_at_isotopic_atoms:no open valence in '" << name() << "'\n";
+      cerr << "MDL_Molecule::only_allow_substitutions_at_isotopic_atoms:no open valence in '" << name() << "', atom " << smarts_equivalent_for_atom(i) << endl;
 
     if (must_have_substituent_at_every_isotopic_atom())
     {
@@ -976,7 +1162,7 @@ MDL_Molecule::only_allow_substitutions_at_isotopic_atoms(const Molecule_to_Query
     }
 
     if (mqs.environment_near_substitution_points_specified())  // do I need this test, or should it always be done
-      _substitution_points.add (i);
+      _substitution_points.add(i);
 
     set_isotope(i, 0);
 
@@ -1048,7 +1234,7 @@ int
 MDL_Molecule::determine_attachment_points_by_query(Molecule_to_Query_Specifications & mqs)
 {
   Substructure_Results sresults;
-  int nhits = mqs.substitutions_only_at().substructure_search (*this, sresults);
+  int nhits = mqs.substitutions_only_at().substructure_search(*this, sresults);
 
 //cerr << "MDL_Molecule::determine_attachment_points_by_query:nhits = " << nhits << endl;
 
@@ -1067,7 +1253,7 @@ MDL_Molecule::determine_attachment_points_by_query(Molecule_to_Query_Specificati
 
   for (int i = 0; i < nhits; i++)
   {
-    const Set_of_Atoms * e = sresults.embedding (i);
+    const Set_of_Atoms * e = sresults.embedding(i);
     
     for (int j = 0; j < e->number_elements(); j++)
     {
@@ -1082,7 +1268,7 @@ MDL_Molecule::determine_attachment_points_by_query(Molecule_to_Query_Specificati
 //  should we also set the unsaturation flag?????
 
     if (mqs.environment_near_substitution_points_specified())
-      _substitution_points.add_non_duplicated_elements (*e);
+      _substitution_points.add_non_duplicated_elements(*e);
   }
 
   return 1;
@@ -1153,7 +1339,7 @@ MDL_Molecule::add_bond (atom_number_t a1, atom_number_t a2,
                         bond_type_t query_bond,
                         int bond_topology)
 {
-  if (! Molecule::add_bond (a1, a2, bond_for_molecule))
+  if (! Molecule::add_bond(a1, a2, bond_for_molecule))
     return 0;
 
   if (! arrays_allocated())
@@ -1252,7 +1438,7 @@ MDL_Molecule::_read_v3000 (iwstring_data_source & input)
     return 0;
   }
 
-  _fill_empty_molecule_with_null_atoms (na);
+  _fill_empty_molecule_with_null_atoms(na);
 
   if (! allocate_arrays(na, nb))
     return 0;
@@ -1278,10 +1464,12 @@ MDL_Molecule::_read_v3000 (iwstring_data_source & input)
 }
 
 int
-MDL_Molecule::_read_v3000 (iwstring_data_source & input,
-                           int na, 
-                           int nb)
+MDL_Molecule::_read_v3000(iwstring_data_source & input,
+                          int na, 
+                          int nb)
 {
+  MDL_File_Supporting_Material * mdlfos = global_default_MDL_File_Supporting_Material();
+
   IWString buffer;
 
   for (int i = 0; i < na; i++)
@@ -1292,7 +1480,7 @@ MDL_Molecule::_read_v3000 (iwstring_data_source & input,
       return 0;
     }
 
-    if (! _parse_v30_atom_record (buffer, 0))
+    if (! _parse_v30_atom_record(buffer, 0, *mdlfos))
     {
       cerr << "MDL_Molecule::_read_v3000:invalid atom record '" << buffer << "'\n";
       return 0;
@@ -1345,8 +1533,8 @@ MDL_Molecule::_read_v3000 (iwstring_data_source & input,
     return 0;
   }
 
-  int * aromatic_atom = new_int(na); iw_auto_array<int> free_aromatic_atom(aromatic_atom);
-  int * aromatic_bond = new_int(na); iw_auto_array<int> free_aromatic_bond(aromatic_bond);
+  int * aromatic_atom = new_int(na); std::unique_ptr<int[]> free_aromatic_atom(aromatic_atom);
+  int * aromatic_bond = new_int(na); std::unique_ptr<int[]> free_aromatic_bond(aromatic_bond);
 
   for (int i = 0; i < nb; i++)
   {
@@ -1356,7 +1544,7 @@ MDL_Molecule::_read_v3000 (iwstring_data_source & input,
       return 0;
     }
 
-    if (! _parse_v30_bond_record (buffer, aromatic_atom, aromatic_bond[i], 1))  // last arg means reading query file
+    if (! _parse_v30_bond_record(buffer, aromatic_atom, aromatic_bond[i], 1))  // last arg means reading query file
     {
       cerr << "MDL_Molecule::_read_v3000:cannot parse bond record\n";
       cerr << buffer << endl;
@@ -1365,7 +1553,7 @@ MDL_Molecule::_read_v3000 (iwstring_data_source & input,
 
     _mdl_bond[i]->set_btype(bondi(i)->btype());
 
-    if (! _look_for_bond_query_directives (i, buffer))
+    if (! _look_for_bond_query_directives(i, buffer))
     {
       cerr << "MDL_Molecule::_read_v3000:invalid bond directives\n";
       cerr << buffer << endl;
@@ -1391,7 +1579,7 @@ MDL_Molecule::_read_v3000 (iwstring_data_source & input,
     return 0;
   }
 
-  while (! buffer.starts_with ("M  V30 END CTAB"))
+  while (! buffer.starts_with("M  V30 END CTAB"))
   {
     if (! input.next_record(buffer))
     {
@@ -1427,8 +1615,7 @@ MDL_Molecule::_convert_symbol_to_element (int ndx,
 {
   if (s.length() <= 2)
   {
-    int notused;
-    const Element * e = get_element_from_symbol(s, notused);
+    const Element * e = get_element_from_symbol_no_case_conversion(s);
     if (NULL == e)
     {
       cerr << "MDL_Molecule::_convert_symbol_to_element:cannot get element for '" << s << "'\n";
@@ -1560,11 +1747,27 @@ MDL_Molecule::compute_aromaticity_handle_atom_lists ()
 }
 
 void
+MDL_Molecule::set_substitution (const atom_number_t a, const int s)
+{
+  _mdl_atom[a]->set_substitution(s);
+
+  return;
+}
+
+void
+MDL_Molecule::set_ring_bond (const atom_number_t a, const int s)
+{
+  _mdl_atom[a]->set_ring_bond(s);
+
+  return;
+}
+
+void
 reset_mdl_molecule_file_scope_variables()
 {
-  convert_a_and_q_atoms_to_atom_lists=0;
-  convert_not_atom_lists_to_organic_lists=0;
-  element_a = NULL;
-  element_q = NULL;
-  element_l = NULL;
+	convert_a_and_q_atoms_to_atom_lists=0;
+	convert_not_atom_lists_to_organic_lists=0;
+	 element_a = NULL;
+	element_q = NULL;
+	element_l = NULL;
 }

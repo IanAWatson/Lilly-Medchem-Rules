@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
 
 #include "assert.h"
@@ -26,7 +8,7 @@
 #include "rmele.h"
 
 void
-Element_to_Remove::_default_values ()
+Element_to_Remove::_default_values()
 {
   _molecules_examined = 0;
   _molecules_changed = 0;
@@ -39,30 +21,30 @@ Element_to_Remove::_default_values ()
 }
 
 Element_to_Remove::Element_to_Remove (const Element * e) : 
-             Element_Matcher (e)
+             Element_Matcher(e)
 {
-  _default_values ();
+  _default_values();
 }
 
 Element_to_Remove::Element_to_Remove (atomic_number_t z) :
-             Element_Matcher (z)
+             Element_Matcher(z)
 {
-  _default_values ();
+  _default_values();
 }
 
 Element_to_Remove::Element_to_Remove (const char * s) : 
-             Element_Matcher (s)
+             Element_Matcher(s)
 {
-  _default_values ();
+  _default_values();
 }
 
 Element_to_Remove::Element_to_Remove (const IWString & s) : 
-             Element_Matcher (s)
+             Element_Matcher(s)
 {
-  _default_values ();
+  _default_values();
 }
 
-Element_to_Remove::~Element_to_Remove ()
+Element_to_Remove::~Element_to_Remove()
 {
   if (-14 == _molecules_examined)
     cerr << "Deleting already deleted Element_to_Remove\n";
@@ -73,12 +55,12 @@ Element_to_Remove::~Element_to_Remove ()
 }
 
 int
-Element_to_Remove::ok () const
+Element_to_Remove::ok() const
 {
   if (_molecules_examined < 0)
     return 0;
 
-  if (! Element_Matcher::ok ())
+  if (! Element_Matcher::ok())
     return 0;
 
   if (_molecules_changed < 0)
@@ -94,11 +76,11 @@ Element_to_Remove::ok () const
 }
 
 int
-Element_to_Remove::debug_print (ostream & os) const
+Element_to_Remove::debug_print (std::ostream & os) const
 {
-  assert (os.good ());
+  assert (os.good());
 
-  (void) Element_Matcher::debug_print (os);
+  (void) Element_Matcher::debug_print(os);
   os << _molecules_examined << " molecules examined, ";
   os << _molecules_changed << " molecules changed";
   if (_molecules_changed)
@@ -109,15 +91,15 @@ Element_to_Remove::debug_print (ostream & os) const
 }
 
 int
-Element_to_Remove::report (ostream & os) const
+Element_to_Remove::report (std::ostream & os) const
 {
-  return debug_print (os);
+  return debug_print(os);
 }
 
 int
-Element_to_Remove::reset_counters ()
+Element_to_Remove::reset_counters()
 {
-  _default_values ();
+  _default_values();
 
   return 1;
 }
@@ -125,7 +107,7 @@ Element_to_Remove::reset_counters ()
 int
 Element_to_Remove::_process (Molecule & m)
 {
-  int matoms = m.natoms ();
+  int matoms = m.natoms();
   int rc = 0;
   for (int i = 0; i < matoms; i++)
   {
@@ -136,7 +118,7 @@ Element_to_Remove::_process (Molecule & m)
     if (! Element_Matcher::matches(e, iso))
       continue;
 
-    int icon = m.ncon (i);
+    int icon = m.ncon(i);
     if (_maxcon_to_remove < 0 ||
         (_maxcon_to_remove >= 0 && icon <= _maxcon_to_remove))
     {
@@ -144,16 +126,16 @@ Element_to_Remove::_process (Molecule & m)
       a1 = a2 = INVALID_ATOM_NUMBER;
       if (2 == icon && _add_bond_after_two_connected_removals)
       {
-        a1 = m.other (i, 0);
-        a2 = m.other (i, 1);
+        a1 = m.other(i, 0);
+        a2 = m.other(i, 1);
         if (a1 > i)
           a1--;
         if (a2 > i)
           a2--;
       }
-      m.remove_atom (i);
+      m.remove_atom(i);
       if (INVALID_ATOM_NUMBER != a1)
-        m.add_bond (a1, a2, SINGLE_BOND);
+        m.add_bond(a1, a2, SINGLE_BOND);
 
       i--;
       matoms--;
@@ -186,13 +168,13 @@ Element_to_Remove::_process (Molecule & m,
 
     int iso = m.isotope(i);
 
-    const Element * e = m.elementi (i);
+    const Element * e = m.elementi(i);
 
-    if (! Element_Matcher::matches (e, iso))
+    if (! Element_Matcher::matches(e, iso))
       continue;
 
     cerr << "Element matcher matches atom " << i << endl;
-    int icon = m.ncon (i);
+    int icon = m.ncon(i);
     if (_maxcon_to_remove < 0 ||
         (_maxcon_to_remove >= 0 && icon <= _maxcon_to_remove))
     {
@@ -200,17 +182,17 @@ Element_to_Remove::_process (Molecule & m,
       a1 = a2 = INVALID_ATOM_NUMBER;
       if (2 == icon && _add_bond_after_two_connected_removals)
       {
-        a1 = m.other (i, 0);
-        a2 = m.other (i, 1);
+        a1 = m.other(i, 0);
+        a2 = m.other(i, 1);
         if (a1 > i)
           a1--;
         if (a2 > i)
           a2--;
       }
 
-      m.remove_atom (i);
+      m.remove_atom(i);
       if (INVALID_ATOM_NUMBER != a1)
-        m.add_bond (a1, a2, SINGLE_BOND);
+        m.add_bond(a1, a2, SINGLE_BOND);
 
       rc++;
 
@@ -227,7 +209,7 @@ Element_to_Remove::process (Molecule & m)
 {
   _molecules_examined++;
 
-  int nr = _process (m);
+  int nr = _process(m);
 
   if (0 == nr)
     return 0;
@@ -245,7 +227,7 @@ Element_to_Remove::process (Molecule & m,
 {
   _molecules_examined++;
 
-  int nr = _process (m, process_these, id);
+  int nr = _process(m, process_these, id);
 
   if (0 == nr)
     return 0;
@@ -271,11 +253,11 @@ Elements_to_Remove::construct_from_command_line (Command_Line & cl,
 {
   int i = 0;
   IWString ele;
-  while (cl.value (option, ele, i++))
+  while (cl.value(option, ele, i++))
   {
 /*  if ('*' == ele)
     {
-      set_remove_all_non_natural_elements (1);
+      set_remove_all_non_natural_elements(1);
       continue;
     }*/
 
@@ -286,9 +268,9 @@ Elements_to_Remove::construct_from_command_line (Command_Line & cl,
       exit(0);
     }
 
-    Element_to_Remove * tmp = new Element_to_Remove (ele);
+    Element_to_Remove * tmp = new Element_to_Remove(ele);
 
-    add (tmp);
+    add(tmp);
 
     if (verbose)
       cerr << "Elements_to_Remove:: will remove atoms of type '" << ele << "'\n";
@@ -308,33 +290,57 @@ Elements_to_Remove::process (Molecule & m)
 
   for (int i = 0; i < _number_elements; i++)
   {
-    rc += _things[i]->process (m);
+    rc += _things[i]->process(m);
   }
 
   if (_remove_all_non_natural_elements)
-    rc += m.remove_all_non_natural_elements ();
+    rc += m.remove_all_non_natural_elements();
 
   return rc;
 }
 
+/*
+  Sometimes the caller will want to process only certain atoms,
+  those for which PROCESS_THESE[I] == ID
 
+  Hmmm, this is more complex that it looks, because of
+  different bonding, and possible interactions between
+  atoms. Not implemented for now....
+*/
 
+/*int
+Elements_to_Remove::process (Molecule & m,
+                             const int * process_these,
+                             const int id)
+{
+  resizable_array<atom_number_t> remove_these;
 
+  int rc = 0;
+  for (int i = 0; i < _number_elements; i++)
+  {
+    rc += _things[i]->process(m, process_these, id, remove_these);
+  }
+
+  if (_remove_all_non_natural_elements)
+    rc += m.remove_all_non_natural_elements();
+
+  return rc;
+}*/
 
 int
-Elements_to_Remove::report (ostream & os) const
+Elements_to_Remove::report (std::ostream & os) const
 {
   for (int i = 0; i < _number_elements; i++)
-    _things[i]->report (os);
+    _things[i]->report(os);
 
   return 1;
 }
 
 int
-Elements_to_Remove::reset_counters ()
+Elements_to_Remove::reset_counters()
 {
   for (int i = 0; i < _number_elements; i++)
-    _things[i]->reset_counters ();
+    _things[i]->reset_counters();
 
   return 1;
 }

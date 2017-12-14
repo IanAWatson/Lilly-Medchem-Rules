@@ -1,26 +1,9 @@
-/**************************************************************************
-
-    Copyright (C) 2012  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
-#include <stdlib.h>
-//#include <assert.h>
+#include <iostream>
 #include <fstream>
 #include <memory>
-using namespace std;
+#include <limits>
+using std::cerr;
+using std::endl;
 
 //#define USE_IWMALLOC
 #ifdef USE_IWMALLOC
@@ -34,7 +17,6 @@ using namespace std;
 
 #include "msi_object.h"
 #include "misc.h"
-#include "iw_auto_array.h"
 
 #include "molecule_to_query.h"
 #include "istream_and_type.h"
@@ -96,6 +78,7 @@ using namespace std;
 #define NAME_OF_ISOLATED_RING_ATTRIBUTE "isolated_ring"
 
 #define NAME_OF_INITIAL_ATOM_NUMBER_ATTRIBUTE "initial_atom_number"
+#define NAME_OF_ATOM_MAP_NUMBER_ATTRIBUTE "atom_map_number"
 #define NAME_OF_FUSED_SYSTEM_SIZE_ATTRIBUTE "fused_system_size"
 #define NAME_OF_RING_ID_SPECIFIER "ring_id"
 #define NAME_OF_FRAGMENT_ID_SPECIFIER "fragment_id"
@@ -110,6 +93,8 @@ using namespace std;
 #define NAME_OF_ENVIRONMENT_REJECTION "environment_rejection"
 #define NAME_OF_ENVIRONMENT_HITS_NEEDED_ATTRIBUTE "environment_hits_needed"
 #define NAME_OF_ENVIRONMENT_OPTIONAL_REJECTION "optional_rejection"
+#define NAME_OF_MAX_ENVIRONMENT_MATCHES_PER_ATTACHMENT_POINT "max_env_matches_per_anchor"
+#define NAME_OF_ENVIRONMENTS_CAN_SHARE_ATTACHMENT_POINTS "env_matches_share_attachment_points"
 #define NAME_OF_QUERY_HITS_NEEDED_ATTRIBUTE "hits_needed"
 #define NAME_OF_FUSED_RING_SYSTEM_SIZE "fused_ring_system_size"
 #define NAME_OF_ONE_EMBEDDING_PER_START_ATOM "one_embedding_per_start_atom"
@@ -150,8 +135,15 @@ using namespace std;
 #define NAME_OF_ATOMS_IN_SPINACH_ATTRIBUTE "atoms_in_spinach_group"
 #define NAME_OF_LENGTH_OF_SPINACH_ATTRIBUTE "length_of_spinach_group"
 #define NAME_OF_DISTANCE_TO_ANOTHER_RING_ATTRIBUTE "distance_to_another_ring"
+#define NAME_OF_NET_FORMAL_CHARGE_ATTRIBUTE "net_formal_charge"
+
+#define NAME_OF_ALL_RINGS_KEKULE "all_rings_kekule"
+
+#define NAME_OF_SYMMETRY_DEGREE_ATTRIBUTE "symmetry_degree"
+#define NAME_OF_SYMMETRY_GROUP_ATTRIBUTE "symmetry_group"
 
 #define NAME_OF_ENVIRONMENT_MUST_MATCH_UNMATCHED_ATOMS_ATTRIBUTE "environment_must_match_unmatched_atoms"
+#define NAME_OF_ENVIRONMENT_CAN_MATCH_IN_RING_ATOMS "environment_can_match_in_ring_atoms"
 
 #define NAME_OF_SPINACH_ATOMS_ATTRIBUTE "spinach_atoms"
 #define NAME_OF_INTER_RING_ATOMS_ATTRIBUTE "inter_ring_atoms"
@@ -184,6 +176,10 @@ using namespace std;
 #define NAME_OF_MIN_FRACTION_ATOMS_MATCHED "min_fraction_atoms_matched"
 #define NAME_OF_MAX_FRACTION_ATOMS_MATCHED "max_fraction_atoms_matched"
 
+#define NAME_OF_HYDROGEN_OK_AS_ENVIRONMENT_MATCH "hydrogen_ok"
+
+static int set_element_hits_needed_during_molecule_to_query = 1;
+
 /*
   In several places we need to quickly ascertain whether or not an msi_object
   specifies a rejection or not
@@ -192,13 +188,13 @@ using namespace std;
 static int
 is_rejection (const msi_object & msi)
 {
-  const msi_attribute * rj = msi.attribute (NAME_OF_REJECTION_ATTRIBUTE);
+  const msi_attribute * rj = msi.attribute(NAME_OF_REJECTION_ATTRIBUTE);
 
   if (NULL == rj)    // no rejection attribute present
    return 0;
 
   int rc;
-  if (! rj->value (rc))
+  if (! rj->value(rc))
   {
     cerr << "The " << NAME_OF_REJECTION_ATTRIBUTE << " attribute must have an int value\n";
     cerr << msi << endl;
@@ -216,10 +212,10 @@ fetch_aromaticity (const msi_object & msi, aromaticity_type_t & aromaticity)
 
   const msi_attribute * arom;
   int i = 0;
-  while (NULL != (arom = msi.attribute (NAME_OF_AROMATICITY_ATTRIBUTE, i++)))
+  while (NULL != (arom = msi.attribute(NAME_OF_AROMATICITY_ATTRIBUTE, i++)))
   {
     int tmp;
-    if (! arom->value (tmp))
+    if (! arom->value(tmp))
     {
       cerr << "fetch_aromaticity: bad value '" << arom->stringval() << "'\n";
       assert (NULL == "This is not good");
@@ -230,7 +226,7 @@ fetch_aromaticity (const msi_object & msi, aromaticity_type_t & aromaticity)
       if (SUBSTRUCTURE_NOT_SPECIFIED == aromaticity)
         aromaticity = NOT_AROMATIC;
       else
-        SET_ALIPHATIC_ATOM (aromaticity);
+        SET_ALIPHATIC_ATOM(aromaticity);
 
       rc++;
     }
@@ -239,7 +235,7 @@ fetch_aromaticity (const msi_object & msi, aromaticity_type_t & aromaticity)
       if (SUBSTRUCTURE_NOT_SPECIFIED == aromaticity)
         aromaticity = AROMATIC;
       else
-        SET_AROMATIC_ATOM (aromaticity);
+        SET_AROMATIC_ATOM(aromaticity);
 
       rc++;
     }
@@ -257,12 +253,13 @@ fetch_aromaticity (const msi_object & msi, aromaticity_type_t & aromaticity)
 static int
 fetch_elements (const msi_object & msi,
                 resizable_array<const Element *> & ele,
+                resizable_array<int> & element_unique_id,
                 int & attributes_specified)
 {
   int ii = 0;
 
   const msi_attribute * attribute;
-  while (NULL != (attribute = msi.attribute (NAME_OF_ATOMIC_NUMBER_ATTRIBUTE, ii++)))
+  while (NULL != (attribute = msi.attribute(NAME_OF_ATOMIC_NUMBER_ATTRIBUTE, ii++)))
   {
     int n = attribute->number_int_values();
     if (0 == n)
@@ -273,8 +270,8 @@ fetch_elements (const msi_object & msi,
 
     for (int i = 0; i < n; i++)
     {
-      atomic_number_t z = attribute->int_multi_value (i);
-      if (! REASONABLE_ATOMIC_NUMBER (z))
+      atomic_number_t z = attribute->int_multi_value(i);
+      if (! REASONABLE_ATOMIC_NUMBER(z))
       {
         cerr << "fetch_elements::invalid atomic number " << z << endl;
         return 0;
@@ -287,12 +284,13 @@ fetch_elements (const msi_object & msi,
         return 0;
       }
       
-      ele.add (e);
+      ele.add(e);
+      element_unique_id.add(e->unique_id());
     }
   }
 
   ii = 0;
-  while (NULL != (attribute = msi.attribute (NAME_OF_ATOMIC_SYMBOL_ATTRIBUTE, ii++)))
+  while (NULL != (attribute = msi.attribute(NAME_OF_ATOMIC_SYMBOL_ATTRIBUTE, ii++)))
   {
     int n = attribute->number_string_values();
     if (0 == n)
@@ -303,9 +301,12 @@ fetch_elements (const msi_object & msi,
 
     for (int i = 0; i < n; i++)
     {
-      const IWString * s = attribute->string_multi_value (i);
+      const IWString * s = attribute->string_multi_value(i);
+//    cerr << "ATOMIC SYMBOL " << *s << endl;
 
-      const Element * e = get_element_from_symbol_no_case_conversion (*s);
+      const Element * e = get_element_from_symbol_no_case_conversion(*s);
+      if (NULL == e && auto_create_new_elements())
+        e = create_element_with_symbol(*s);
 
       if (NULL == e)
       {
@@ -313,7 +314,9 @@ fetch_elements (const msi_object & msi,
         return 0;
       }
       
-      ele.add (e);
+      ele.add(e);
+      element_unique_id.add(e->unique_id());
+//    cerr << "Hash value " << e->atomic_symbol_hash_value() << endl;
     }
   }
 
@@ -331,12 +334,12 @@ get_float_attribute (const msi_object & msi,
                      float & v,
                      float minval, float maxval)
 {
-  const msi_attribute * att = msi.attribute (att_name);
+  const msi_attribute * att = msi.attribute(att_name);
 
   if (NULL == att)
     return 1;
 
-  if (! att->value (v) || v < minval || v > maxval)
+  if (! att->value(v) || v < minval || v > maxval)
   {
     cerr << "invalid " << att_name << " specification '" << att->stringval() << "'\n";
     return 0;
@@ -367,7 +370,7 @@ append_int_values (const msi_object & msi,
   int ii = 0;
 
   const msi_attribute * attribute;
-  while (NULL != (attribute = msi.attribute (attribute_name, ii++)))
+  while (NULL != (attribute = msi.attribute(attribute_name, ii++)))
   {
     if (0 == attribute->number_int_values())
     {
@@ -378,7 +381,7 @@ append_int_values (const msi_object & msi,
     int n = attribute->number_int_values();
     for (int i = 0; i < n; i++)
     {
-      int j = attribute->int_multi_value (i);
+      int j = attribute->int_multi_value(i);
       if (MIN_NOT_SPECIFIED != min_val && j < min_val)
       {
         cerr << "Value out of range, min is " << min_val << " '" << (*attribute) << "'\n";
@@ -391,7 +394,7 @@ append_int_values (const msi_object & msi,
         return 0;
       }
 
-      specifier.add (j);
+      specifier.add(j);
       attributes_specified++;
     }
   }
@@ -405,7 +408,7 @@ static int
 set_int_value (const msi_attribute & msi, int & value, int min_val, int max_val)
 {
   int tmp;
-  if (! msi.value (tmp))
+  if (! msi.value(tmp))
   {
     cerr << "msi attribute value not interpretable as int\n";
     cerr << msi << endl;
@@ -447,10 +450,10 @@ really_gruesome (resizable_array<int> & specifier, const msi_object * msi,
   {
     int tmp;
 
-    if (! set_int_value (*attribute, tmp, min_value_allowed, max_value_allowed))
+    if (! set_int_value(*attribute, tmp, min_value_allowed, max_value_allowed))
       return 0;
 
-    specifier.add (tmp);
+    specifier.add(tmp);
     attributes_specified++;
   }
 
@@ -471,7 +474,7 @@ _really_gruesome (Min_Max_Specifier<T> & specifier, const msi_object & msi,
 {
   int attributes_specified_here = 0;
 
-  if (! append_int_values (msi, attribute_name, min_value_allowed, max_value_allowed,
+  if (! append_int_values(msi, attribute_name, min_value_allowed, max_value_allowed,
                            specifier, attributes_specified_here))
     return 0;
 
@@ -486,29 +489,29 @@ _really_gruesome (Min_Max_Specifier<T> & specifier, const msi_object & msi,
 
   IWString name = "min_" + attribute_name;
   const msi_attribute * attribute;
-  if (NULL != (attribute = msi.attribute (name)))
+  if (NULL != (attribute = msi.attribute(name)))
   {
     int tmp;
-    if (! set_int_value (*attribute, tmp, min_value_allowed, max_value_allowed))
+    if (! set_int_value(*attribute, tmp, min_value_allowed, max_value_allowed))
       return 0;
-    specifier.set_min (tmp);
+    specifier.set_min(tmp);
     attributes_specified_here++;
   }
 
   name = "max_" + attribute_name;
-  if (NULL != (attribute = msi.attribute (name)))
+  if (NULL != (attribute = msi.attribute(name)))
   {
     int tmp;
-    if (! set_int_value (*attribute, tmp, min_value_allowed, max_value_allowed))
+    if (! set_int_value(*attribute, tmp, min_value_allowed, max_value_allowed))
       return 0;
-    specifier.set_max (tmp);
+    specifier.set_max(tmp);
     attributes_specified_here++;
   }
 
   if (attributes_specified_here)
     attributes_specified++;
   else
-    specifier.set_match_any (1);
+    specifier.set_match_any(1);
 
   return 1;
 }
@@ -527,7 +530,7 @@ really_gruesome (Min_Max_Specifier<T> & specifier,
 {
   assert (specifier.ok());
 
-  int rc = _really_gruesome (specifier, msi, attribute_name, attributes_specified,
+  int rc = _really_gruesome(specifier, msi, attribute_name, attributes_specified,
                              min_value_allowed, max_value_allowed);
 
   if (rc)
@@ -546,7 +549,7 @@ template int really_gruesome (Min_Max_Specifier<int> & specifier,
                  int & attributes_specified,
                  int min_value_allowed, int max_value_allowed);
 
-static int
+/*static int
 fetch_attribute (const msi_object & msi,
                  const char * attribute_name,
                  int & destination,
@@ -555,12 +558,12 @@ fetch_attribute (const msi_object & msi,
                  int & attributes_specified,
                  int ok_not_present = 1)
 {
-  const msi_attribute * att = msi.attribute (attribute_name);
+  const msi_attribute * att = msi.attribute(attribute_name);
   if (NULL == att)
     return ok_not_present;       // attribute not present
 
   int tmp;
-  if (! att->value (tmp))
+  if (! att->value(tmp))
   {
     cerr << "The " << attribute_name << " attribute must be a whole number\n";
     cerr << msi;
@@ -579,106 +582,113 @@ fetch_attribute (const msi_object & msi,
   attributes_specified++;
 
   return 1;
-}
+}*/
 
 int
-Substructure_Atom_Specifier::construct_from_msi_object (const msi_object & msi)
+Substructure_Atom_Specifier::construct_from_msi_object(const msi_object & msi)
 {
   assert (ok());
   _attributes_specified = 0;
 
-  const msi_attribute * att = msi.attribute (NAME_OF_PREFERENCE_VALUE_ATTRIBUTE);
+  const msi_attribute * att = msi.attribute(NAME_OF_PREFERENCE_VALUE_ATTRIBUTE);
   if (att)
   {
-    if (! att->value (_preference_value))
+    if (! att->value(_preference_value))
     {
       cerr << "Bad preference value\n";
       return 0;
     }
   }
 
-  att = msi.attribute (NAME_OF_CHARGED_ATTRIBUTE);
+  att = msi.attribute(NAME_OF_CHARGED_ATTRIBUTE);
   if (att)
   {
-    if (NULL != msi.attribute (NAME_OF_FORMAL_CHARGE_ATTRIBUTE))
+    if(NULL != msi.attribute(NAME_OF_FORMAL_CHARGE_ATTRIBUTE))
       cerr << "Substructure_Atom_Specifier::construct_from_msi_object: warning, the " << NAME_OF_CHARGED_ATTRIBUTE << " and " << NAME_OF_FORMAL_CHARGE_ATTRIBUTE << " attributes may clash\n";
 
-    _formal_charge.resize (8);
+    _formal_charge.resize(8);
     for (int i= 1; i < 4; i++)
     {
-      _formal_charge.add (i);
-      _formal_charge.add (-i);
+      _formal_charge.add(i);
+      _formal_charge.add(-i);
     }
   }
 
-  if (! fetch_elements (msi, _element, _attributes_specified))
+  if (! fetch_elements(msi, _element, _element_unique_id, _attributes_specified))
     return 0;
 
-  if (! really_gruesome (_ncon, msi, NAME_OF_NCON_ATTRIBUTE, _attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_ncon, msi, NAME_OF_NCON_ATTRIBUTE, _attributes_specified, 0, MAX_NOT_SPECIFIED))
     return 0;
 
-  if (! really_gruesome (_nbonds, msi, NAME_OF_NBONDS_ATTRIBUTE, _attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_nbonds, msi, NAME_OF_NBONDS_ATTRIBUTE, _attributes_specified, 0, MAX_NOT_SPECIFIED))
     return 0;
 
-  if (! really_gruesome (_nrings, msi, NAME_OF_NRINGS_ATTRIBUTE, _attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_nrings, msi, NAME_OF_NRINGS_ATTRIBUTE, _attributes_specified, 0, MAX_NOT_SPECIFIED))
     return 0;
 
-  if (! really_gruesome (_ring_bond_count, msi, NAME_OF_RING_BOND_COUNT_ATTRIBUTE, _attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_ring_bond_count, msi, NAME_OF_RING_BOND_COUNT_ATTRIBUTE, _attributes_specified, 0, MAX_NOT_SPECIFIED))
     return 0;
 
-  if (! really_gruesome (_ncon2, msi, "ncon2", _attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_ncon2, msi, "ncon2", _attributes_specified, 0, MAX_NOT_SPECIFIED))
     return 0;
 
-  if (! really_gruesome (_formal_charge, msi, NAME_OF_FORMAL_CHARGE_ATTRIBUTE, _attributes_specified, -4, 4))
+  if (! really_gruesome(_formal_charge, msi, NAME_OF_FORMAL_CHARGE_ATTRIBUTE, _attributes_specified, -4, 4))
     return 0;
 
-  if (! really_gruesome (_hcount, msi, NAME_OF_HCOUNT_ATTRIBUTE, _attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_hcount, msi, NAME_OF_HCOUNT_ATTRIBUTE, _attributes_specified, 0, MAX_NOT_SPECIFIED))
     return 0;
 
-  if (! really_gruesome (_ring_size, msi, NAME_OF_RING_SIZE_ATTRIBUTE, _attributes_specified, 3, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_ring_size, msi, NAME_OF_RING_SIZE_ATTRIBUTE, _attributes_specified, 3, MAX_NOT_SPECIFIED))
     return 0;
 
-  if (! really_gruesome (_attached_heteroatom_count, msi, NAME_OF_ATTACHED_HETEROATOM_COUNT_SPECIFIER, 
+  if (! really_gruesome(_attached_heteroatom_count, msi, NAME_OF_ATTACHED_HETEROATOM_COUNT_SPECIFIER, 
                               _attributes_specified, 0, MAX_NOT_SPECIFIED))
     return 0;
 
-  if (! really_gruesome (_lone_pair_count, msi, NAME_OF_LONE_PAIR_SPECIFIER, 
+  if (! really_gruesome(_lone_pair_count, msi, NAME_OF_LONE_PAIR_SPECIFIER, 
                          _attributes_specified, 0, MAX_NOT_SPECIFIED))
     return 0;
 
-  if (! really_gruesome (_unsaturation, msi, NAME_OF_UNSATURATION_ATTRIBUTE, 
+  if (! really_gruesome(_unsaturation, msi, NAME_OF_UNSATURATION_ATTRIBUTE, 
                          _attributes_specified, 0, MAX_NOT_SPECIFIED))
     return 0;
 
-  if (! really_gruesome (_daylight_x, msi, NAME_OF_DAYLIGHT_X_ATTRIBUTE, 
+  if (! really_gruesome(_daylight_x, msi, NAME_OF_DAYLIGHT_X_ATTRIBUTE, 
                          _attributes_specified, 0, MAX_NOT_SPECIFIED))
     return 0;
 
-  if (! really_gruesome (_isotope, msi, NAME_OF_ISOTOPE_ATTRIBUTE, 
+  if (! really_gruesome(_isotope, msi, NAME_OF_ISOTOPE_ATTRIBUTE, 
                          _attributes_specified, 0, MAX_NOT_SPECIFIED))
     return 0;
 
-  if (! really_gruesome (_aryl, msi, NAME_OF_ARYL_ATTRIBUTE, 
+  if (! really_gruesome(_aryl, msi, NAME_OF_ARYL_ATTRIBUTE, 
                          _attributes_specified, 0, MAX_NOT_SPECIFIED))
     return 0;
 
-  if (! really_gruesome (_vinyl, msi, NAME_OF_VINYL_ATTRIBUTE, 
+  if (! really_gruesome(_vinyl, msi, NAME_OF_VINYL_ATTRIBUTE, 
                          _attributes_specified, 0, MAX_NOT_SPECIFIED))
     return 0;
 
-  if (! really_gruesome (_fused_system_size, msi, NAME_OF_FUSED_SYSTEM_SIZE_ATTRIBUTE,
+  if (! really_gruesome(_fused_system_size, msi, NAME_OF_FUSED_SYSTEM_SIZE_ATTRIBUTE,
                          _attributes_specified, 0, MAX_NOT_SPECIFIED))
     return 0;
 
-  (void) fetch_aromaticity (msi, _aromaticity);
+  if (! really_gruesome(_symmetry_degree, msi, NAME_OF_SYMMETRY_DEGREE_ATTRIBUTE, 
+                        _attributes_specified, 0, MAX_NOT_SPECIFIED))
+    return 0;
+
+  if (! _fetch_symmetry_group(msi))
+    return 0;
+
+  (void) fetch_aromaticity(msi, _aromaticity);
 
   if (SUBSTRUCTURE_NOT_SPECIFIED != _aromaticity)
     _attributes_specified++;
 
-  att = msi.attribute (NAME_OF_CHIRALITY_SPECIFIER);
+  att = msi.attribute(NAME_OF_CHIRALITY_SPECIFIER);
   if (att)
   {
-    if (! att->value (_chirality))
+    if (! att->value(_chirality))
     {
       cerr << "Substructure_Atom_Specifier::construct_from_msi_object: bad chirality specifier\n";
       cerr << (*att) << endl;
@@ -692,11 +702,11 @@ Substructure_Atom_Specifier::construct_from_msi_object (const msi_object & msi)
 
 // for backward compatibility, parse the deprecated "isolated_ring" attribute
 
-  att = msi.attribute (NAME_OF_ISOLATED_RING_ATTRIBUTE);
+  att = msi.attribute(NAME_OF_ISOLATED_RING_ATTRIBUTE);
   if (att)
   {
     int iso;
-    if (! att->value (iso) || iso < 0)
+    if (! att->value(iso) || iso < 0)
     {
       cerr << "Substructure_Atom_Specifier::construct_from_msi_object: bad isolated ring specifier\n";
       cerr << (*att) << endl;
@@ -704,9 +714,9 @@ Substructure_Atom_Specifier::construct_from_msi_object (const msi_object & msi)
     } 
 
     if (0 == iso)
-      _fused_system_size.set_min (2);
+      _fused_system_size.set_min(2);
     else
-      _fused_system_size.add (1);
+      _fused_system_size.add(1);
 
 
     _attributes_specified++;
@@ -715,20 +725,47 @@ Substructure_Atom_Specifier::construct_from_msi_object (const msi_object & msi)
   if (! really_gruesome(_heteroatoms_in_ring, msi, NAME_OF_HETEROATOMS_IN_RING_ATTRIBUTE, _attributes_specified, 0, MAX_NOT_SPECIFIED))
     return 0;
 
-  if (! really_gruesome (_aromatic_ring_sizes, msi, NAME_OF_AROMATIC_RING_SIZE_ATTRIBUTE, _attributes_specified, 3, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_aromatic_ring_sizes, msi, NAME_OF_AROMATIC_RING_SIZE_ATTRIBUTE, _attributes_specified, 3, MAX_NOT_SPECIFIED))
     return 0;
 
-  if (! really_gruesome (_aliphatic_ring_sizes, msi, NAME_OF_ALIPHATIC_RING_SIZE_ATTRIBUTE, _attributes_specified, 3, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_aliphatic_ring_sizes, msi, NAME_OF_ALIPHATIC_RING_SIZE_ATTRIBUTE, _attributes_specified, 3, MAX_NOT_SPECIFIED))
     return 0;
 
-#ifdef USE_IWMALLOC
-//check_all_malloced (stderr);
-#endif
+  att = msi.attribute(NAME_OF_ALL_RINGS_KEKULE);
+  if (NULL != att)
+  {
+    att->value(_all_rings_kekule);    // should check the value...
+    _attributes_specified++;
+  }
 
 //if (0 == _attributes_specified)
 //  cerr << "Warning, no attributes specified\n";
 
   assert (ok());
+
+  return 1;
+}
+
+int
+Substructure_Atom_Specifier::_fetch_symmetry_group(const msi_object & msi)
+{
+  const msi_attribute * att = msi.attribute(NAME_OF_SYMMETRY_GROUP_ATTRIBUTE);
+  if (NULL == att)
+    return 1;
+
+  if (1 != att->number_int_values())
+  {
+    cerr << "Substructure_Atom_Specifier::_fetch_symmetry_group:multiple values not supported, see Ian\n";
+    return 0;
+  }
+
+  if (! att->value(_symmetry_group) || _symmetry_group <= 0)
+  {
+    cerr << "Substructure_Atom_Specifier::_fetch_symmetry_group:invalid symmetry group specification\n";
+    return 0;
+  }
+
+//cerr << "Substructure_Atom_Specifier::_fetch_symmetry_group:set " << _symmetry_group << endl;
 
   return 1;
 }
@@ -841,18 +878,18 @@ Substructure_Bond::construct_from_msi_object (const msi_object * msi,
 */
 
 int
-Substructure_Bond::write_as_msi_attribute (ostream & os,
+Substructure_Bond::write_as_msi_attribute (std::ostream & os,
                                            int indentation) const
 {
   assert (ok());
 
   IWString ind;
-  ind.extend (indentation, ' ');
+  ind.extend(indentation, ' ');
 
   os << ind;
 
   if (NULL != _b)
-    return _write_as_smarts (os);
+    return _write_as_smarts(os);
 
   os << "(A I ";
 
@@ -902,11 +939,11 @@ Substructure_Bond::write_as_msi_attribute (ostream & os,
 }
 
 int
-Substructure_Bond::_write_as_smarts (ostream & os) const
+Substructure_Bond::_write_as_smarts (std::ostream & os) const
 {
   os << "(A C " << NAME_OF_BOND_SMARTS_ATTRIBUTE << " \"" << _a1->unique_id() << ' ';
 
-  (void) __write_as_smarts (os);
+  (void) __write_as_smarts(os);
 
   os << "\")\n";
 
@@ -919,17 +956,17 @@ Substructure_Bond::_write_as_smarts (ostream & os) const
 
 static int
 write_ord_bond_types (bond_type_t bt,
-                      ostream & os)
+                      std::ostream & os)
 {
   int written = 0;
 
-  if (IS_SINGLE_BOND (bt))
+  if (IS_SINGLE_BOND(bt))
   {
     os << '-';
     written++;
   }
 
-  if (IS_DOUBLE_BOND (bt))
+  if (IS_DOUBLE_BOND(bt))
   {
     if (written)
       os << ',';
@@ -937,7 +974,7 @@ write_ord_bond_types (bond_type_t bt,
     written++;
   }
 
-  if (IS_TRIPLE_BOND (bt))
+  if (IS_TRIPLE_BOND(bt))
   {
     if (written)
       os << ',';
@@ -945,7 +982,7 @@ write_ord_bond_types (bond_type_t bt,
     written++;
   }
 
-  if (IS_AROMATIC_BOND (bt))
+  if (IS_AROMATIC_BOND(bt))
   {
     if (written)
       os << ',';
@@ -957,10 +994,10 @@ write_ord_bond_types (bond_type_t bt,
 }
 
 int
-Substructure_Bond::__write_as_smarts (ostream & os) const
+Substructure_Bond::__write_as_smarts (std::ostream & os) const
 {
   if (0 != _bond_types)
-    write_ord_bond_types (_bond_types, os);
+    write_ord_bond_types(_bond_types, os);
 
   if (NULL == _b)
     return os.good();
@@ -968,7 +1005,7 @@ Substructure_Bond::__write_as_smarts (ostream & os) const
   if (0 != _bond_types)
     os << ';';
 
-  _b->smarts (os);
+  _b->smarts(os);
 
 //cerr << "Substructure_Bond::__write_as_smarts: '" << _b->smarts (cerr) << "' operators = " << _logexp.number_operators() << endl;
 
@@ -976,7 +1013,7 @@ Substructure_Bond::__write_as_smarts (ostream & os) const
   for (int i = 0; i < _logexp.number_operators(); i++)
   {
     const_IWSubstring op;
-    _logexp.op (i, op);
+    _logexp.op(i, op);
 
     if ('|' == op)     // we don't use | for OR here
       os << ',';
@@ -984,7 +1021,7 @@ Substructure_Bond::__write_as_smarts (ostream & os) const
       os << op;
 
     b = b->next();
-    b->smarts (os);
+    b->smarts(os);
   }
 
   return os.good();
@@ -995,7 +1032,7 @@ Substructure_Bond::__write_as_smarts (ostream & os) const
 */
 
 /*int
-Substructure_Bond::_write_msi (ostream & os,
+Substructure_Bond::_write_msi (std::ostream & os,
                                const IWString & ind) const
 {
   for (int i = 0; i < _number_elements; i++)
@@ -1021,7 +1058,7 @@ Substructure_Bond::_write_msi (ostream & os,
 }*/
 
 /*int
-Substructure_Bond::write_msi (ostream & os,
+Substructure_Bond::write_msi (std::ostream & os,
                               int & object_id, 
                               int indentation)
 {
@@ -1040,7 +1077,7 @@ Substructure_Bond::write_msi (ostream & os,
 */
 
 /*int
-Substructure_Bond::write_as_msi_object (ostream & os,
+Substructure_Bond::write_as_msi_object (std::ostream & os,
                                         int & object_id, 
                                         int indentation) const
 {
@@ -1061,7 +1098,7 @@ Substructure_Bond::write_as_msi_object (ostream & os,
 }*/
 
 /*int
-Substructure_Bond::write_as_msi_object_or_attribute (ostream & os,
+Substructure_Bond::write_as_msi_object_or_attribute (std::ostream & os,
                                                      int & object_id,
                                                      int indentation) const
 {
@@ -1071,13 +1108,25 @@ Substructure_Bond::write_as_msi_object_or_attribute (ostream & os,
     return write_as_msi_object (os, object_id, indentation);
 }*/
 
+static int
+all_atomic_numbers_positive (const resizable_array<const Element *> & element)
+{
+  for (int i = 0; i < element.number_elements(); ++i)
+  {
+    if (element[i]->atomic_number() <= 0)
+      return 0;
+  }
+
+  return 1;
+}
+
 int
-Substructure_Atom_Specifier::write_msi (ostream & os, int indentation,
+Substructure_Atom_Specifier::write_msi(std::ostream & os, int indentation,
                                         int unary_operator, int op)
 {
   IWString ind;
   if (indentation)
-    ind.extend (indentation, ' ');
+    ind.extend(indentation, ' ');
 
   if (0 == unary_operator)
     os << ind << "(A I " << NAME_OF_REJECTION_ATTRIBUTE << " 1)\n";
@@ -1104,58 +1153,83 @@ Substructure_Atom_Specifier::write_msi (ostream & os, int indentation,
 //  os << ind << "(A I atomic_number " << _atomic_number[i] << ")\n";
 
   int na = _element.number_elements();
-  if (0 == na)
-    ;
-  else
+  if (na > 0)
   {
-    os << ind << "(A I " << NAME_OF_ATOMIC_NUMBER_ATTRIBUTE << ' ';
-    if (1 == na)
-      os << _element[0]->atomic_number();
+    if (all_atomic_numbers_positive(_element))
+    {
+      os << ind << "(A I " << NAME_OF_ATOMIC_NUMBER_ATTRIBUTE << ' ';
+      if (1 == na)
+        os << _element[0]->atomic_number();
+      else
+      {
+        os << '(';
+        for (int i = 0; i < na; i++)
+        {
+          if (i)
+            os << ' ';
+          os << _element[i]->atomic_number();
+        }
+        os << ')';
+      }
+    }
     else
     {
-      os << '(';
-      for (int i = 0; i < na; i++)
+      os << ind << "(A C " << NAME_OF_ATOMIC_SYMBOL_ATTRIBUTE << ' ';
+      if (1 == na)
+        os << '"' << _element[0]->symbol() << '"';
+      else
       {
-        if (i)
-          os << ' ';
-        os << _element[i]->atomic_number();
+        os << '"';
+        for (int i = 0; i < na; i++)
+        {
+          if (i)
+            os << ' ';
+          os << _element[i]->symbol();
+        }
+        os << '"';
       }
-      os << ')';
     }
 
     os << ")\n";
   }
 
-  _ncon.write_msi (os, NAME_OF_NCON_ATTRIBUTE, indentation);
-  _nbonds.write_msi (os, NAME_OF_NBONDS_ATTRIBUTE, indentation);
-  _formal_charge.write_msi (os, NAME_OF_FORMAL_CHARGE_ATTRIBUTE, indentation);
-  _hcount.write_msi (os, NAME_OF_HCOUNT_ATTRIBUTE, indentation);
-  _nrings.write_msi (os, NAME_OF_NRINGS_ATTRIBUTE, indentation);
-  _ring_bond_count.write_msi (os, NAME_OF_RING_BOND_COUNT_ATTRIBUTE, indentation);
-  _ncon2.write_msi (os, "ncon2", indentation);
-  _ring_size.write_msi (os, NAME_OF_RING_SIZE_ATTRIBUTE, indentation);
-  _aromatic_ring_sizes.write_msi (os, NAME_OF_AROMATIC_RING_SIZE_ATTRIBUTE, indentation);
-  _aliphatic_ring_sizes.write_msi (os, NAME_OF_ALIPHATIC_RING_SIZE_ATTRIBUTE, indentation);
-  _attached_heteroatom_count.write_msi (os, NAME_OF_ATTACHED_HETEROATOM_COUNT_SPECIFIER, indentation);
-  _lone_pair_count.write_msi (os, NAME_OF_LONE_PAIR_SPECIFIER, indentation);
-  _unsaturation.write_msi (os, NAME_OF_UNSATURATION_ATTRIBUTE, indentation);
-  _daylight_x.write_msi (os, NAME_OF_DAYLIGHT_X_ATTRIBUTE, indentation);
-  _isotope.write_msi (os, NAME_OF_ISOTOPE_ATTRIBUTE, indentation);
-  _aryl.write_msi (os, NAME_OF_ARYL_ATTRIBUTE, indentation);
-  _vinyl.write_msi (os, NAME_OF_VINYL_ATTRIBUTE, indentation);
-  _fused_system_size.write_msi (os, NAME_OF_FUSED_SYSTEM_SIZE_ATTRIBUTE, indentation);
-  _heteroatoms_in_ring.write_msi (os, NAME_OF_HETEROATOMS_IN_RING_ATTRIBUTE, indentation);
+  _ncon.write_msi(os, NAME_OF_NCON_ATTRIBUTE, indentation);
+  _nbonds.write_msi(os, NAME_OF_NBONDS_ATTRIBUTE, indentation);
+  _formal_charge.write_msi(os, NAME_OF_FORMAL_CHARGE_ATTRIBUTE, indentation);
+  _hcount.write_msi(os, NAME_OF_HCOUNT_ATTRIBUTE, indentation);
+  _nrings.write_msi(os, NAME_OF_NRINGS_ATTRIBUTE, indentation);
+  _ring_bond_count.write_msi(os, NAME_OF_RING_BOND_COUNT_ATTRIBUTE, indentation);
+  _ncon2.write_msi(os, "ncon2", indentation);
+  _ring_size.write_msi(os, NAME_OF_RING_SIZE_ATTRIBUTE, indentation);
+  _aromatic_ring_sizes.write_msi(os, NAME_OF_AROMATIC_RING_SIZE_ATTRIBUTE, indentation);
+  _aliphatic_ring_sizes.write_msi(os, NAME_OF_ALIPHATIC_RING_SIZE_ATTRIBUTE, indentation);
+  _attached_heteroatom_count.write_msi(os, NAME_OF_ATTACHED_HETEROATOM_COUNT_SPECIFIER, indentation);
+  _lone_pair_count.write_msi(os, NAME_OF_LONE_PAIR_SPECIFIER, indentation);
+  _unsaturation.write_msi(os, NAME_OF_UNSATURATION_ATTRIBUTE, indentation);
+  _daylight_x.write_msi(os, NAME_OF_DAYLIGHT_X_ATTRIBUTE, indentation);
+  _isotope.write_msi(os, NAME_OF_ISOTOPE_ATTRIBUTE, indentation);
+  _aryl.write_msi(os, NAME_OF_ARYL_ATTRIBUTE, indentation);
+  _vinyl.write_msi(os, NAME_OF_VINYL_ATTRIBUTE, indentation);
+  _fused_system_size.write_msi(os, NAME_OF_FUSED_SYSTEM_SIZE_ATTRIBUTE, indentation);
+  _heteroatoms_in_ring.write_msi(os, NAME_OF_HETEROATOMS_IN_RING_ATTRIBUTE, indentation);
+  _symmetry_degree.write_msi(os, NAME_OF_SYMMETRY_DEGREE_ATTRIBUTE, indentation);
   
   if (SUBSTRUCTURE_NOT_SPECIFIED != _aromaticity)
   {
-    if (IS_AROMATIC_ATOM (_aromaticity))
+    if (IS_AROMATIC_ATOM(_aromaticity))
       os << ind << "(A I " << NAME_OF_AROMATICITY_ATTRIBUTE << " 1)\n";
-    if (IS_ALIPHATIC_ATOM (_aromaticity))
+    if (IS_ALIPHATIC_ATOM(_aromaticity))
       os << ind << "(A I " << NAME_OF_AROMATICITY_ATTRIBUTE << " 0)\n";
   }
 
   if (SUBSTRUCTURE_NOT_SPECIFIED != _chirality)
     os << ind << "(A I " << NAME_OF_CHIRALITY_SPECIFIER << " " << _chirality << ")\n";
+
+  if (_symmetry_group > 0)
+    os << ind << "(A I " << NAME_OF_SYMMETRY_GROUP_ATTRIBUTE << ' ' << _symmetry_group << ")\n";
+
+  if (SUBSTRUCTURE_NOT_SPECIFIED != _all_rings_kekule)
+   os << ind << "(A I " << NAME_OF_ALL_RINGS_KEKULE << ' ' << _all_rings_kekule << ")\n";
 
   return os.good();
 }
@@ -1165,14 +1239,14 @@ Substructure_Atom_Specifier::write_msi (ostream & os, int indentation,
 */
 
 int
-Substructure_Atom::_write_children_msi (ostream & os, 
+Substructure_Atom::_write_children_msi (std::ostream & os, 
                                int & object_id,
                                int indentation)
 {
   int nc = _children.number_elements();
   for (int i = 0; i < nc; i++)
   {
-    _children[i]->write_msi (os, object_id, NAME_OF_QUERY_ATOM_OBJECT, indentation);
+    _children[i]->write_msi(os, object_id, NAME_OF_QUERY_ATOM_OBJECT, indentation);
   }
 
   return os.good();
@@ -1185,7 +1259,7 @@ Substructure_Atom::_write_children_msi (ostream & os,
 */
 
 int
-Substructure_Atom::write_msi (ostream & os, int & object_id,
+Substructure_Atom::write_msi (std::ostream & os, int & object_id,
                               const const_IWSubstring & stringid, int indentation)
 {
   assert (ok());
@@ -1193,12 +1267,15 @@ Substructure_Atom::write_msi (ostream & os, int & object_id,
 
   IWString ind;
   if (indentation)
-    ind.extend (indentation, ' ');
+    ind.extend(indentation, ' ');
 
   os << ind << "(" << _unique_id << ' ' << stringid << endl;
 
   if (_initial_atom_number >= 0)
     os << ind << "  (A I " << NAME_OF_INITIAL_ATOM_NUMBER_ATTRIBUTE << " " << _initial_atom_number << ")\n";
+
+  if (_atom_map_number >= 0)
+    os << ind << "  (A I " << NAME_OF_ATOM_MAP_NUMBER_ATTRIBUTE << " " << _atom_map_number << ")\n";
 
   if (_or_id)
     os << ind << "  (A I or " << _or_id << ")\n";
@@ -1206,7 +1283,7 @@ Substructure_Atom::write_msi (ostream & os, int & object_id,
   if (0 == _match_as_match_or_rejection)
     os << ind << "  (A I " << NAME_OF_REJECTION_ATTRIBUTE << " 1)\n";
 
-  if (! Substructure_Atom_Specifier::write_msi (os, indentation + 2))
+  if (! Substructure_Atom_Specifier::write_msi(os, indentation + 2))
     return 0;
 
   if (_ring_id)
@@ -1224,7 +1301,7 @@ Substructure_Atom::write_msi (ostream & os, int & object_id,
   if (_numeric_value.is_set())
   {
     double tmp;
-    _numeric_value.value (tmp);
+    _numeric_value.value(tmp);
     os << ind << "  (A D " << NAME_OF_NUMERIC_VALUE_ATTRIBUTE << ' ' << tmp << ")\n";
   }
 
@@ -1237,19 +1314,19 @@ Substructure_Atom::write_msi (ostream & os, int & object_id,
     os << ind << "  (" << object_id++ << " Query_Atom_Specifier\n";
     Substructure_Atom_Specifier * a = _components[i];
     if (i > 0)   // must include the operator
-      a->write_msi (os, indentation + 4, _operator.unary_operator (i), _operator.op (i - 1));
+      a->write_msi(os, indentation + 4, _operator.unary_operator(i), _operator.op(i - 1));
     else                  // the last one does not have an operator
-      a->write_msi (os, indentation + 4, _operator.unary_operator (i));
+      a->write_msi(os, indentation + 4, _operator.unary_operator(i));
 
     os << ind << "  )\n";
   }
 
   if (_environment.active())
-    _environment.write_msi (os, object_id, indentation + 2);
+    _environment.write_msi(os, object_id, indentation + 2);
 
   for (int i = 0; i < _bonds.number_elements(); i++)
   {
-    _bonds[i]->write_as_msi_attribute (os, indentation + 2);
+    _bonds[i]->write_as_msi_attribute(os, indentation + 2);
   }
 
   if (_sum_all_preference_hits)
@@ -1259,20 +1336,20 @@ Substructure_Atom::write_msi (ostream & os, int & object_id,
   for (int i = 0; i < np; i++)
   {
     os << ind << "  (" << (object_id++) << ' ' << NAME_OF_QUERY_ATOM_PREFERENCE_OBJECT << endl;
-    _preferences[i]->write_msi (os, indentation + 4);
+    _preferences[i]->write_msi(os, indentation + 4);
     os << ind << "  )\n";
   }
 
   os << ind << ")\n";
 
-  if (! _write_children_msi (os, object_id, indentation))
+  if (! _write_children_msi(os, object_id, indentation))
     return 0;
 
   return os.good();
 }
 
 int
-Substructure_Environment::write_msi (ostream & os,
+Substructure_Environment::write_msi (std::ostream & os,
                                      int & object_id,
                                      int indentation)
 {
@@ -1281,7 +1358,7 @@ Substructure_Environment::write_msi (ostream & os,
 
   IWString ind;
   if (indentation)
-    ind.extend (indentation, ' ');
+    ind.extend(indentation, ' ');
 
   os << ind << "(" << object_id++ << ' ';
   if (_query_environment_match_as_rejection)
@@ -1296,16 +1373,26 @@ Substructure_Environment::write_msi (ostream & os,
     os << ind << "  (A I and " << _and_id << ")\n";
 
   if (_hits_needed.is_set())
-    _hits_needed.write_msi (os, NAME_OF_QUERY_HITS_NEEDED_ATTRIBUTE, indentation + 2);
+    _hits_needed.write_msi(os, NAME_OF_QUERY_HITS_NEEDED_ATTRIBUTE, indentation + 2);
 
   if (_no_other_substituents_allowed)
     os << ind << "  (A I " << NAME_OF_NO_OTHER_SUBSTITUENTS_ALLOWED_ATTRIBUTE << ' ' << _no_other_substituents_allowed << ")\n";
 
+  if (_max_environment_matches_per_attachment_point < std::numeric_limits<int>::max())
+    os << ind << "  (A I " << NAME_OF_MAX_ENVIRONMENT_MATCHES_PER_ATTACHMENT_POINT << ' ' << _max_environment_matches_per_attachment_point << ")\n";
+
+  if (std::numeric_limits<int>::max() != _max_matches_to_find)
+    os << ind << "  (A I " << NAME_OF_MAX_MATCHES_TO_FIND << ' ' << _max_matches_to_find << ")\n";
+
+  os << ind << "  (A I " << NAME_OF_ENVIRONMENTS_CAN_SHARE_ATTACHMENT_POINTS << ' ' << _environments_can_share_attachment_points << ")\n";
+
+  os << ind << "  (A I " << NAME_OF_HYDROGEN_OK_AS_ENVIRONMENT_MATCH << ' ' << _hydrogen_ok_as_environment_match << ")\n";
+
   IWString tmp;
-  if (! _bond.bond_type_as_string (tmp))
+  if (! _bond.bond_type_as_string(tmp))
   {
     cerr << "Substructure_Environment::write_msi: what kind of bond?\n";
-    _bond.debug_print (cerr, ind);
+    _bond.debug_print(cerr, ind);
   }
 
   os << ind << "  (A I " << tmp << "_bond";
@@ -1330,7 +1417,7 @@ Substructure_Environment::write_msi (ostream & os,
   for (int i = 0; i < _number_elements; i++)
   {
     Substructure_Atom * a = _things[i];
-    if (! a->write_msi (os, object_id, NAME_OF_QUERY_ATOM_OBJECT, indentation + 2))
+    if (! a->write_msi(os, object_id, NAME_OF_QUERY_ATOM_OBJECT, indentation + 2))
       break;
   }
 
@@ -1345,16 +1432,16 @@ Substructure_Environment::write_msi (ostream & os,
 */
 
 int
-Substructure_Atom_Environment::write_msi (ostream & os, int & object_id, int indentation) const
+Substructure_Atom_Environment::write_msi (std::ostream & os, int & object_id, int indentation) const
 {
   IWString ind;
-  ind.extend (indentation, ' ');
+  ind.extend(indentation, ' ');
 
   for (int i = 0; i < _number_elements; i++)
   {
     os << ind << '(' << object_id++ << ' ' << NAME_OF_ENVIRONMENT_OBJECT << endl;
 
-    if (0 == _operator.unary_operator (i))
+    if (0 == _operator.unary_operator(i))
       os << ind << "  (A I " << NAME_OF_REJECTION_ATTRIBUTE << " 1)\n";
     if (_operator.number_operators() && i < _number_elements - 1)
     {
@@ -1373,7 +1460,7 @@ Substructure_Atom_Environment::write_msi (ostream & os, int & object_id, int ind
       os << "\")\n";
     }
 
-    _things[i]->write_msi (os, object_id, NAME_OF_QUERY_ATOM_OBJECT, indentation + 2);
+    _things[i]->write_msi(os, object_id, NAME_OF_QUERY_ATOM_OBJECT, indentation + 2);
 
     os << ind << ")\n";
   }
@@ -1387,13 +1474,13 @@ Substructure_Atom::_create_preference_from_msi_object (const msi_object & msi)
 {
   Substructure_Atom_Specifier * a = new Substructure_Atom_Specifier;
 
-  if (! a->construct_from_msi_object (msi))
+  if (! a->construct_from_msi_object(msi))
   {
     delete a;
     return 0;
   }
 
-  _preferences.add (a);
+  _preferences.add(a);
 
   return 1;
 }
@@ -1405,30 +1492,33 @@ Substructure_Atom::_create_preference_from_msi_object (const msi_object & msi)
 */
 
 static int
-extract_operator (const msi_object & msi,
-                  IW_Logical_Expression & logexp,
-                  int default_operator,
-                  const char * caller)
+extract_operator(const msi_object & msi,
+                 IW_Logical_Expression & logexp,
+                 int default_operator,
+                 const char * caller)
 {
   IWString op;
-  if (! msi.string_value_for_attribute (NAME_OF_OPERATOR_ATTRIBUTE, op))
-    logexp.add_operator (default_operator);
+  if (! msi.string_value_for_attribute(NAME_OF_OPERATOR_ATTRIBUTE, op))
+    logexp.add_operator(default_operator);
   else if (NAME_OF_AND_OPERATOR == op)
-    logexp.add_operator (IW_LOGEXP_AND);
+    logexp.add_operator(IW_LOGEXP_AND);
   else if (NAME_OF_OR_OPERATOR == op)
-    logexp.add_operator (IW_LOGEXP_OR);
+    logexp.add_operator(IW_LOGEXP_OR);
   else if (NAME_OF_XOR_OPERATOR == op)
-    logexp.add_operator (IW_LOGEXP_XOR);
+    logexp.add_operator(IW_LOGEXP_XOR);
   else if (NAME_OF_LOW_PRIORITY_AND_OPERATOR == op)
-    logexp.add_operator (IW_LOGEXP_LOW_PRIORITY_AND);
+    logexp.add_operator(IW_LOGEXP_LOW_PRIORITY_AND);
   else
   {
     cerr << caller << ": unrecognised operator '" << op << "'\n";
     return 0;
   }
 
-  if (is_rejection (msi))
-    logexp.set_unary_operator (logexp.number_operators(), 0);
+  cerr << "Parsed '" << op << "' now ";
+  logexp.debug_print(cerr);
+
+  if (is_rejection(msi))
+    logexp.set_unary_operator(logexp.number_operators(), 0);
 
   return 1;
 }
@@ -1445,7 +1535,7 @@ Substructure_Atom::_add_component (const msi_object & msi)
   }
 
   Substructure_Atom_Specifier * tmp = new Substructure_Atom_Specifier;
-  if (! tmp->construct_from_msi_object (msi))
+  if (! tmp->construct_from_msi_object(msi))
   {
     cerr << "Substructure_Atom::_add_component: component atom not formed\n";
     cerr << msi;
@@ -1455,13 +1545,13 @@ Substructure_Atom::_add_component (const msi_object & msi)
 
   if (0 == _components.number_elements())    // no operator with first object
     ;
-  else if (! extract_operator (msi, _operator, IW_LOGEXP_OR, "Substructure_Atom::_add_component"))
+  else if (! extract_operator(msi, _operator, IW_LOGEXP_OR, "Substructure_Atom::_add_component"))
     return 0;
 
-  if (is_rejection (msi))
-    _operator.set_unary_operator (_operator.number_results() - 1, 0);
+  if (is_rejection(msi))
+    _operator.set_unary_operator(_operator.number_results() - 1, 0);
 
-  _components.add (tmp);
+  _components.add(tmp);
 
   assert (ok());
   return 1;
@@ -1477,13 +1567,13 @@ Substructure_Atom::_add_component (const msi_object & msi)
 int
 Substructure_Atom::_add_bond (Substructure_Bond * b)
 {
-  _bonds.add (b);
+  _bonds.add(b);
 
   if (1 == _bonds.number_elements())     // first bond, must notify parent of extra child
   {
     _bond_to_parent = b;
     _parent = b->a();
-    _parent->notify_extra_child (this);
+    _parent->notify_extra_child(this);
   }
   else
   {
@@ -1520,62 +1610,109 @@ Substructure_Atom::_add_bond (const msi_object & msi,
   return _add_bond (b);
 }*/
 
+/*
+  Look like
+
+    1 -
+    1 2 3 -!@
+
+    A set of atoms and then the bond
+*/
+
+static int
+parse_smarts_bond_attribute (const msi_attribute * att,
+                             Set_of_Atoms & other_end,
+                             IWString & bond_smarts)
+{
+  const IWString & Satt = att->stringval();    // 
+
+  const int nw = Satt.nwords();
+
+  if (nw < 2)
+  {
+    cerr << "parse_smarts_bond_attribute: bond smarts must have at least two tokens '" << Satt << "'\n";
+    return 0;
+  }
+
+  const int natoms = nw-1;
+
+  other_end.resize_keep_storage(natoms);
+
+  int i = 0;
+  const_IWSubstring Sanum;
+  for (int j = 0; j < natoms; ++j)
+  {
+    Satt.nextword(Sanum, i);
+
+    atom_number_t zatom;
+    if (! Sanum.numeric_value(zatom) || zatom < 0)
+    {
+      cerr << "parse_smarts_bond_attribute: invalid atom number '" << Sanum << "'\n";
+      return 0;
+    }
+
+    other_end.add_if_not_already_present(zatom);
+  }
+
+  Satt.nextword(bond_smarts, i);
+
+  return bond_smarts.length();
+}
+
 int
 Substructure_Atom::_process_attribute_smarts_bond (const msi_attribute * att,
                                                    extending_resizable_array<Substructure_Atom *> & completed)
 {
-  const IWString & Satt = att->stringval();    // 
+  Set_of_Atoms other_end;
+  IWString bond_smarts;
 
-  if (2 != Satt.nwords())
+  if (! parse_smarts_bond_attribute(att, other_end, bond_smarts))
   {
-    cerr << "Substructure_Atom::_process_attribute_smarts_bond: bond smarts must have two tokens '" << Satt << "'\n";
+    cerr << "Substructure_Atom::_process_attribute_smarts_bond:invalid bond smarts " << *att << endl;
     return 0;
   }
 
-  const_IWSubstring Sanum;
-  Satt.word (0, Sanum);
-
-  int other_end;
-  if (! Sanum.numeric_value (other_end) || other_end < 0)
+  if (other_end.number_elements() > 1)
   {
-    cerr << "Substructure_Atom::_process_attribute_smarts_bond: invalid atom number '" << Sanum << "'\n";
+    cerr << "Substructure_Atom::_process_attribute_smarts_bond:cannot handle multi-valued attachment points\n";
     return 0;
   }
 
-  if (NULL == completed[other_end])
+  const atom_number_t o = other_end[0];
+
+  if (NULL == completed[o])
   {
-    cerr << "Substructure_Atom::_process_attribute_smarts_bond: atom " << other_end << " has not been defined\n";
+    cerr << "Substructure_Atom::_process_attribute_smarts_bond: atom " << o << " has not been defined\n";
     return 0;
   }
 
-  if (this == completed[other_end])
+  if (this == completed[o])
   {
     cerr << "Substructure_Atom::_process_attribute_smarts_bond: atom bonded to itself\n";
     return 0;
   }
 
-  const_IWSubstring bsmarts;
-  Satt.word (1, bsmarts);
-
   Substructure_Bond * b = new Substructure_Bond;
 
-  b->set_atom (completed[other_end]);
-
   int characters_processed;
-  if (! b->construct_from_smarts (bsmarts.rawchars(), bsmarts.length(), characters_processed))
+  if (! b->construct_from_smarts(bond_smarts.rawchars(), bond_smarts.length(), characters_processed))
   {
-    cerr << "Substructure_Bond::_process_attribute_smarts_bond: cannot parse bond smarts '" << bsmarts << "'\n";
+    cerr << "parse_smarts_bond_attribute:cannot parse bond smarts " << *att << "\n";
+    delete b;
     return 0;
   }
 
-  if (characters_processed != bsmarts.length())
+  if (characters_processed != bond_smarts.length())
   {
-    cerr << "Substructure_Bond::_process_attribute_smarts_bond: extra junk at end of bond smarts '" << bsmarts << "'\n";
+    cerr << "parse_smarts_bond_attribute:extra junk at end of bond smarts " << *att << "\n";
     cerr << characters_processed << " characters processed\n";
+    delete b;
     return 0;
   }
 
-  return _add_bond (b);
+  b->set_atom(completed[o]);
+
+  return _add_bond(b);
 }
 
 /*
@@ -1591,9 +1728,9 @@ Substructure_Atom::_process_attribute_bond (const msi_attribute * att,
 
   int other_end;
   if (1 == att->number_int_values())
-    (void) att->value (other_end);
+    (void) att->value(other_end);
   else
-    other_end = att->int_multi_value (0);
+    other_end = att->int_multi_value(0);
 
   if (other_end < 0)
   {
@@ -1614,7 +1751,7 @@ Substructure_Atom::_process_attribute_bond (const msi_attribute * att,
   }
 
   Substructure_Bond * b = new Substructure_Bond;
-  b->set_atom (completed[other_end]);
+  b->set_atom(completed[other_end]);
 
   if (att->number_int_values() > 1)
   {
@@ -1622,7 +1759,7 @@ Substructure_Atom::_process_attribute_bond (const msi_attribute * att,
 
     for (int i = 1; i < att->number_int_values(); i++)
     {
-      int j = att->int_multi_value (i);
+      int j = att->int_multi_value(i);
 
       if (1 == j)
         bond_type = bond_type | SINGLE_BOND;
@@ -1640,9 +1777,9 @@ Substructure_Atom::_process_attribute_bond (const msi_attribute * att,
     }
   }
 
-  b->set_type (bond_type);
+  b->set_type(bond_type);
 
-  return _add_bond (b);
+  return _add_bond(b);
 }
 
 /*
@@ -1658,7 +1795,7 @@ Substructure_Environment::_process_attribute_bond (const msi_attribute * att,
 //cerr << "Parsing '" << *att << "' btype " << bond_type << " as bond\n";
 
   if (0 != bond_type)     // only add if bond_type has defined a particular type
-    _bond.set_type (bond_type);
+    _bond.set_type(bond_type);
   else
     _bond.set_match_any();
 
@@ -1666,7 +1803,7 @@ Substructure_Environment::_process_attribute_bond (const msi_attribute * att,
   if (1 == nb)         // NOT multi-valued
   {
     int a;
-    if (! att->value (a) || a < 0)
+    if (! att->value(a) || a < 0)
     {
       cerr << "Substructure_Environment::_process_attribute_bond: invalid atom '" << (*att) << endl;
       return 0;
@@ -1678,7 +1815,7 @@ Substructure_Environment::_process_attribute_bond (const msi_attribute * att,
       return 0;
     }
 
-    _possible_parents.add (completed[a]);
+    _possible_parents.add(completed[a]);
 
     return 1;
   }
@@ -1687,7 +1824,7 @@ Substructure_Environment::_process_attribute_bond (const msi_attribute * att,
 
   for (int i = 0; i < nb; i++)
   {
-    int a = att->int_multi_value (i);
+    int a = att->int_multi_value(i);
 
     if (a < 0)
     {
@@ -1701,7 +1838,7 @@ Substructure_Environment::_process_attribute_bond (const msi_attribute * att,
       return 0;
     }
 
-    _possible_parents.add (completed[a]);
+    _possible_parents.add(completed[a]);
   }
 
   return 1;
@@ -1789,22 +1926,22 @@ Substructure_Atom::_process_attribute_bonds (const msi_object & msi,
 {
   const msi_attribute * att;
   int i = 0;
-  while (NULL != (att = msi.attribute (i++)))
+  while (NULL != (att = msi.attribute(i++)))
   {
     if (NAME_OF_BOND_SMARTS_ATTRIBUTE == att->name())
     {
-      if (! _process_attribute_smarts_bond (att, completed))
+      if (! _process_attribute_smarts_bond(att, completed))
         return 0;
     }
 
     bond_type_t bond_type;
 
-    if (! attribute_is_bond (att, bond_type))
+    if (! attribute_is_bond(att, bond_type))
       continue;
 
 //  cerr << "Bond '" << *att;
 
-    if (! _process_attribute_bond (att, bond_type, completed))
+    if (! _process_attribute_bond(att, bond_type, completed))
       return 0;
   }
 
@@ -1824,11 +1961,13 @@ Substructure_Environment::_process_attribute_bonds (const msi_object & msi,
 
   const msi_attribute * att;
   int i = 0;
-  while (NULL != (att = msi.attribute (i++)))
+  while (NULL != (att = msi.attribute(i++)))
   {
+//  cerr << "Substructure_Environment::_process_attribute_bonds: examining " << *att << endl;
+
     bond_type_t bond_type;
 
-    if (! attribute_is_bond (att, bond_type))
+    if (! attribute_is_bond(att, bond_type))
       continue;
 
     if (rc)
@@ -1839,10 +1978,52 @@ Substructure_Environment::_process_attribute_bonds (const msi_object & msi,
     }
 
 //  cerr << "Processing '" << (*att) << "' as attribute bond\n";
-    if (! _process_attribute_bond (att, bond_type, completed))
+    if (! _process_attribute_bond(att, bond_type, completed))
       return 0;
 
     rc++;
+  }
+
+  if (rc)
+    return rc;
+
+// If no bond directives, maybe a bond smarts directive
+
+  i = 0;
+  while (NULL != (att = msi.attribute(i++)))
+  {
+    if (NAME_OF_BOND_SMARTS_ATTRIBUTE != att->name())
+      continue;
+
+//  cerr << "Examining " << *att << endl;
+    Set_of_Atoms other_end;
+    IWString bond_smarts;
+
+    if (! parse_smarts_bond_attribute(att, other_end, bond_smarts))
+    {
+      cerr << "Substructure_Environment::_process_attribute_bond:invalid bond smarts " << *att << endl;
+      return 0;
+    }
+
+    int characters_processed;
+    if (! _bond.construct_from_smarts(bond_smarts.rawchars(), bond_smarts.length(), characters_processed))
+    {
+      cerr << "Substructure_Environment::_process_attribute_bond:invalid bond smarts " << bond_smarts << endl;
+      return 0;
+    }
+
+    for (int j = 0; j < other_end.number_elements(); ++j)
+    {
+      const atom_number_t a = other_end[j];
+
+      if (NULL == completed[a])
+      {
+        cerr << "Substructure_Environment::_process_attribute_bonds: atom " << a << " has not been defined\n";
+        return 0;
+      }
+
+      _possible_parents.add(completed[a]);
+    }
   }
 
   return 1;
@@ -1874,7 +2055,7 @@ Substructure_Atom::_create_environment_from_msi_object (const msi_object & msi,
     }
 
     Substructure_Atom * a = new Substructure_Atom;
-    if (! a->construct_from_msi_object (*m, completed))
+    if (! a->construct_from_msi_object(*m, completed))
     {
       cerr << "_create_environment_from_msi_object: cannot create environment component " << i << endl;
       delete a;
@@ -1891,7 +2072,7 @@ Substructure_Atom::_create_environment_from_msi_object (const msi_object & msi,
   }
 
   while (_children.number_elements() > initial_children)
-    _environment.transfer_in (_children, initial_children);
+    _environment.transfer_in(_children, initial_children);
 
   return _environment.number_elements();
 }
@@ -1904,7 +2085,7 @@ int
 Substructure_Atom_Environment::create_from_msi_object (msi_object & msi)
 {
   IWString smarts;
-  if (msi.string_value_for_attribute (NAME_OF_SMARTS_ATTRIBUTE, smarts))
+  if (msi.string_value_for_attribute(NAME_OF_SMARTS_ATTRIBUTE, smarts))
   {
     if (msi.number_elements())
     {
@@ -1944,7 +2125,7 @@ Substructure_Atom::_construct_from_msi_object (const msi_object & msi,
   }
 
 #ifdef DEBUG_COMPLTED
-  cerr << "Building atom\n";msi->print (cerr);
+  cerr << "Building atom\n";msi->print(cerr);
   for (int i = 0; i < 6; i++)
   {
     cerr << "Completed[" << i << "] = " << completed[i] << endl;
@@ -1953,7 +2134,7 @@ Substructure_Atom::_construct_from_msi_object (const msi_object & msi,
   cerr << "Building atom from\n" << (*msi);
 #endif
 
-  if (! Substructure_Atom_Specifier::construct_from_msi_object (msi))
+  if (! Substructure_Atom_Specifier::construct_from_msi_object(msi))
   {
     cerr << "Substructure_Atom::construct_from_msi_object: cannot get attributes\n";
     return 0;
@@ -1979,58 +2160,58 @@ Substructure_Atom::_construct_from_msi_object (const msi_object & msi,
     }
   }
 
-  att = msi.attribute (NAME_OF_OR_OPERATOR);
+  att = msi.attribute(NAME_OF_OR_OPERATOR);
   if (att)
   {
-    if (! att->value (_or_id) || 0 == _or_id)
+    if (! att->value(_or_id) || 0 == _or_id)
     {
       cerr << "Substructure_Atom::_construct_from_msi_object: or id must be a positive number\n";
       return 0;
     }
   }
 
-  att = msi.attribute (NAME_OF_RING_ID_SPECIFIER);
+  att = msi.attribute(NAME_OF_RING_ID_SPECIFIER);
   if (att)
   {
-    if (! att->value (_ring_id) || 0 == _ring_id)
+    if (! att->value(_ring_id) || 0 == _ring_id)
     {
       cerr << "Substructure_Atom::_construct_from_msi_object: ring id must be a positive number\n";
       return 0;
     }
   }
 
-  att = msi.attribute (NAME_OF_FRAGMENT_ID_SPECIFIER);
+  att = msi.attribute(NAME_OF_FRAGMENT_ID_SPECIFIER);
   if (att)
   {
-    if (! att->value (_fragment_id) || 0 == _fragment_id)
+    if (! att->value(_fragment_id) || 0 == _fragment_id)
     {
       cerr << "Substructure_Atom::_construct_from_msi_object: fragment id must be a positive number\n";
       return 0;
     }
   }
 
-  att = msi.attribute (NAME_OF_TEXT_IDENTIFIER_ATTRIBUTE);
+  att = msi.attribute(NAME_OF_TEXT_IDENTIFIER_ATTRIBUTE);
   if (att)
-    att->value (_text_identifier);
+    att->value(_text_identifier);
 
-  att = msi.attribute (NAME_OF_NUMERIC_VALUE_ATTRIBUTE);
+  att = msi.attribute(NAME_OF_NUMERIC_VALUE_ATTRIBUTE);
   if (att)
   {
     double tmp;
-    if (! att->value (tmp))
+    if (! att->value(tmp))
     {
       cerr << "Substructure_Atom::_construct_from_msi_object: the " << NAME_OF_NUMERIC_VALUE_ATTRIBUTE << " attribute must be numeric\n";
       return 0;
     }
 
-    _numeric_value.set (tmp);
+    _numeric_value.set(tmp);
   }
 
-  att = msi.attribute (NAME_OF_INCLUDE_IN_EMBEDDING_ATTRIBUTE);
+  att = msi.attribute(NAME_OF_INCLUDE_IN_EMBEDDING_ATTRIBUTE);
   if (att)
   {
     int tmp;
-    if (! att->value (tmp))
+    if (! att->value(tmp))
     {
       cerr << "Substructure_Atom::_construct_from_msi_object: the " <<
              NAME_OF_INCLUDE_IN_EMBEDDING_ATTRIBUTE << " attribute requires a whole number\n";
@@ -2042,9 +2223,9 @@ Substructure_Atom::_construct_from_msi_object (const msi_object & msi,
 
 // For simplicity, one can specify only one of atom smarts, smiles and smarts
 
-  if ((NULL !=  msi.attribute (NAME_OF_ATOM_SMARTS_ATTRIBUTE)) +
-      (NULL !=  msi.attribute (NAME_OF_SMARTS_ATTRIBUTE)) +
-      (NULL !=  msi.attribute (NAME_OF_SMILES_ATTRIBUTE)) > 1)
+  if ((NULL !=  msi.attribute(NAME_OF_ATOM_SMARTS_ATTRIBUTE)) +
+      (NULL !=  msi.attribute(NAME_OF_SMARTS_ATTRIBUTE)) +
+      (NULL !=  msi.attribute(NAME_OF_SMILES_ATTRIBUTE)) > 1)
   {
       cerr << "The '" << NAME_OF_ATOM_SMARTS_ATTRIBUTE << "', '" <<
               NAME_OF_SMILES_ATTRIBUTE << "' and '" <<
@@ -2052,46 +2233,46 @@ Substructure_Atom::_construct_from_msi_object (const msi_object & msi,
       return 0;
   }
 
-  att = msi.attribute (NAME_OF_ATOM_SMARTS_ATTRIBUTE);
+  att = msi.attribute(NAME_OF_ATOM_SMARTS_ATTRIBUTE);
   if (att)
   {
     IWString csmarts;
-    att->value (csmarts);
+    att->value(csmarts);
 
-    if (! (csmarts.starts_with ('[') && csmarts.ends_with (']')))
+    if (! (csmarts.starts_with('[') && csmarts.ends_with(']')))
     {
       cerr << "Substructure_Atom::_construct_from_msi_object: atomic smarts must be within [] '" << csmarts << "'\n";
       return 0;
     }
 
-    if (! construct_from_smarts_token (csmarts))
+    if (! construct_from_smarts_token(csmarts))
     {
       cerr << "Substructure_Atom::_construct_from_msi_object: cannot interpret smarts '" << csmarts << "'\n";
       return 0;
     }
   }
 
-  att = msi.attribute (NAME_OF_SUM_ALL_PREFERENCE_HITS_ATTRIBUTE);
+  att = msi.attribute(NAME_OF_SUM_ALL_PREFERENCE_HITS_ATTRIBUTE);
   if (att)
   {
-    if (! att->value (_sum_all_preference_hits))
+    if (! att->value(_sum_all_preference_hits))
     {
       cerr << "Substructure_Atom::_construct_from_msi_object: the " << NAME_OF_SUM_ALL_PREFERENCE_HITS_ATTRIBUTE << " attribute must be a whole number\n";
       return 0;
     }
   }
 
-  att = msi.attribute (NAME_OF_SMILES_ATTRIBUTE);
+  att = msi.attribute(NAME_OF_SMILES_ATTRIBUTE);
   if (att)
   {
-    if (! parse_smiles_specifier (att))
+    if (! parse_smiles_specifier(att))
       return 0;
   }
 
-  att = msi.attribute (NAME_OF_SMARTS_ATTRIBUTE);
+  att = msi.attribute(NAME_OF_SMARTS_ATTRIBUTE);
   if (att)
   {
-    if (! parse_smarts_specifier (att))
+    if (! parse_smarts_specifier(att))
       return 0;
   }
 
@@ -2105,17 +2286,17 @@ Substructure_Atom::_construct_from_msi_object (const msi_object & msi,
     if (NAME_OF_QUERY_ATOM_OBJECT == m.name() || 
              NAME_OF_QUERY_ATOM_SPECIFIER_OBJECT == m.name())
     {
-      if (! _add_component (m))
+      if (! _add_component(m))
         return 0;
     }
     else if (NAME_OF_ENVIRONMENT_OBJECT == m.name())
     {
-      if (! _create_environment_from_msi_object (m, completed))
+      if (! _create_environment_from_msi_object(m, completed))
         return 0;
     }
     else if (NAME_OF_QUERY_ATOM_PREFERENCE_OBJECT == m.name())
     {
-      if (! _create_preference_from_msi_object (m))
+      if (! _create_preference_from_msi_object(m))
         return 0;
     }
     else if (NAME_OF_QUERY_BOND_OBJECT == m.name())   // will be processed by calling function
@@ -2147,13 +2328,13 @@ Substructure_Atom::_construct_from_msi_object (const msi_object & msi,
 */
 
 int
-Substructure_Atom::construct_from_msi_object (const msi_object & msi,
-                                              extending_resizable_array<Substructure_Atom *> & completed)
+Substructure_Atom::construct_from_msi_object(const msi_object & msi,
+                                             extending_resizable_array<Substructure_Atom *> & completed)
 {
-  if (is_rejection (msi))
+  if (is_rejection(msi))
     _match_as_match_or_rejection = 0;
 
-  if (! _construct_from_msi_object (msi, completed))
+  if (! _construct_from_msi_object(msi, completed))
   {
     cerr << msi;
     return 0;
@@ -2164,7 +2345,7 @@ Substructure_Atom::construct_from_msi_object (const msi_object & msi,
 
 // Process any bonds which have been specified as attributes
 
-  if (! _process_attribute_bonds (msi, completed))
+  if (! _process_attribute_bonds(msi, completed))
   {
     cerr << msi;
     return 0;
@@ -2241,7 +2422,7 @@ determine_part_of_non_kekule_aromatic (Molecule & m,
     if (ring_size > 6)
       return 0;
 
-    if (! ri->contains_bond (b.a1(), b.a2()))
+    if (! ri->contains_bond(b.a1(), b.a2()))
       continue;
 
     if (5 == ring_size)   // always
@@ -2274,7 +2455,7 @@ initialise_bond_attributes (Substructure_Bond & sb,
   if (mqs.just_atomic_number_and_connectivity())
     sb.set_match_any();
   else if (0 == mdlbd->btype())
-    sb.copy (b, mqs.copy_bond_attributes());
+    sb.copy(b, mqs.copy_bond_attributes());
   else if (NULL == b)
     sb.set_match_any();
   else if (b->is_aromatic())
@@ -2283,38 +2464,46 @@ initialise_bond_attributes (Substructure_Bond & sb,
     if (0 == ablki)
     {
       bond_type_t bt = b->btype();
-      sb.set_type (bt & BOND_TYPE_ONLY_MASK);
+      sb.set_type(bt & BOND_TYPE_ONLY_MASK);
     }
     else if (1 == ablki)
       sb.set_type(AROMATIC_BOND);
     else if (part_of_non_kekule_aromatic)
     {
       bond_type_t bt = b->btype();
-      sb.set_type (bt & BOND_TYPE_ONLY_MASK);
+      sb.set_type(bt & BOND_TYPE_ONLY_MASK);
     }
     else
       sb.set_type(AROMATIC_BOND);
   }
   else
-    sb.set_type (mdlbd->btype());
+    sb.set_type(mdlbd->btype());
 
 #ifdef DEBUG_INITIALISE_BOND_ATTRIBUTES
   cerr << "Set bond type " << sb.types_matched() << endl;
 #endif
 
-  sb.set_atom (completed[j]);
+  sb.set_atom(completed[j]);
 
   if (0 == mdlbd->bond_topology())   // nothing known
     ;
   else if (1 == mdlbd->bond_topology())
-    sb.set_must_be_in_a_ring (1);
+    sb.set_must_be_in_a_ring(1);
   else if (2 == mdlbd->bond_topology())
   {
-    sb.set_must_be_in_a_ring (0);
+    sb.set_must_be_in_a_ring(0);
 //  cerr << "Bond topology 2 between atoms " << b->a1() << " and " << b->a2() << endl;
   }
   else
-    cerr << "Unrecognised bond topology for atom " << b->other (j) << " " << mdlbd->bond_topology() << endl;
+    cerr << "Unrecognised bond topology for atom " << b->other(j) << " " << mdlbd->bond_topology() << endl;
+
+  if (mqs.bonds_preserve_ring_membership())   // we do not test for conflicting directives
+  {
+    if (b->nrings())
+      sb.set_must_be_in_a_ring(1);
+    else
+      sb.set_must_be_in_a_ring(0);
+  }
 
   return 1;
 }
@@ -2328,7 +2517,7 @@ Substructure_Atom::_build_atomic_number_matches_from_atom_list(const ISIS_Atom_L
     {
       const Element * ej = ali.elementi(j);
 
-      set_element (ej);
+      set_element(ej);
     }
 
     return 1;
@@ -2338,16 +2527,16 @@ Substructure_Atom::_build_atomic_number_matches_from_atom_list(const ISIS_Atom_L
 
   for (int i = 0; i < ali.number_elements(); i++)
   {
-    s->set_element (ali.elementi(i));
+    s->set_element(ali.elementi(i));
   }
 
-  _components.add (s);
+  _components.add(s);
 
   int n = _components.number_elements();
-  _operator.set_unary_operator (n - 1, 0);
+  _operator.set_unary_operator(n - 1, 0);
 
   if (n > 1)
-    _operator.add_operator (IW_LOGEXP_LOW_PRIORITY_AND);
+    _operator.add_operator(IW_LOGEXP_LOW_PRIORITY_AND);
 
   return 1;
 }
@@ -2437,7 +2626,8 @@ Substructure_Atom::create_from_molecule (Molecule & m,
                                          atom_number_t my_atom_number,
                                          Substructure_Atom * my_parent,
                                          const Molecule_to_Query_Specifications & mqs,
-                                         extending_resizable_array<Substructure_Atom *> & completed)
+                                         extending_resizable_array<Substructure_Atom *> & completed,
+                                         const int * include_these_atoms)
 {
 //cerr << "Substructure_Atom::creating from molecule with " << m.natoms() << " atoms, atom " << my_atom_number << endl;
 
@@ -2470,7 +2660,7 @@ Substructure_Atom::create_from_molecule (Molecule & m,
   cerr << endl;
 #endif
 
-  const Atom * a = m.atomi (my_atom_number);
+  const Atom * a = m.atomi(my_atom_number);
 
   const Element * e = a->element();
 
@@ -2487,7 +2677,7 @@ Substructure_Atom::create_from_molecule (Molecule & m,
 //cerr << "Examining atom " << mdlad->initial_atomic_symbol() << endl;
 // Jan 2009. If the alias is a number, don't interpret it as a smarts
 
-  if (mdlad->alias().length())
+  if (mqs.interpret_atom_alias_as_smarts() && mdlad->alias().length())
   {
     const_IWSubstring s = mdlad->alias();
     int notused;
@@ -2497,16 +2687,18 @@ Substructure_Atom::create_from_molecule (Molecule & m,
     {
       smarts_specified = mdlad->alias();
 
-      if (! smarts_specified.starts_with ('[') && smarts_specified.ends_with (']'))
+      if (! smarts_specified.starts_with('[') && smarts_specified.ends_with(']'))
       {
         cerr << "Substructure_Atom::create_from_molecule:invalid atomic smarts as alias '" << smarts_specified << "'\n";
         return 0;
       }
     }
   }
-  else if (mqs.smarts_for_element (e, smarts_specified))
+  else if (! mqs.interpret_atom_alias_as_smarts() && mdlad->alias().length())   // probably from Marvin, AH, AQ...
+    _build_atomic_number_matches_from_atom_list(mdlad->atom_list());
+  else if (mqs.smarts_for_element(e, smarts_specified))
   {
-    if (! smarts_specified.starts_with ('[') && smarts_specified.ends_with (']'))
+    if (! smarts_specified.starts_with('[') && smarts_specified.ends_with(']'))
     {
       cerr << "Substructure_Atom::create_from_molecule:invalid atomic smarts as alias '" << smarts_specified << "'\n";
       return 0;
@@ -2514,10 +2706,10 @@ Substructure_Atom::create_from_molecule (Molecule & m,
   }
   else if (e->is_in_periodic_table())
   {
-    if (1 == e->atomic_number() && mqs.convert_explicit_hydrogens_to_match_any_atom())
+    if (1 == e->atomic_number() && (mqs.convert_explicit_hydrogens_to_match_any_atom() || mqs.convert_explicit_hydrogens_to_match_any_atom_including_hydrogen()))
       ;
     else
-      set_element (e);
+      set_element(e);
   }
   else if ("A" == initial_atomic_symbol)    // match any atom
     ;
@@ -2528,48 +2720,59 @@ Substructure_Atom::create_from_molecule (Molecule & m,
   else if ("Q" ==  initial_atomic_symbol)    // heteroatom
   {
     Substructure_Atom_Specifier * q = new Substructure_Atom_Specifier;
-    q->set_element (get_element_from_atomic_number(6));
-    _components.add (q);
+    q->set_element(get_element_from_atomic_number(6));
+    _components.add(q);
     if (_components.number_elements() > 1)   // will never happen here
-      _operator.add_operator (IW_LOGEXP_LOW_PRIORITY_AND);
-    _operator.set_unary_operator (0, 0);
+      _operator.add_operator(IW_LOGEXP_LOW_PRIORITY_AND);
+    _operator.set_unary_operator(0, 0);
   }
 
   int acon = a->ncon();
 
 #ifdef DEBUG_CREATE_FROM_MOLECULE
-  cerr << "Atom " << my_atom_number << " type " << m.atomic_number (my_atom_number) << " has " << m.hcount (my_atom_number) << " hydrogens\n";
+  cerr << "Atom " << my_atom_number << " type " << m.atomic_number(my_atom_number) << " has " << m.hcount(my_atom_number) << " hydrogens\n";
 #endif
 
   if (smarts_specified.length() > 0)
     ;
   else if (1 == mdlad->exact_change())
   {
-    _ncon.add (acon);
-    _nbonds.add (a->nbonds());
+    _ncon.add(acon);
+    _nbonds.add(a->nbonds());
   }
+  else if (mqs.query_must_match_both_explicit_and_implicit_hydrogens())
+    cerr << "query_must_match_both_explicit_and_implicit_hydrogens\n";
+  else if ((MQS_ISOTOPE_MEANS_NCON & mqs.isotopic_label_means()) && a->isotope() > 0)
+    _ncon.add(m.ncon(my_atom_number));
   else if (0 != mdlad->substitution())
   {
 //  cerr << "Atom " << my_atom_number << " substitution " << mdlad->substitution() << endl;
     if (-2 == mdlad->substitution())
-      _ncon.add (acon);
+      _ncon.add(acon);
     else if (-1 == mdlad->substitution())
-      _ncon.add (0);
+      _ncon.add(0);
     else if (mdlad->substitution() > 0)
-      _ncon.add (mdlad->substitution());
+      _ncon.add(mdlad->substitution());
+    else if (-3 == mdlad->substitution())    // IAW extentions that means do nothing
+      ;
     else
-      set_min_ncon (acon);
+      set_min_ncon(acon);
   }
   else if (0 != mdlad->min_ncon())
-    set_min_ncon (mdlad->min_ncon());
+    set_min_ncon(mdlad->min_ncon());
   else if (0 != mdlad->max_ncon())
-    set_max_ncon (mdlad->max_ncon());
+    set_max_ncon(mdlad->max_ncon());
+  else if (! mqs.make_embedding())
+  {
+    _ncon.add(acon);
+    _nbonds.add(a->nbonds());
+  }
   else
   {
     if (1 == acon && NULL != my_parent)    // doesn't make sense to specify anything
       ;
     else
-      set_min_ncon (acon);
+      set_min_ncon(acon);
   }
 
 //#define DEBUG_HCOUNT_STUFF
@@ -2586,41 +2789,52 @@ Substructure_Atom::create_from_molecule (Molecule & m,
   else if (! mqs.discern_hcount())
     ;
   else if (1 == mdlad->exact_change())
-    _hcount.add (const_cast<Atom *> (a)->implicit_hydrogens());
+    _hcount.add(const_cast<Atom *>(a)->implicit_hydrogens());
   else if (1 == mdlad->h0designator())
-    _hcount.add (0);
+    _hcount.add(0);
   else if (mdlad->hcount() > 0)   // hcount 1 in ISIS means NO implicit Hydrogens
-    _hcount.add (mdlad->hcount() - 1);
+    _hcount.add(mdlad->hcount() - 1);
   else if (mdlad->min_hcount() > 0)
-    _hcount.set_min (mdlad->min_hcount());
+    _hcount.set_min(mdlad->min_hcount());
   else if (mdlad->explicit_hydrogen_atoms_removed())
-    _hcount.set_min (mdlad->explicit_hydrogen_atoms_removed());
+    _hcount.set_min(mdlad->explicit_hydrogen_atoms_removed());
+  else if (! a->element()->organic())    // cannot say anything about it
+    ;
   else if (! e->is_in_periodic_table())    // can't say anything about hcount
     ;
   else if (1 == e->atomic_number())   // don't say anything about hcount
     ;
   else if (mqs.just_atomic_number_and_connectivity())
     ;
-  else if (_ncon.is_set())
+  else if (mqs.ignore_molecular_hydrogen_information())
+    ;
+  else if (_ncon.is_set() || -3 == mdlad->substitution())
     ;
   else
   {
-    int exh = m.explicit_hydrogens (my_atom_number);
-    int ih  = m.implicit_hydrogens (my_atom_number);
+    int exh = m.explicit_hydrogens(my_atom_number);
+    int ih  = m.implicit_hydrogens(my_atom_number);
 
     if (0 == exh && 0 == ih)
-      _hcount.add (0);
+      _hcount.add(0);
     else if (exh + ih < 3)       // specifying a max of 3 Hydrogens is useless
-      _hcount.set_max (exh + ih);
+      _hcount.set_max(exh + ih);
   }
 
 #ifdef DEBUG_HCOUNT_STUFF
   cerr << "atom " << my_atom_number << " hcount set to ";
-  _hcount.debug_print (cerr);
+  _hcount.debug_print(cerr);
 #endif
+
+//cerr << "preserve_saturation " << mqs.preserve_saturation() << ", uns " << mdlad->unsaturated() << endl;
 
   if (smarts_specified.length())
     ;
+  else if (mqs.preserve_saturation())
+  {
+    const auto s = a->nbonds() - a->ncon();
+    _unsaturation.add(s);
+  }
   else if (0 == mdlad->unsaturated())
     ;
   else if (mqs.just_atomic_number_and_connectivity())
@@ -2628,30 +2842,34 @@ Substructure_Atom::create_from_molecule (Molecule & m,
   else if (mdlad->unsaturated() > 0)
   {
     if (8 == e->atomic_number())   // Oxygen can only have 1 unsaturation
-      _unsaturation.add (1);
+      _unsaturation.add(1);
     else
-      _unsaturation.set_min (1);
+      _unsaturation.set_min(1);
   }
   else if (SPECIAL_MEANING_FULLY_SATURATED == mdlad->unsaturated())
-    _unsaturation.add (0);
+    _unsaturation.add(0);
 
   if (smarts_specified.length())
     ;
   else if (mqs.just_atomic_number_and_connectivity())
     ;
   else if (a->formal_charge())
-    set_formal_charge (a->formal_charge());
+    set_formal_charge(a->formal_charge());
 
   if (smarts_specified.length())
     ;
   else if (only_include_isotopically_labeled_atoms())  // ignore isotopic labels
     ;
+  else if (mqs.substituents_only_at_isotopic_atoms())   // ignore isotopes
+    ;
+  else if (0 != mqs.isotopic_label_means())
+    ;
   else if (a->isotope())
-    _isotope.add (a->isotope());
+    _isotope.add(a->isotope());
 
-  int nr = m.nrings (my_atom_number);
+  int nr = m.nrings(my_atom_number);
 
-  int rbc = m.ring_bond_count (my_atom_number);
+  int rbc = m.ring_bond_count(my_atom_number);
 
 //cerr << "Atom " << my_atom_number << " nr = " << nr << " rbc " << rbc << endl;
 
@@ -2665,21 +2883,30 @@ Substructure_Atom::create_from_molecule (Molecule & m,
       _ring_bond_count.add(0);
     else if (-2 == r)  // as drawn
       _ring_bond_count.add(rbc);
+    else if (-3 == r)    // ignore
+      ;
     else if (r > 1)
       _ring_bond_count.add(r);
   }
-  else if (mqs.atoms_conserve_ring_membership())
+  else if (mqs.atoms_conserve_ring_membership() && nr > 0)
   {
-    int ns = m.nrings_including_non_sssr_rings(my_atom_number);
+    _ring_bond_count.add(rbc);
+//  int ns = m.nrings_including_non_sssr_rings(my_atom_number);
 //  cerr << "atoms_conserve_ring_membership, nr = " << nr << " ns = " << ns << endl;
 
-    for (int i = nr; i <= ns; i++)
-    {
-      _nrings.add(i);
-    }
+//  for (int i = nr; i <= ns; i++)
+//  {
+//    _nrings.add(i);
+//  }
+  }
+  else if (mqs.ring_atoms_conserve_ring_membership() && nr)
+  {
+    _nrings.set_min(nr);
   }
   else if (0 == nr && mqs.non_ring_atoms_become_nrings_0())
     _nrings.add(0);
+  else if ((MQS_ISOTOPE_MEANS_RING_BOND_COUNT & mqs.isotopic_label_means()))
+    _ring_bond_count.add(rbc);
   else if (rbc > 0)
     _ring_bond_count.set_min(rbc);
   else if (nr > 0)
@@ -2696,6 +2923,13 @@ Substructure_Atom::create_from_molecule (Molecule & m,
   {
     _set_match_any_aromatic(mqs.convert_all_aromatic_atoms_to_generic_aromatic(), m, my_atom_number);
   }
+  else if (mqs.aromatic_only_matches_aromatic_aliphatic_only_matches_aliphatic())
+  {
+    if (m.is_aromatic(my_atom_number))
+      update_aromaticity(AROMATIC);
+    else
+      update_aromaticity(NOT_AROMATIC);
+  }
   else if (nr)
   {
     int known_aromaticity = mdlad->aromatic();
@@ -2703,29 +2937,29 @@ Substructure_Atom::create_from_molecule (Molecule & m,
     if (known_aromaticity < 0)    // need to compute it
     {
       aromaticity_type_t arom;
-      if (m.aromaticity (my_atom_number, arom))
+      if (m.aromaticity(my_atom_number, arom))
       {
-        if (IS_AROMATIC_ATOM (arom))
-          update_aromaticity (arom);
+        if (IS_AROMATIC_ATOM(arom))
+          update_aromaticity(arom);
         else if (mqs.only_aromatic_atoms_match_aromatic_atoms())
-          update_aromaticity (NOT_AROMATIC);
-//      if (IS_ALIPHATIC_ATOM (arom))     // only make positive decisions about aromaticity
-//        update_aromaticity (arom);
+          update_aromaticity(NOT_AROMATIC);
+//      if (IS_ALIPHATIC_ATOM(arom))     // only make positive decisions about aromaticity
+//        update_aromaticity(arom);
       }
     }
     else if (AROMATIC == known_aromaticity)
-      update_aromaticity (AROMATIC);
+      update_aromaticity(AROMATIC);
     else if (NOT_AROMATIC == known_aromaticity)
-      update_aromaticity (NOT_AROMATIC);
+      update_aromaticity(NOT_AROMATIC);
   }
   else if (m.is_aromatic(my_atom_number))   // chain aromatic atom
     update_aromaticity(AROMATIC);
   else if (mqs.only_aromatic_atoms_match_aromatic_atoms())
   {
-    if (m.is_aromatic (my_atom_number))
-      update_aromaticity (AROMATIC);
+    if (m.is_aromatic(my_atom_number))
+      update_aromaticity(AROMATIC);
     else
-      update_aromaticity (NOT_AROMATIC);
+      update_aromaticity(NOT_AROMATIC);
   }
 
 // We take the easy way out here and just use our component. Probably should do all of them if present
@@ -2756,27 +2990,29 @@ Substructure_Atom::create_from_molecule (Molecule & m,
   {
     Substructure_Bond * sb = new Substructure_Bond;
 
-    const Bond * b = m.bond_between_atoms (my_atom_number, parent_atom_number);
+    const Bond * b = m.bond_between_atoms(my_atom_number, parent_atom_number);
     assert (NULL != b);
 
-    int bnumber = m.which_bond (my_atom_number, parent_atom_number);
+    int bnumber = m.which_bond(my_atom_number, parent_atom_number);
 
 //  When dealing with Hydrogens that can be anything, we need to allow the bond type to be anything. Bit of a kludge here I'm afraid
 
-    if (1 == e->atomic_number() && mqs.convert_explicit_hydrogens_to_match_any_atom())
+    if (1 == e->atomic_number() && (mqs.convert_explicit_hydrogens_to_match_any_atom() || mqs.convert_explicit_hydrogens_to_match_any_atom_including_hydrogen()))
     {
-      initialise_bond_attributes (*sb, mdlfd.mdl_bond_data(bnumber), NULL, parent_atom_number, completed, mqs, 0);
+      initialise_bond_attributes(*sb, mdlfd.mdl_bond_data(bnumber), NULL, parent_atom_number, completed, mqs, 0);
     }
+    else if (bnumber >= mdlfd.number_bonds())   // underlying mdl_molecule may have been expanded
+      ;
     else if (aromatic_bonds_lose_kekule_identity())
-      initialise_bond_attributes (*sb, mdlfd.mdl_bond_data(bnumber), b, parent_atom_number, completed, mqs, determine_part_of_non_kekule_aromatic(m, *b));
+      initialise_bond_attributes(*sb, mdlfd.mdl_bond_data(bnumber), b, parent_atom_number, completed, mqs, determine_part_of_non_kekule_aromatic(m, *b));
     else
-      initialise_bond_attributes (*sb, mdlfd.mdl_bond_data(bnumber), b, parent_atom_number, completed, mqs, 0);
+      initialise_bond_attributes(*sb, mdlfd.mdl_bond_data(bnumber), b, parent_atom_number, completed, mqs, 0);
 
 #ifdef DEBUG_CREATE_FROM_MOLECULE
     sb->debug_print(cerr, "From parent ");
 #endif
 
-    _bonds.add (sb);
+    _bonds.add(sb);
 
     assert (completed[parent_atom_number] == _parent);
 
@@ -2785,11 +3021,23 @@ Substructure_Atom::create_from_molecule (Molecule & m,
 
     if (smarts_specified.length())
     {
-      if (! construct_from_smarts_token (smarts_specified))
+//  cerr << "Building from smarts '" << smarts_specified << "' (parent)\n";
+      if (! construct_from_smarts_token(smarts_specified))
       {
         cerr << "Substructure_Atom::create_from_molecule:invalid smarts in alias '" << smarts_specified << "'\n";
         return 0;
       }
+      smarts_specified.resize(0);
+    }
+  }
+
+  if (smarts_specified.length())
+  {
+//  cerr << "Building from smarts '" << smarts_specified << "'\n";
+    if (! construct_from_smarts_token(smarts_specified))
+    {
+      cerr << "Substructure_Atom::create_from_molecule:invalid smarts in alias '" << smarts_specified << "'\n";
+      return 0;
     }
   }
 
@@ -2797,9 +3045,9 @@ Substructure_Atom::create_from_molecule (Molecule & m,
 
   for (int i = 0; i < acon; i++)
   {
-    const Bond * b = a->item (i);
+    const Bond * b = a->item(i);
 
-    atom_number_t j = b->other (my_atom_number);
+    atom_number_t j = b->other(my_atom_number);
 
     if (j == parent_atom_number)
       continue;
@@ -2814,16 +3062,16 @@ Substructure_Atom::create_from_molecule (Molecule & m,
     cerr << "From atom " << my_atom_number << " go to atom " << j << endl;
 #endif
 
-    int bnumber = m.which_bond (b->a1(), b->a2());
+    int bnumber = m.which_bond(b->a1(), b->a2());
 
     Substructure_Bond * sb = new Substructure_Bond();
 
     if (aromatic_bonds_lose_kekule_identity())
-      initialise_bond_attributes (*sb, mdlfd.mdl_bond_data(bnumber), b, j, completed, mqs, determine_part_of_non_kekule_aromatic(m, *b));
+      initialise_bond_attributes(*sb, mdlfd.mdl_bond_data(bnumber), b, j, completed, mqs, determine_part_of_non_kekule_aromatic(m, *b));
     else
-      initialise_bond_attributes (*sb, mdlfd.mdl_bond_data(bnumber), b, j, completed, mqs, 0);
+      initialise_bond_attributes(*sb, mdlfd.mdl_bond_data(bnumber), b, j, completed, mqs, 0);
 
-    _bonds.add (sb);
+    _bonds.add(sb);
 
 #ifdef DEBUG_CREATE_FROM_MOLECULE
     cerr << "Ring closure bond back to atom " << j << endl;
@@ -2835,7 +3083,21 @@ Substructure_Atom::create_from_molecule (Molecule & m,
 
   for (int i = 0; i < acon; i++)
   {
-    atom_number_t j = a->other (my_atom_number, i);
+    const atom_number_t j = a->other(my_atom_number, i);
+
+#ifdef DEBUG_CREATE_FROM_MOLECULE
+    cerr << "From atom " << my_atom_number << " child " << j << " inc " << (NULL == include_these_atoms ? '1' : include_these_atoms[j]) << " complete " << completed[j] << ' ' << m.smarts_equivalent_for_atom(j) << endl;
+#endif
+
+    if (NULL != include_these_atoms && ! include_these_atoms[j])
+      continue;
+
+#ifdef DEBUG_CREATE_FROM_MOLECULE
+    if (NULL != include_these_atoms)
+      cerr << "include_these_atoms[" << j << "] " << include_these_atoms[j] << endl;
+    else
+      cerr << "include_these_atoms not set\n";
+#endif
 
     if (completed[j])    // must be a cyclic structure
       continue;
@@ -2845,9 +3107,9 @@ Substructure_Atom::create_from_molecule (Molecule & m,
 
     Substructure_Atom * child = new Substructure_Atom;
 
-    child->create_from_molecule (m, mdlfd, j, this, mqs, completed);
+    child->create_from_molecule(m, mdlfd, j, this, mqs, completed, include_these_atoms);
 
-    _children.add (child);
+    _children.add(child);
   }
 
 // Jun 2002.  Wow, Beckman rearrangement with MFCD00046298 breaks. 
@@ -2857,10 +3119,10 @@ Substructure_Atom::create_from_molecule (Molecule & m,
 
 #ifdef USE_RING_SIZES
   List_of_Ring_Sizes lors;
-  m.ring_sizes_for_atom (my_atom_number, lors);
+  m.ring_sizes_for_atom(my_atom_number, lors);
   for (int i = 0; i < lors.number_elements(); i++)
   {
-    _ring_size.add (lors[i]);
+    _ring_size.add(lors[i]);
   }
 #endif
 
@@ -2886,7 +3148,7 @@ Substructure_Atom::_parse_smiles_specifier (Molecule & m,
 {
   Molecule_to_Query_Specifications mqs;
 
-  if (! create_from_molecule (m, mdlfd, 0, _parent, mqs, completed))
+  if (! create_from_molecule(m, mdlfd, 0, _parent, mqs, completed))
     return 0;
 
 // We need to make room to allow ourselves to be attached to the rest
@@ -2896,15 +3158,15 @@ Substructure_Atom::_parse_smiles_specifier (Molecule & m,
   if (_nbonds.number_elements())
   {
     int nb = _nbonds[0];
-    _nbonds.resize (0);
-    _nbonds.set_min (nb + 1);
+    _nbonds.resize(0);
+    _nbonds.set_min(nb + 1);
   }
 
   if (_ncon.number_elements())
   {
     int nc = _ncon[0];
-    _ncon.resize (0);
-    _ncon.set_min (nc + 1);
+    _ncon.resize(0);
+    _ncon.set_min(nc + 1);
   }
 
   if (_hcount.number_elements())
@@ -2913,15 +3175,15 @@ Substructure_Atom::_parse_smiles_specifier (Molecule & m,
     if (0 == hc)
     {
       cerr << "Substructure_Atom::_parse_smiles_specifier: warning, no open valence in '" << m.smiles() << "'\n";
-      _hcount.resize (0);
+      _hcount.resize(0);
     }
     else 
     {
-      _hcount.resize (0);
+      _hcount.resize(0);
       if (1 == hc)
-        _hcount.add (0);
+        _hcount.add(0);
       else
-        _hcount.set_max (hc - 1);
+        _hcount.set_max(hc - 1);
     }
   }
 
@@ -2938,14 +3200,14 @@ Substructure_Atom::parse_smiles_specifier (const IWString & smiles)
   assert (smiles.nchars());
 
   Molecule m;
-  if (! m.build_from_smiles (smiles))
+  if (! m.build_from_smiles(smiles))
   {
     cerr << "Substructure_Atom::_parse_smiles_specifier: bad smiles\n";
     return 0;
   }
 
-  extending_resizable_array<Substructure_Atom *> completed (NULL);
-  completed.resize (m.natoms());
+  extending_resizable_array<Substructure_Atom *> completed(NULL);
+  completed.resize(m.natoms());
 
 // Unique numbers get scrambled in the process, so save it
 
@@ -2954,9 +3216,9 @@ Substructure_Atom::parse_smiles_specifier (const IWString & smiles)
   MDL_File_Data mdlfd;
   mdlfd.build(m);
 
-  int rc = _parse_smiles_specifier (m, mdlfd, completed);
+  int rc = _parse_smiles_specifier(m, mdlfd, completed);
 
-  assign_unique_atom_numbers (uid);
+  assign_unique_atom_numbers(uid);
 
   return rc;
 }
@@ -2965,18 +3227,18 @@ int
 Substructure_Atom::parse_smiles_specifier (const msi_attribute * msi)
 {
   IWString smiles;
-  msi->value (smiles);
+  msi->value(smiles);
 
-  return parse_smiles_specifier (smiles);
+  return parse_smiles_specifier(smiles);
 }
 
 int
 Substructure_Atom::parse_smarts_specifier (const msi_attribute * msi)
 {
   const_IWSubstring smarts;
-  msi->value (smarts);
+  msi->value(smarts);
 
-  if (smarts.contains ('.'))
+  if (smarts.contains('.'))
   {
     cerr << "Substructure_Atom::parse_smarts_specifier: (msi) cannot contain '.'\n";
     return 0;
@@ -2987,15 +3249,15 @@ Substructure_Atom::parse_smarts_specifier (const msi_attribute * msi)
   int uid = _unique_id;
 
 //cerr << "Calling parse smarts specifier on '" << smarts << "'\n";
-  int rc = parse_smarts_specifier (smarts);
+  int rc = parse_smarts_specifier(smarts);
 
-  assign_unique_atom_numbers (uid);
+  assign_unique_atom_numbers(uid);
 
   return rc;
 }
 
-ostream &
-operator << (ostream & os, const Substructure_Atom & a)
+std::ostream &
+operator << (std::ostream & os, const Substructure_Atom & a)
 {
   os << "Atom " << a.unique_id();
   if (NULL == a.current_hold_atom())
@@ -3006,8 +3268,8 @@ operator << (ostream & os, const Substructure_Atom & a)
   return os;
 }
 
-ostream &
-operator << (ostream & os, const Link_Atom & l)
+std::ostream &
+operator << (std::ostream & os, const Link_Atom & l)
 {
   os << "Link atom between " << l.a1() << " and " << l.a2();
   return os;
@@ -3034,11 +3296,11 @@ Single_Substructure_Query::create_molecule (Molecule & m, int fill_min_ncon,
 //cerr << "Seems the query contains a min of " << _min_atoms_in_query << " atoms\n";
 
   if (_comment.length())
-    m.set_name (_comment);
+    m.set_name(_comment);
 
-  m.resize (_min_atoms_in_query);
+  m.resize(_min_atoms_in_query);
 
-  return _root_atoms[0]->create_molecule (m, fill_min_ncon, set_implicit_hydrogens);
+  return _root_atoms[0]->create_molecule(m, fill_min_ncon, set_implicit_hydrogens);
 }
 
 /*int
@@ -3047,7 +3309,7 @@ Single_Substructure_Query::_initialise_sub_array (Molecule & m,
                                                   Molecule_to_Query_Specifications & mqs)
 {
   Substructure_Results sresults;
-  int nhits = substitutions_only_at.substructure_search (m, sresults);
+  int nhits = substitutions_only_at.substructure_search(m, sresults);
 
   if (0 == nhits)
   {
@@ -3057,16 +3319,16 @@ Single_Substructure_Query::_initialise_sub_array (Molecule & m,
   
   int matoms = m.natoms();
 
-  int * sub = new int[matoms]; iw_auto_array<int> free_sub (sub);
+  int * sub = new int[matoms]; std::unique_ptr<int[]> free_sub(sub);
   assert (NULL != sub);
 
-  m.ncon (sub);     // sub[i] = m.ncon (i)
+  m.ncon(sub);     // sub[i] = m.ncon(i)
 
   for (int i = 0; i < nhits; i++)
   {
-    const Set_of_Atoms * e = sresults.embedding (i);
+    const Set_of_Atoms * e = sresults.embedding(i);
     
-    e->set_vector (sub, 0);
+    e->set_vector(sub, 0);
   }
 
   cerr << "Warning, removing isotopes\n";
@@ -3075,25 +3337,45 @@ Single_Substructure_Query::_initialise_sub_array (Molecule & m,
 
   mqs.delete_substitution();
 
-  return mqs.set_substitution (sub, matoms);
+  return mqs.set_substitution(sub, matoms);
 }*/
 
 int
 Single_Substructure_Query::create_from_molecule (MDL_Molecule & m, 
-                                                 Molecule_to_Query_Specifications & mqs)
+                                                 Molecule_to_Query_Specifications & mqs,
+                                                 const int * include_these_atoms)
 {
   assert (m.ok());
   assert (0 == _root_atoms.number_elements());
 
   if (! m.arrays_allocated())
-    m.build (m);
+    m.build(m);
 
-  if (! _create_from_molecule (m, mqs))
+#ifdef DEBUG_CREATE_FROM_MOLECULE
+  cerr << "Single_Substructure_Query::create_from_molecule line " << __LINE__ << " " << m.name() << endl;
+  for (int i = 0; i < m.natoms(); ++i)
+  {
+    if (include_these_atoms[i])
+      cerr << "Will include atom " << i << ' ' << m.smarts_equivalent_for_atom(i) << endl;
+  }
+#endif
+
+//cerr << "Single_Substructure_Query::create_from_molecule:BEGIN   " << m.smiles() << endl;
+
+  if (! _create_from_molecule(m, mqs, include_these_atoms))
     return 0;
 
   assign_unique_numbers();
 
-  _build_element_hits_needed (m, mqs);
+  if (mqs.set_element_hits_needed_during_molecule_to_query())
+    _build_element_hits_needed(m, mqs, include_these_atoms);
+
+  if (mqs.ncon() > 0)
+    _ncon.add(mqs.ncon());
+  if (mqs.min_ncon() > 0)
+    _ncon.set_min(mqs.min_ncon());
+  if (mqs.max_ncon() > 0)
+    _ncon.set_max(mqs.max_ncon());
 
   return 1;
 }
@@ -3106,14 +3388,18 @@ Single_Substructure_Query::create_from_molecule (MDL_Molecule & m,
 
 int
 Single_Substructure_Query::_build_element_hits_needed (const MDL_Molecule & m,
-                                const Molecule_to_Query_Specifications & mqs)
+                                const Molecule_to_Query_Specifications & mqs,
+                                const int * include_these_atoms)
 {
-  int * count = new_int (HIGHEST_ATOMIC_NUMBER + 1); iw_auto_array<int> free_count (count);
+  int * count = new_int(HIGHEST_ATOMIC_NUMBER + 1); std::unique_ptr<int[]> free_count(count);
 
   int matoms = m.natoms();
 
   for (int i = 0; i < matoms; i++)
   {
+    if (NULL != include_these_atoms && 0 == include_these_atoms[i])
+      continue;
+
     if (only_include_isotopically_labeled_atoms() && 0 == m.isotope(i))
       continue;
 
@@ -3122,7 +3408,7 @@ Single_Substructure_Query::_build_element_hits_needed (const MDL_Molecule & m,
     if (! e->is_in_periodic_table())
       continue;
 
-    if (1 == e->atomic_number() && mqs.convert_explicit_hydrogens_to_match_any_atom())
+    if (1 == e->atomic_number() && (mqs.convert_explicit_hydrogens_to_match_any_atom() || mqs.convert_explicit_hydrogens_to_match_any_atom_including_hydrogen()))
       continue;
 
     const MDL_Atom_Data * mad = m.mdl_atom(i);
@@ -3131,6 +3417,9 @@ Single_Substructure_Query::_build_element_hits_needed (const MDL_Molecule & m,
       continue;
     
     if ("Q" == mad->initial_atomic_symbol())
+      continue;
+
+    if (mad->alias().length())
       continue;
 
     const ISIS_Atom_List & alist = mad->atom_list();
@@ -3149,9 +3438,9 @@ Single_Substructure_Query::_build_element_hits_needed (const MDL_Molecule & m,
       continue;
 
     Elements_Needed * tmp = new Elements_Needed(i);
-    tmp->set_min (count[i]);
+    tmp->set_min(count[i]);
 
-    _elements_needed.add (tmp);
+    _elements_needed.add(tmp);
   }
 
   return 1;
@@ -3175,11 +3464,40 @@ first_isotopically_labelled_atom_in_fragment (Molecule & m,
   return INVALID_ATOM_NUMBER;
 }
 
+static atom_number_t
+first_allowed_atom_in_fragment (Molecule & m,
+                                const int f,
+                                const extending_resizable_array<Substructure_Atom *> & atoms_already_done,
+                                const int * include_these_atoms)
+{
+  const int matoms = m.natoms();
+
+  for (int i = 0; i < matoms; ++i)
+  {
+    if (NULL == include_these_atoms)
+      ;
+    else if (0 == include_these_atoms[i])
+      continue;
+
+    if (i >= atoms_already_done.number_elements())
+      ;
+    else if (NULL != atoms_already_done[i])
+      continue;
+
+    if (m.fragment_membership(i) != f)
+      continue;
+
+    return i;
+  }
+
+  return INVALID_ATOM_NUMBER;
+}
+
 int
 Single_Substructure_Query::_create_from_molecule (MDL_Molecule & m,
-                                                  Molecule_to_Query_Specifications & mqs)
+                                                  Molecule_to_Query_Specifications & mqs,
+                                                  const int * include_these_atoms)
 {
-
   int matoms = m.natoms();
  
   if (0 == matoms)
@@ -3187,10 +3505,15 @@ Single_Substructure_Query::_create_from_molecule (MDL_Molecule & m,
 
   _respect_initial_atom_numbering = 1;
 
-  set_comment (m.molecule_name());
+  set_comment(m.molecule_name());
 
   if (mqs.condense_explicit_hydrogens_to_anchor_atoms())
   {
+    if (NULL != include_these_atoms)
+    {
+      cerr << "Single_Substructure_Query::_create_from_molecule:include_these_atoms not handled, see Ian\n";
+      exit(1);
+    }
     m.remove_explicit_hydrogens();
     m.compute_aromaticity_handle_atom_lists();
     matoms = m.natoms();
@@ -3221,17 +3544,10 @@ Single_Substructure_Query::_create_from_molecule (MDL_Molecule & m,
   cerr << "min_hcount " << mqs.min_hcount() << endl;
 #endif
 
-/*if (mqs.condense_explicit_hydrogens_to_anchor_atoms())    handled above now
-  {
-    m.remove_all (1);
-    m.compute_aromaticity_if_needed();
-    matoms = m.natoms();
-  }*/
-
   if (mqs.min_extra_atoms_in_target() >= 0)
     _natoms.set_min(matoms + mqs.min_extra_atoms_in_target());
   else
-    _natoms.set_min (matoms);
+    _natoms.set_min(matoms);
 
   if (mqs.max_extra_atoms_in_target() >= 0)
     _natoms.set_max(matoms + mqs.max_extra_atoms_in_target());
@@ -3266,13 +3582,40 @@ Single_Substructure_Query::_create_from_molecule (MDL_Molecule & m,
 
       Substructure_Atom * r = new Substructure_Atom;
 
-      if (! r->create_from_molecule (m, m, astart, NULL, mqs, tmp))
+      if (! r->create_from_molecule(m, m, astart, NULL, mqs, tmp))
       {
         cerr << "Single_Substructure_Query::_create_from_molecule:failure for fragment " << i << endl;
         return 0;
       }
     
-      _root_atoms.add (r);
+      _root_atoms.add(r);
+    }
+  }
+  else if (NULL != include_these_atoms)
+  {
+//#define ECHO_SUBSET
+#ifdef ECHO_SUBSET
+    cerr << "_create_from_molecule:have subset of atoms\n";
+    for (int i = 0; i < matoms; ++i)
+    {
+      cerr << " atom " << i << ' ' << m.smarts_equivalent_for_atom(i) << " inc " << include_these_atoms[i] << endl;
+    }
+#endif
+    for (int i = 0; i < nf; ++i)
+    {
+      atom_number_t astart;
+      while (INVALID_ATOM_NUMBER != (astart = first_allowed_atom_in_fragment(m, i, tmp, include_these_atoms)))
+      {
+        Substructure_Atom * r = new Substructure_Atom;
+
+        if (! r->create_from_molecule(m, m, astart, NULL, mqs, tmp, include_these_atoms))
+        {
+          cerr << "Single_Substructure_Query::_create_from_molecule:failure to build from atom " << astart << " in fragment " << i << endl;
+          return 0;
+        }
+
+        _root_atoms.add(r);
+      }
     }
   }
   else
@@ -3281,21 +3624,25 @@ Single_Substructure_Query::_create_from_molecule (MDL_Molecule & m,
     {
       Substructure_Atom * r = new Substructure_Atom;
 
-      atom_number_t astart = m.first_atom_in_fragment (i);
+      atom_number_t astart = m.first_atom_in_fragment(i);
       
-      if (! r->create_from_molecule (m, m, astart, NULL, mqs, tmp))
+      if (! r->create_from_molecule(m, m, astart, NULL, mqs, tmp))
       {
         cerr << "Single_Substructure_Query::_create_from_molecule:failure for fragment " << i << endl;
         return 0;
       }
     
-      _root_atoms.add (r);
+      _root_atoms.add(r);
     }
   }
 
-//cerr << "Created query with " << _root_atoms.number_elements() << " root atoms, atoms in query " << _max_atoms_in_query << endl;
+  if (0 == _root_atoms.number_elements())
+  {
+    cerr << "Single_Substructure_Query::create_from_molecule:no root atoms found\n";
+    return 0;
+  }
 
-  _natoms.set_min (matoms);
+//cerr << "Created query with " << _root_atoms.number_elements() << " root atoms, atoms in query " << _max_atoms_in_query << endl;
 
   int nr = m.number_sssr_rings();
 
@@ -3303,14 +3650,16 @@ Single_Substructure_Query::_create_from_molecule (MDL_Molecule & m,
   {
     // some time put in a computation of the number of rings with isotopes - is complicated by fused rings...
   }
+  else if (NULL != include_these_atoms)   // again, kind of hard
+    ;
   else if (nr)
-    _nrings.set_min (nr);
+    _nrings.set_min(nr);
 
   for (int i = 0; i < m.number_link_atoms(); i++)
   {
     const Link_Atom * l = m.link_atom(i);;
 
-    if (! add_link_atom (*l))
+    if (! add_link_atom(*l))
     {
       cerr << "ISIS Link Atom " << (*l) << endl;
       return 0;
@@ -3320,15 +3669,36 @@ Single_Substructure_Query::_create_from_molecule (MDL_Molecule & m,
   for (int i = 0; i < m.chiral_centres(); i++)
   {
     const Chiral_Centre * c = m.chiral_centre_in_molecule_not_indexed_by_atom_number(i);
-    _add_chiral_centre (m, *c);
+    _add_chiral_centre(m, *c);
   }
 
   if (mqs.environment_near_substitution_points_specified() || mqs.environment_no_match_near_substitution_points_specified())
   {
-    if (! _add_environment_according_to_matched_atoms (mqs))
+    if (! _add_environment_according_to_matched_atoms(mqs))
     {
       cerr << "Single_Substructure_Query::_create_from_molecule:cannot build environment\n";
       return 0;
+    }
+  }
+
+  if (NULL != include_these_atoms)
+  {
+    int * xref = new_int(matoms); std::unique_ptr<int[]> free_xref(xref);
+    int ndx = 0;
+    for (int i = 0; i < matoms; ++i)
+    {
+      if (include_these_atoms[i])
+      {
+        xref[i] = ndx;
+        ndx++;
+      }
+    }
+
+    _natoms.set_min(ndx);
+
+    for (int i = 0; i < _root_atoms.number_elements(); ++i)
+    {
+      _root_atoms[i]->adjust_initial_atom_numbers(xref);
     }
   }
 
@@ -3337,13 +3707,14 @@ Single_Substructure_Query::_create_from_molecule (MDL_Molecule & m,
 
 int
 Substructure_Query::_create_query_and_add (MDL_Molecule & m,
-                                           Molecule_to_Query_Specifications & mqs)
+                                           Molecule_to_Query_Specifications & mqs,
+                                           const int * include_these_atoms)
 {
 //cerr << "Substructure_Query::_create_query_and_add:building from '" << m.smiles() << "'\n";
 
   Single_Substructure_Query * q = new Single_Substructure_Query;
 
-  if (! q->create_from_molecule (m, mqs))
+  if (! q->create_from_molecule(m, mqs, include_these_atoms))
   {
     delete q;
 
@@ -3364,7 +3735,8 @@ Substructure_Query::_create_query_and_add (MDL_Molecule & m,
 
 int
 Substructure_Query::create_from_molecule (MDL_Molecule & m, 
-                                          Molecule_to_Query_Specifications & mqs)
+                                          Molecule_to_Query_Specifications & mqs,
+                                          const int * include_these_atoms)
 {
   _comment = m.name();
 
@@ -3375,10 +3747,10 @@ Substructure_Query::create_from_molecule (MDL_Molecule & m,
   const int nlink = m.number_link_atoms();
 
   if (0 == nlink)
-    return _create_query_and_add (m, mqs);
+    return _create_query_and_add(m, mqs, include_these_atoms);
 
   Link_Atom_Current_State * lacc = new Link_Atom_Current_State[nlink];
-  iw_auto_array<Link_Atom_Current_State> free_lacc(lacc);
+  std::unique_ptr<Link_Atom_Current_State[]> free_lacc(lacc);
 
   for (int i = 0; i < nlink; i++)
   {
@@ -3394,7 +3766,7 @@ Substructure_Query::create_from_molecule (MDL_Molecule & m,
 
   assert (nlink == link_atoms.number_elements());
 
-  int rc = _enumerate_list_atom_possibilities(m, mqs, link_atoms, lacc, nlink, 0);
+  int rc = _enumerate_list_atom_possibilities(m, mqs, link_atoms, lacc, nlink, 0, include_these_atoms);
 
 #ifdef DEBUG_CREATE_FROM_MOLECULE
   cerr << "Substructure_Query::create_from_molecule:created " << _number_elements << " molecules\n";
@@ -3410,7 +3782,8 @@ Substructure_Query::_enumerate_list_atom_possibilities (const MDL_Molecule & m,
                                                         const resizable_array_p<Link_Atom> & link_atoms,
                                                         Link_Atom_Current_State * lacc,
                                                         int nlink,
-                                                        int ndx)
+                                                        int ndx,
+                                                        const int * include_these_atoms)
 {
   lacc[ndx].reset();
 
@@ -3419,9 +3792,9 @@ Substructure_Query::_enumerate_list_atom_possibilities (const MDL_Molecule & m,
   while (link_atoms[ndx]->create_next_variant(tmp, lacc[ndx]))
   {
     if (ndx == nlink - 1)
-      _create_query_and_add(tmp, mqs);
+      _create_query_and_add(tmp, mqs, include_these_atoms);
     else
-      _enumerate_list_atom_possibilities (tmp, mqs, link_atoms, lacc, nlink, ndx + 1);
+      _enumerate_list_atom_possibilities(tmp, mqs, link_atoms, lacc, nlink, ndx + 1, include_these_atoms);
   }
 
   return 1;
@@ -3429,13 +3802,14 @@ Substructure_Query::_enumerate_list_atom_possibilities (const MDL_Molecule & m,
 
 int
 Substructure_Query::create_from_molecule (const Molecule & m,
-                                          Molecule_to_Query_Specifications & mqs)
+                                          Molecule_to_Query_Specifications & mqs,
+                                          const int * include_these_atoms)
 {
   MDL_Molecule tmp(m);
 
   tmp.set_name(m.name());
 
-  return create_from_molecule(tmp, mqs);
+  return create_from_molecule(tmp, mqs, include_these_atoms);
 
 }
 
@@ -3446,13 +3820,13 @@ add_environment (const msi_object & msi,
                  resizable_array_p<Substructure_Environment> & destination)
 {
   Substructure_Environment * e = new Substructure_Environment;
-  if (! e->construct_from_msi_object (msi, completed, s, SINGLE_BOND))
+  if (! e->construct_from_msi_object(msi, completed, s, SINGLE_BOND))
   {
     cerr << "Single_Substructure_Query::_add_environment_according_to_matched_atoms:cannot parse environment specification\n";
     return 0;
   }
 
-  destination.add (e);
+  destination.add(e);
 
   return 1;
 }
@@ -3472,9 +3846,9 @@ Single_Substructure_Query::_add_environment_according_to_matched_atoms (Molecule
     return 0;
   }
 
-  extending_resizable_array<Substructure_Atom *> completed (NULL);
+  extending_resizable_array<Substructure_Atom *> completed(NULL);
 
-  _collect_all_atoms (completed);
+  _collect_all_atoms(completed);
 
 #ifdef CHECK_ATOMS_DEFINED
   for (int i = 0; i < completed.number_elements(); i++)
@@ -3498,13 +3872,13 @@ Single_Substructure_Query::_add_environment_according_to_matched_atoms (Molecule
 
     if (env.active())
     {
-      if (! add_environment (env, s, completed, _environment))
+      if (! add_environment(env, s, completed, _environment))
         return 0;
     }
 
     if (env_no_match.active())
     {
-      if (! add_environment (env_no_match, s, completed, _environment_rejections))
+      if (! add_environment(env_no_match, s, completed, _environment_rejections))
         return 0;
     }
   }
@@ -3519,16 +3893,16 @@ Single_Substructure_Query::_add_environment_according_to_matched_atoms (Molecule
 */
 
 int
-Single_Substructure_Query::write_msi (ostream & os, int & object_id,
-                                      const const_IWSubstring & logical_operator,
-                                      int indentation)
+Single_Substructure_Query::write_msi(std::ostream & os, int & object_id,
+                                     const const_IWSubstring & logical_operator,
+                                     int indentation)
 {
   assert (ok());
   assert (os.good());
 
   IWString ind;
   if (indentation)
-    ind.extend (indentation, ' ');
+    ind.extend(indentation, ' ');
 
   os << ind << "(" << object_id++ << " Query\n";
 
@@ -3548,7 +3922,7 @@ Single_Substructure_Query::write_msi (ostream & os, int & object_id,
   if (_rejection)
     os << ind << "  (A I " << NAME_OF_REJECTION_ATTRIBUTE << " 1)\n";
 
-  _attached_heteroatom_count.write_msi (os, NAME_OF_ATTACHED_HETEROATOM_COUNT_SPECIFIER, indentation + 2);
+  _attached_heteroatom_count.write_msi(os, NAME_OF_ATTACHED_HETEROATOM_COUNT_SPECIFIER, indentation + 2);
   if (_heteroatoms.number_elements())
   {
     os << ind << "  (A I " << NAME_OF_DEFINE_HETEROATOMS_ATTRIBUTE << ' ';
@@ -3568,9 +3942,9 @@ Single_Substructure_Query::write_msi (ostream & os, int & object_id,
     os << ")\n";
   }
 
-  _heteroatoms_in_molecule.write_msi (os, NAME_OF_HETEROATOMS_ATTRIBUTE, indentation + 2);
+  _heteroatoms_in_molecule.write_msi(os, NAME_OF_HETEROATOMS_ATTRIBUTE, indentation + 2);
 
-  _heteroatoms_matched.write_msi (os, NAME_OF_HETEROATOMS_MATCHED_ATTRIBUTE, indentation + 2);
+  _heteroatoms_matched.write_msi(os, NAME_OF_HETEROATOMS_MATCHED_ATTRIBUTE, indentation + 2);
 
   if (_find_one_embedding_per_start_atom)
     os << ind << "  (A I " << NAME_OF_ONE_EMBEDDING_PER_START_ATOM << " 1)\n";
@@ -3581,7 +3955,7 @@ Single_Substructure_Query::write_msi (ostream & os, int & object_id,
   if (_sort_by_preference_value)
     os << ind << "  (A I " << NAME_OF_SORT_BY_PREFERENCE_VALUE_ATTRIBUTE << " 1)\n";
 
-  _hits_needed.write_msi (os, NAME_OF_QUERY_HITS_NEEDED_ATTRIBUTE, indentation + 2);
+  _hits_needed.write_msi(os, NAME_OF_QUERY_HITS_NEEDED_ATTRIBUTE, indentation + 2);
 
   if (_normalise_rc_per_hits_needed)
     os << ind << "  (A I " << NAME_OF_NORMALISE_RC_PER_HITS_NEEDED << " 1)\n";
@@ -3609,21 +3983,21 @@ Single_Substructure_Query::write_msi (ostream & os, int & object_id,
   if (0 == _environment_must_match_unmatched_atoms)
     os << ind << "  (A I " << NAME_OF_ENVIRONMENT_MUST_MATCH_UNMATCHED_ATOMS_ATTRIBUTE << " 0)\n";
 
-  _natoms.write_msi (os, NAME_OF_NATOMS_ATTRIBUTE, indentation + 2);
-  _nrings.write_msi (os, NAME_OF_NRINGS_ATTRIBUTE, indentation + 2);
+  _natoms.write_msi(os, NAME_OF_NATOMS_ATTRIBUTE, indentation + 2);
+  _nrings.write_msi(os, NAME_OF_NRINGS_ATTRIBUTE, indentation + 2);
 
-  _isolated_rings.write_msi (os, NAME_OF_ISOLATED_RING_COUNT_SPECIFIER, indentation + 2);
-  _fused_rings.write_msi (os, NAME_OF_FUSED_RING_COUNT_SPECIFIER, indentation + 2);
-  _strongly_fused_rings.write_msi (os, NAME_OF_STRONGLY_FUSED_RING_COUNT_SPECIFIER, indentation + 2);
+  _isolated_rings.write_msi(os, NAME_OF_ISOLATED_RING_COUNT_SPECIFIER, indentation + 2);
+  _fused_rings.write_msi(os, NAME_OF_FUSED_RING_COUNT_SPECIFIER, indentation + 2);
+  _strongly_fused_rings.write_msi(os, NAME_OF_STRONGLY_FUSED_RING_COUNT_SPECIFIER, indentation + 2);
 
-  _isolated_ring_objects.write_msi (os, NAME_OF_ISOLATED_RING_OBJECTS, indentation + 2);
+  _isolated_ring_objects.write_msi(os, NAME_OF_ISOLATED_RING_OBJECTS, indentation + 2);
 
-  _aromatic_rings.write_msi (os, NAME_OF_AROMATIC_RING_COUNT_SPECIFIER, indentation + 2);
-  _non_aromatic_rings.write_msi (os, NAME_OF_NON_AROMATIC_RING_COUNT_SPECIFIER, indentation + 2);
+  _aromatic_rings.write_msi(os, NAME_OF_AROMATIC_RING_COUNT_SPECIFIER, indentation + 2);
+  _non_aromatic_rings.write_msi(os, NAME_OF_NON_AROMATIC_RING_COUNT_SPECIFIER, indentation + 2);
 
-  _ncon.write_msi (os, NAME_OF_NCON_ATTRIBUTE, indentation + 2);
+  _ncon.write_msi(os, NAME_OF_NCON_ATTRIBUTE, indentation + 2);
 
-  _distance_between_hits.write_msi (os, NAME_OF_DISTANCE_BETWEEN_HITS_ATTRIBUTE, indentation + 2);
+  _distance_between_hits.write_msi(os, NAME_OF_DISTANCE_BETWEEN_HITS_ATTRIBUTE, indentation + 2);
 
   if (_matched_atoms_to_check_for_hits_too_close > 0)
      os << ind << "  (A I " << NAME_OF_DISTANCE_BETWEEN_HITS_NCHECK_ATTRIBUTE << ' ' << _matched_atoms_to_check_for_hits_too_close << ")\n";
@@ -3647,21 +4021,23 @@ Single_Substructure_Query::write_msi (ostream & os, int & object_id,
     os << ind << "  (A C " << NAME_OF_SORT_MATCHES_BY << " \"" << tmp << "\")\n";
   }
 
-  _atoms_in_spinach.write_msi (os, NAME_OF_SPINACH_ATOMS_ATTRIBUTE, indentation + 2);
-  _inter_ring_atoms.write_msi (os, NAME_OF_INTER_RING_ATOMS_ATTRIBUTE, indentation + 2);
+  _net_formal_charge.write_msi(os, NAME_OF_NET_FORMAL_CHARGE_ATTRIBUTE, indentation + 2);
 
-  _unmatched_atoms.write_msi (os, NAME_OF_UNMATCHED_ATOMS, indentation + 2);
+  _atoms_in_spinach.write_msi(os, NAME_OF_SPINACH_ATOMS_ATTRIBUTE, indentation + 2);
+  _inter_ring_atoms.write_msi(os, NAME_OF_INTER_RING_ATOMS_ATTRIBUTE, indentation + 2);
 
-  if (static_cast<float> (0.0) != _min_fraction_atoms_matched)
+  _unmatched_atoms.write_msi(os, NAME_OF_UNMATCHED_ATOMS, indentation + 2);
+
+  if (static_cast<float>(0.0) != _min_fraction_atoms_matched)
     os << ind << "  (A D " << NAME_OF_MIN_FRACTION_ATOMS_MATCHED << ' ' << _min_fraction_atoms_matched << ")\n";
 
-  if (static_cast<float> (0.0) != _max_fraction_atoms_matched)
+  if (static_cast<float>(0.0) != _max_fraction_atoms_matched)
     os << ind << "  (A D " << NAME_OF_MAX_FRACTION_ATOMS_MATCHED << ' ' << _max_fraction_atoms_matched << ")\n";
 
 
-  _ring_atoms_matched.write_msi (os, NAME_OF_RING_ATOMS_MATCHED_ATTRIBUTE, indentation + 2);
-  _number_isotopic_atoms.write_msi (os, NAME_OF_NUMBER_ISOTOPIC_ATOMS_ATTRIBUTE, indentation + 2);
-  _number_fragments.write_msi (os, NAME_OF_NUMBER_FRAGMENTS_ATTRIBUTE, indentation + 2);
+  _ring_atoms_matched.write_msi(os, NAME_OF_RING_ATOMS_MATCHED_ATTRIBUTE, indentation + 2);
+  _number_isotopic_atoms.write_msi(os, NAME_OF_NUMBER_ISOTOPIC_ATOMS_ATTRIBUTE, indentation + 2);
+  _number_fragments.write_msi(os, NAME_OF_NUMBER_FRAGMENTS_ATTRIBUTE, indentation + 2);
 
   if (_ncon_ignore_singly_connected)
     os << ind << "  (A I " << NAME_OF_NCON_IGNORE_SINGLY_CONNECTED << ' ' <<
@@ -3675,30 +4051,30 @@ Single_Substructure_Query::write_msi (ostream & os, int & object_id,
   else if (1 == _implicit_ring_condition)
     os << ind << "  (A I " << NAME_OF_IMPLICIT_RING_CONDITION << " 1)\n";
 
-  _distance_between_root_atoms.write_msi (os, NAME_OF_DISTANCE_BETWEEN_ROOT_ATOMS_SPECIFIER, indentation + 2);
+  _distance_between_root_atoms.write_msi(os, NAME_OF_DISTANCE_BETWEEN_ROOT_ATOMS_SPECIFIER, indentation + 2);
 
   for (int i = 0; i < _elements_needed.number_elements(); i++)
   {
-    _elements_needed[i]->write_msi (os, NAME_OF_ELEMENTS_NEEDED_OBJECT, object_id, indentation + 2);
+    _elements_needed[i]->write_msi(os, NAME_OF_ELEMENTS_NEEDED_OBJECT, object_id, indentation + 2);
   }
 
   for (int i = 0; i < _element_hits_needed.number_elements(); i++)
   {
-    _element_hits_needed[i]->write_msi (os, NAME_OF_ELEMENT_HITS_NEEDED_OBJECT, object_id, indentation + 2);
+    _element_hits_needed[i]->write_msi(os, NAME_OF_ELEMENT_HITS_NEEDED_OBJECT, object_id, indentation + 2);
   }
 
   int nr = _ring_specification.number_elements();
   for (int i = 0; i < nr; i++)
   {
     const Substructure_Ring_Specification * r = _ring_specification[i];
-    r->write_msi (os, object_id, indentation + 2);
+    r->write_msi(os, object_id, indentation + 2);
   }
 
   int nrs = _ring_system_specification.number_elements();
   for (int i = 0; i < nrs; i++)
   {
     const Substructure_Ring_System_Specification * r = _ring_system_specification[i];
-    r->write_msi (os, object_id, indentation + 2);
+    r->write_msi(os, object_id, indentation + 2);
   }
 
   if (_no_matched_atoms_between.number_elements())
@@ -3712,7 +4088,7 @@ Single_Substructure_Query::write_msi (ostream & os, int & object_id,
 
   for (int i = 0; i < _link_atom.number_elements(); i++)
   {
-    _link_atom[i]->write_msi (os, ind, NAME_OF_LINK_ATOMS_SPECIFIER);
+    _link_atom[i]->write_msi(os, ind, NAME_OF_LINK_ATOMS_SPECIFIER);
   }
 
   for (int i = 0; i < _chirality.number_elements(); i++)
@@ -3723,7 +4099,7 @@ Single_Substructure_Query::write_msi (ostream & os, int & object_id,
   int rc = 1;
   for (int i = 0; i < _root_atoms.number_elements(); i++)
   {
-    if (! _root_atoms[i]->write_msi (os, object_id, NAME_OF_QUERY_ATOM_OBJECT, indentation + 2))
+    if (! _root_atoms[i]->write_msi(os, object_id, NAME_OF_QUERY_ATOM_OBJECT, indentation + 2))
       return 0;
   }
 
@@ -3731,14 +4107,14 @@ Single_Substructure_Query::write_msi (ostream & os, int & object_id,
   for (int i = 0; i < ne; i++)
   {
     Substructure_Environment * e = _environment[i];
-    e->write_msi (os, object_id, indentation + 2);
+    e->write_msi(os, object_id, indentation + 2);
   }
 
   nr = _environment_rejections.number_elements();
   for (int i = 0; i < nr; i++)
   {
     Substructure_Environment * r = _environment_rejections[i];
-    r->write_msi (os, object_id, indentation + 2);
+    r->write_msi(os, object_id, indentation + 2);
   }
 
   if (os.good())
@@ -3748,13 +4124,13 @@ Single_Substructure_Query::write_msi (ostream & os, int & object_id,
 }
 
 int
-Single_Substructure_Query::write_msi (ostream & os)
+Single_Substructure_Query::write_msi (std::ostream & os)
 {
   if (0 == _max_atoms_in_query)
     (void) max_atoms_in_query();
 
   int i = _max_atoms_in_query + 1;
-  return write_msi (os, i, "", 0);
+  return write_msi(os, i, "", 0);
 }
 
 int
@@ -3762,14 +4138,14 @@ Single_Substructure_Query::write (const char * fname)
 {
   assert (NULL != fname);
 
-  ofstream os (fname, ios::out);
+  std::ofstream os(fname, std::ios::out);
   if (! os.good())
   {
     cerr << "Single_Substructure_Query::write: cannot open '" << fname << "'\n";
     return 0;
   }
 
-  return write_msi (os);
+  return write_msi(os);
 }
 
 /*
@@ -3783,7 +4159,7 @@ Single_Substructure_Query::_parse_ring_specifier_object (const msi_object & msi)
   assert (NAME_OF_RING_SPECIFIER_OBJECT == msi.name());
 
   Substructure_Ring_Specification * r = new Substructure_Ring_Specification();
-  if (! r->construct_from_msi_object (msi))
+  if (! r->construct_from_msi_object(msi))
   {
     delete r;
 
@@ -3794,10 +4170,10 @@ Single_Substructure_Query::_parse_ring_specifier_object (const msi_object & msi)
 
   if (0 == _ring_specification.number_elements())    // no operators with first object
     ;
-  else if (! extract_operator (msi, _ring_specification_logexp, IW_LOGEXP_AND, "Single_Substructure_Query::_parse_ring_specifier_object"))
+  else if (! extract_operator(msi, _ring_specification_logexp, IW_LOGEXP_AND, "Single_Substructure_Query::_parse_ring_specifier_object"))
     return 0;
 
-  _ring_specification.add (r);
+  _ring_specification.add(r);
 
   return 1;
 }
@@ -3808,12 +4184,12 @@ Single_Substructure_Query::_parse_ring_specifier_object (const msi_object & msi)
 */
 
 int
-Single_Substructure_Query::_parse_ring_system_specifier_object (const msi_object & msi)
+Single_Substructure_Query::_parse_ring_system_specifier_object(const msi_object & msi)
 {
   assert (NAME_OF_RING_SYSTEM_SPECIFIER_OBJECT == msi.name());
 
   Substructure_Ring_System_Specification * r = new Substructure_Ring_System_Specification();
-  if (! r->construct_from_msi_object (msi))
+  if (! r->construct_from_msi_object(msi))
   {
     delete r;
 
@@ -3824,10 +4200,13 @@ Single_Substructure_Query::_parse_ring_system_specifier_object (const msi_object
 
   if (0 == _ring_system_specification.number_elements())
     ;
-  else if (! extract_operator (msi, _ring_system_specification_logexp, IW_LOGEXP_AND, "Single_Substructure_Query::_parse_ring_system_specifier_object"))
+  else if (! extract_operator(msi, _ring_system_specification_logexp, IW_LOGEXP_AND, "Single_Substructure_Query::_parse_ring_system_specifier_object"))
+  {
+    delete r;
     return 0;
+  }
 
-  _ring_system_specification.add (r);
+  _ring_system_specification.add(r);
 
   return 1;
 }
@@ -3844,8 +4223,8 @@ is_root_substructure_atom (const msi_object & msi)
   int nat = msi.attribute_count();
   for (int i = 0; i < nat; i++)
   {
-    const msi_attribute * att = msi.attribute (i);
-    if (att->name().ends_with ("bond"))    // got a bond, not a root
+    const msi_attribute * att = msi.attribute(i);
+    if (att->name().ends_with("bond"))    // got a bond, not a root
       return 0;
     if (NAME_OF_BOND_SMARTS_ATTRIBUTE == att->name())   // a smarts bond, not a root
       return 0;
@@ -3854,7 +4233,7 @@ is_root_substructure_atom (const msi_object & msi)
   int nmsi = msi.number_elements();
   for (int i = 0; i < nmsi; i++)
   {
-    const msi_object * m = msi.item (i);
+    const msi_object * m = msi.item(i);
     if (NAME_OF_QUERY_BOND_OBJECT == m->name())
       return 0;
   }
@@ -3876,9 +4255,9 @@ Single_Substructure_Query::_construct_environment_from_msi_object (const msi_obj
 
   Substructure_Environment * a = new Substructure_Environment();
 
-  _collect_all_atoms (completed);
+  _collect_all_atoms(completed);
 
-  int rc = a->construct_from_msi_object (msi, completed);
+  int rc = a->construct_from_msi_object(msi, completed);
 
   if (0 == rc)
   {
@@ -3887,7 +4266,7 @@ Single_Substructure_Query::_construct_environment_from_msi_object (const msi_obj
     return 0;
   }
 
-  env.add (a);
+  env.add(a);
 
   return 1;
 }
@@ -3898,11 +4277,11 @@ Substructure_Environment::_add_possible_parent (atom_number_t possible_parent,
                                                 extending_resizable_array<Substructure_Atom *> & completed)
 {
   if (0 != possible_parent_bond_type)     // only add if bond_type has defined a particular type
-    _bond.set_type (possible_parent_bond_type);
+    _bond.set_type(possible_parent_bond_type);
   else
     _bond.set_match_any();
 
-  _possible_parents.add (completed[possible_parent]);
+  _possible_parents.add(completed[possible_parent]);
 
   return 1;
 }
@@ -3921,11 +4300,11 @@ Substructure_Environment::construct_from_msi_object (const msi_object & msi,
   {
     _query_environment_match_as_rejection = 0;
 
-    const msi_attribute * att = msi.attribute (NAME_OF_ENVIRONMENT_REJECTION);
+    const msi_attribute * att = msi.attribute(NAME_OF_ENVIRONMENT_REJECTION);
     if (att)
     {
       int i;
-      if (! att->value (i))
+      if (! att->value(i))
       {
         cerr << "The rejection attribute must be numeric\n";
         return 0;
@@ -3936,14 +4315,14 @@ Substructure_Environment::construct_from_msi_object (const msi_object & msi,
 
 // Process any bonds which have been specified as attributes
 
-  if (! _process_attribute_bonds (msi, completed))
+  if (! _process_attribute_bonds(msi, completed))
   {
-    msi.print (cerr);
+    msi.print(cerr);
     return 0;
   }
 
   if (INVALID_ATOM_NUMBER != possible_parent)
-    _add_possible_parent (possible_parent, possible_parent_bond_type, completed);
+    _add_possible_parent(possible_parent, possible_parent_bond_type, completed);
 
   int np = _possible_parents.number_elements();
 
@@ -3954,14 +4333,14 @@ Substructure_Environment::construct_from_msi_object (const msi_object & msi,
   }
 
   int notused = 0;
-  if (! really_gruesome (_hits_needed, msi, NAME_OF_QUERY_HITS_NEEDED_ATTRIBUTE, notused, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_hits_needed, msi, NAME_OF_QUERY_HITS_NEEDED_ATTRIBUTE, notused, 0, MAX_NOT_SPECIFIED))
     return 0;
 
-  const msi_attribute * att = msi.attribute (NAME_OF_NO_OTHER_SUBSTITUENTS_ALLOWED_ATTRIBUTE);
+  const msi_attribute * att = msi.attribute(NAME_OF_NO_OTHER_SUBSTITUENTS_ALLOWED_ATTRIBUTE);
   if (att)
   {
 //  cerr << "Got " << NAME_OF_NO_OTHER_SUBSTITUENTS_ALLOWED_ATTRIBUTE << endl;
-    if (! att->value (_no_other_substituents_allowed))
+    if (! att->value(_no_other_substituents_allowed))
     {
       cerr << "Substructure_Environment::construct_from_msi_object: the " << NAME_OF_NO_OTHER_SUBSTITUENTS_ALLOWED_ATTRIBUTE <<
               " must be a whole number\n";
@@ -3969,10 +4348,50 @@ Substructure_Environment::construct_from_msi_object (const msi_object & msi,
     }
   }
 
-  att = msi.attribute (NAME_OF_OR_OPERATOR);
+  att = msi.attribute(NAME_OF_HYDROGEN_OK_AS_ENVIRONMENT_MATCH);
   if (att)
   {
-    if (! att->value (_or_id) || _or_id <= 0)
+    if (! att->value(_hydrogen_ok_as_environment_match) || _hydrogen_ok_as_environment_match < 0)
+    {
+      cerr << "Substructure_Environment::construct_from_msi_object: the " << NAME_OF_HYDROGEN_OK_AS_ENVIRONMENT_MATCH << " must be a whole number\n";
+      return 0;
+    }
+  }
+
+  att = msi.attribute(NAME_OF_MAX_ENVIRONMENT_MATCHES_PER_ATTACHMENT_POINT);
+  if (att)
+  {
+    if (! att->value(_max_environment_matches_per_attachment_point) || _max_environment_matches_per_attachment_point <= 0)
+    {
+      cerr << "Substructure_Environment::construct_from_msi_object: then " << NAME_OF_MAX_ENVIRONMENT_MATCHES_PER_ATTACHMENT_POINT << " must be a +ve whole number\n";
+      return 0;
+    }
+  }
+
+  att = msi.attribute(NAME_OF_ENVIRONMENTS_CAN_SHARE_ATTACHMENT_POINTS);
+  if (att)
+  {
+    if (! att->value(_environments_can_share_attachment_points) || _environments_can_share_attachment_points < 0)
+    {
+      cerr << "Substructure_Environment::construct_from_msi_object: the " << NAME_OF_ENVIRONMENTS_CAN_SHARE_ATTACHMENT_POINTS << " attribute must be a whole +ve number\n";
+      return 0;
+    }
+  }
+
+  att = msi.attribute(NAME_OF_MAX_MATCHES_TO_FIND);
+  if (att)
+  {
+    if (! att->value(_max_matches_to_find) || _max_matches_to_find < 1)
+    {
+      cerr << "Substructure_Environment::construct_from_msi_object:the " << NAME_OF_MAX_MATCHES_TO_FIND << " attribute must be a whole +ve number\n";
+      return 0;
+    }
+  }
+
+  att = msi.attribute(NAME_OF_OR_OPERATOR);
+  if (att)
+  {
+    if (! att->value(_or_id) || _or_id <= 0)
     {
       cerr << "Substructure_Environment::construct_from_msi_object: the " << NAME_OF_OR_OPERATOR <<
               " must be a positive whole number\n";
@@ -3980,10 +4399,10 @@ Substructure_Environment::construct_from_msi_object (const msi_object & msi,
     }
   }
 
-  att = msi.attribute (NAME_OF_AND_OPERATOR);
+  att = msi.attribute(NAME_OF_AND_OPERATOR);
   if (att)
   {
-    if (! att->value (_and_id) || _and_id <= 0)
+    if (! att->value(_and_id) || _and_id <= 0)
     {
       cerr << "Substructure_Environment::construct_from_msi_object: the " << NAME_OF_AND_OPERATOR  <<
               " must be a positive whole number\n";
@@ -4000,10 +4419,10 @@ Substructure_Environment::construct_from_msi_object (const msi_object & msi,
 // Now construct the structural specification. There can be any number
 
   int i = 0;
-  while (NULL != (att = msi.attribute (NAME_OF_SMARTS_ATTRIBUTE, i++)))
+  while (NULL != (att = msi.attribute(NAME_OF_SMARTS_ATTRIBUTE, i++)))
   {
     Substructure_Atom * a = new Substructure_Atom;
-    a->set_unique_id (msi.object_id());
+    a->set_unique_id(msi.object_id());
 
     const_IWSubstring x;
     att->value(x);
@@ -4012,7 +4431,7 @@ Substructure_Environment::construct_from_msi_object (const msi_object & msi,
     if (x.length() && (isdigit(s[0]) || '>' == s[0] || '<' == s[0]))
     {
       int value, qualifier;
-      int chars_consumed = smarts_fetch_numeric (s, value, qualifier);
+      int chars_consumed = smarts_fetch_numeric(s, value, qualifier);
       if (0 == chars_consumed)
       {
         cerr << "Substructure_Environment::construct_from_msi_object:invalid numeric qualifier '" << x << "'\n";
@@ -4034,30 +4453,30 @@ Substructure_Environment::construct_from_msi_object (const msi_object & msi,
       }
     }
 
-    else if (! a->parse_smarts_specifier (att))
+    else if (! a->parse_smarts_specifier(att))
     {
       delete a;
       return 0;
     }
 
 //  cerr << "Build query from smarts " << (*att) << endl;
-    add (a);
+    add(a);
   }
 
   i = 0;
-  while (NULL != (att = msi.attribute (NAME_OF_SMILES_ATTRIBUTE, i++)))
+  while (NULL != (att = msi.attribute(NAME_OF_SMILES_ATTRIBUTE, i++)))
   {
     Substructure_Atom * a = new Substructure_Atom;
-    a->set_unique_id (msi.object_id());
+    a->set_unique_id(msi.object_id());
 
-    if (! a->parse_smiles_specifier (att))
+    if (! a->parse_smiles_specifier(att))
     {
       delete a;
       return 0;
     }
 
 //  cerr << "Build query from smiles " << (*att) << endl;
-    add (a);
+    add(a);
   }
 
   for (i = 0; i < nmsi; i++)
@@ -4070,14 +4489,14 @@ Substructure_Environment::construct_from_msi_object (const msi_object & msi,
     else if (NAME_OF_QUERY_ATOM_OBJECT == m.name())
     {
       Substructure_Atom * a = new Substructure_Atom;
-      if (! a->construct_from_msi_object (m, completed))
+      if (! a->construct_from_msi_object(m, completed))
       {
         delete a;
         return 0;
       }
 
-      if (is_root_substructure_atom (m))
-        add (a);
+      if (is_root_substructure_atom(m))
+        add(a);
     }
     else
     {
@@ -4115,9 +4534,9 @@ next_disconnected (const const_IWSubstring & smarts,
   if (istart)
     disconnected += istart;
 
-  if (! disconnected.starts_with ('.'))
+  if (! disconnected.starts_with('.'))
     ;
-  else if (disconnected.starts_with (".."))
+  else if (disconnected.starts_with(".."))
   {
     cerr << "Invalid smarts no matched atoms specifier .... '" << smarts << "'\n";
     abort();
@@ -4143,7 +4562,7 @@ next_disconnected (const const_IWSubstring & smarts,
 
     if ('.' != disconnected[i + 1])
     {
-      disconnected.iwtruncate (i);
+      disconnected.iwtruncate(i);
       istart += i;
       return 1;
     }
@@ -4166,7 +4585,7 @@ transfer_to_our_array (resizable_array_p<T> & to,
 {
   for (int i = 0; i < from.number_elements(); i++)
   {
-    to.add (from[i]);
+    to.add(from[i]);
   }
 
   return;
@@ -4197,7 +4616,7 @@ Single_Substructure_Query::_parse_smarts_specifier (const const_IWSubstring & sm
   cerr << "Parsing smarts '" << smarts << "'\n";
 #endif
 
-  if (smarts.starts_with ('.'))
+  if (smarts.starts_with('.'))
   {
     cerr << "Single_Substructure_Query::_parse_smarts_specifier: smarts cannot start with '.'\n";
     cerr << "Bad smarts '" << smarts << "'\n";
@@ -4216,17 +4635,17 @@ Single_Substructure_Query::_parse_smarts_specifier (const const_IWSubstring & sm
 
   Parse_Smarts_Tmp pst;
 
-  pst.set_natoms (smarts.length());
+  pst.set_natoms(smarts.length());
 
-  while (next_disconnected (smarts, i, disconnected))
+  while (next_disconnected(smarts, i, disconnected))
   {
 #ifdef DEBUG_SSSQ_PARSE_SMARTS_SPECIFIER
     cerr << "Smarts disconnected token '" << disconnected << "' being processed\n";
 #endif
 
-    int paren_balance = disconnected.balance ('(', ')');
+    int paren_balance = disconnected.balance('(', ')');
 
-    if (disconnected.starts_with ('('))
+    if (disconnected.starts_with('('))
     {
       if (component_grouping)
       {
@@ -4245,17 +4664,17 @@ Single_Substructure_Query::_parse_smarts_specifier (const const_IWSubstring & sm
     Substructure_Atom * a = new Substructure_Atom;
 
     if (component_grouping)
-      a->set_fragment_id (component_id);
+      a->set_fragment_id(component_id);
 
-    if (-1 == paren_balance && disconnected.ends_with (')'))       // closing a component grouping
+    if (-1 == paren_balance && disconnected.ends_with(')'))       // closing a component grouping
     {
       disconnected.chop();
       component_grouping = 0;
     }
 
-    pst.add_root_atom (a);
+    pst.add_root_atom(a);
 
-    if (! a->parse_smarts_specifier (disconnected, pst, query_atoms_created))
+    if (! a->parse_smarts_specifier(disconnected, pst, query_atoms_created))
     {
       cerr << "Single_Substructure_Query::_parse_smarts_specifier: cannot parse '" << disconnected << "'\n";
       delete a;
@@ -4267,13 +4686,14 @@ Single_Substructure_Query::_parse_smarts_specifier (const const_IWSubstring & sm
 //  cerr << "Query atoms created incremented to " << query_atoms_created << endl;
   }
 
-  transfer_to_our_array (_root_atoms, pst.root_atoms());
+  transfer_to_our_array(_root_atoms, pst.root_atoms());
 
-  transfer_to_our_array (_no_matched_atoms_between, pst.no_matched_atoms_between());
+  transfer_to_our_array(_no_matched_atoms_between, pst.no_matched_atoms_between());
 
-  transfer_to_our_array (_link_atom, pst.link_atoms());
+  transfer_to_our_array(_link_atom, pst.link_atoms());
 
-  _build_chirality_specifications_from_atom_chiral_info();
+  if (! ignore_chirality_in_smarts_input())
+    _build_chirality_specifications_from_atom_chiral_info();
 
 #ifdef DEBUG_SSSQ_PARSE_SMARTS_SPECIFIER
   cerr << "After parsing '" << smarts << "' we have " << _root_atoms.number_elements() << " root atoms\n";
@@ -4283,35 +4703,62 @@ Single_Substructure_Query::_parse_smarts_specifier (const const_IWSubstring & sm
 }
 
 static int
-fetch_heteroatom_definitions (const msi_attribute * att,
-                              resizable_array<atomic_number_t> & heteroatoms)
+fetch_heteroatom_definitions(const msi_attribute * att,
+                             resizable_array<atomic_number_t> & heteroatoms)
 {
-  int z;
   int ndx = 0;
-  while (att->next_value (z, ndx))
+  if (att->valid_as_int())
   {
-    if (z < 0 || z > HIGHEST_ATOMIC_NUMBER)
+    int z;
+    while (att->next_value(z, ndx))
     {
-      cerr << "Invalid atomic number in heteroatom spec '" << z << "'\n";
-      return 0;
-    }
+      if (z < 0 || z > HIGHEST_ATOMIC_NUMBER)
+      {
+        cerr << "Invalid atomic number in heteroatom spec '" << z << "'\n";
+        return 0;
+      }
 
-    heteroatoms.add (z);
+      heteroatoms.add(z);
+    }
+  }
+  else
+  {
+    IWString s = att->stringval();
+
+    int i = 0;
+    const_IWSubstring token;
+    while (s.nextword(token, i))
+    {
+      const Element * e = get_element_from_symbol_no_case_conversion(token);
+      if (NULL == e)
+      {
+        cerr << "fetch_heteroatom_definitions:unrecognised element specification '" << s << "'\n";
+        return 0;
+      }
+
+      if (e->atomic_number () < 0)
+      {
+        cerr << "fetch_heteroatom_definitions::element " << s << " has no atomic number\n";
+        return 0;
+      }
+
+      heteroatoms.add(e->atomic_number());
+    }
   }
 
   return heteroatoms.number_elements();
 }
 
 static int
-fetch_heteroatom_definitions (const msi_attribute & att,
-                              int * heteroatm)
+fetch_heteroatom_definitions(const msi_attribute & att,
+                             int * heteroatm)
 {
-  set_vector (heteroatm, HIGHEST_ATOMIC_NUMBER + 1, 0);
+  set_vector(heteroatm, HIGHEST_ATOMIC_NUMBER + 1, 0);
 
   int z;
   int ndx = 0;
 
-  while (att.next_value (z, ndx))
+  while (att.next_value(z, ndx))
   {
     if (z < 0 || z > HIGHEST_ATOMIC_NUMBER)
     {
@@ -4334,26 +4781,28 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
 
   int version_attribute_found = 0;
 
-  _numeric_value.resize (0);
+  _numeric_value.resize(0);
+
+  int environments_can_share_attachment_points = -1;    // indicates not set
 
   int natt = msi.attribute_count();
   for (int i = 0; i < natt; i++)
   {
-    const msi_attribute * att = msi.attribute (i);
+    const msi_attribute * att = msi.attribute(i);
     if (NAME_OF_COMMENT_ATTRIBUTE == att->name())
     {
-      att->value (_comment);
+      att->value(_comment);
       attribute_recognised[i] = 1;
     }
     else if ("Label" == att->name())
     {
-      att->value (_comment);
+      att->value(_comment);
       attribute_recognised[i] = 1;
     }
     else if (NAME_OF_VERSION_ATTRIBUTE == att->name())
     {
       int v;
-      if (! att->value (v) || 2 != v)
+      if (! att->value(v) || 2 != v)
       {
         cerr << "Single_Substructure_Query::_construct_from_msi_object: can only read version 2 queries\n";
         return 0;
@@ -4363,53 +4812,53 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
     }
     else if (NAME_OF_DEFINE_HETEROATOMS_ATTRIBUTE == att->name())
     {
-      if (! fetch_heteroatom_definitions (att, _heteroatoms))
+      if (! fetch_heteroatom_definitions(att, _heteroatoms))
         return 0;
       attribute_recognised[i] = 1;
     }
     else if (NAME_OF_ONE_EMBEDDING_PER_START_ATOM == att->name())
     {
       int oe;
-      if (! att->value (oe))
+      if (! att->value(oe))
       {
         cerr << "Single_Substructure_Query::_construct_from_msi_object: the '" << NAME_OF_ONE_EMBEDDING_PER_START_ATOM <<
                 "' attribute requires a whole number\n";
         return 0;
       }
 
-      set_find_one_embedding_per_atom (oe);
+      set_find_one_embedding_per_atom(oe);
       attribute_recognised[i] = 1;
     }
     else if (NAME_OF_UNIQUE_EMBEDDINGS_ONLY == att->name())
     {
       int ue;
-      if (! att->value (ue))
+      if (! att->value(ue))
       {
         cerr << "Single_Substructure_Query::_construct_from_msi_object: the '" << NAME_OF_UNIQUE_EMBEDDINGS_ONLY <<
                 "' attribute requires a whole number\n";
         return 0;
       }
 
-      set_find_unique_embeddings_only (ue);
+      set_find_unique_embeddings_only(ue);
       attribute_recognised[i] = 1;
     }
     else if (NAME_OF_NORMALISE_RC_PER_HITS_NEEDED == att->name())
     {
       int nrc;
-      if (! att->value (nrc) || nrc < 0)
+      if (! att->value(nrc) || nrc < 0)
       {
         cerr << "Single_Substructure_Query::_construct_from_msi_object: the '" << NAME_OF_NORMALISE_RC_PER_HITS_NEEDED <<
                 "' attribute requires a non negative whole number\n";
         return 0;
       }
 
-      set_normalise_rc_per_hits_needed (nrc);
+      set_normalise_rc_per_hits_needed(nrc);
       attribute_recognised[i] = 1;
     }
     else if (NAME_OF_SUBTRACT_FROM_RC == att->name())
     {
       int nsr;
-      if (! att->value (nsr))
+      if (! att->value(nsr))
       {
         cerr << "Single_Substructure_Query::_construct_from_msi_object: the '" << NAME_OF_SUBTRACT_FROM_RC <<
                 "' attribute requires a whole number\n";
@@ -4421,7 +4870,7 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
     }
     else if (NAME_OF_RESPECT_INITIAL_NUMBERING_ATTRIBUTE == att->name())
     {
-      if (! att->value (_respect_initial_atom_numbering))
+      if (! att->value(_respect_initial_atom_numbering))
       {
         cerr << "Single_Substructure_Query::_construct_from_msi_object: the '" << NAME_OF_RESPECT_INITIAL_NUMBERING_ATTRIBUTE <<
                 "' attribute requires a whole number\n";
@@ -4433,7 +4882,7 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
     else if (NAME_OF_MAX_MATCHES_TO_FIND == att->name())
     {
       int mmf;
-      if (! att->value (mmf) || mmf <= 0)
+      if (! att->value(mmf) || mmf <= 0)
       {
         cerr << "Single_Substructure_Query::_construct_from_msi_object: the '" << NAME_OF_MAX_MATCHES_TO_FIND <<
                 "' attribute requires a whole positive number\n";
@@ -4446,7 +4895,7 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
     else if (NAME_OF_SAVE_HITS_ATTRIBUTE == att->name())
     {
       int sha;
-      if (! att->value (sha) || sha < 0)
+      if (! att->value(sha) || sha < 0)
       {
         cerr << "Single_Substructure_Query::_construct_from_msi_object: the '" << NAME_OF_SAVE_HITS_ATTRIBUTE <<
                 "' attribute requires a whole non-negative number\n";
@@ -4459,7 +4908,7 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
     else if (NAME_OF_NCON_IGNORE_SINGLY_CONNECTED == att->name())
     {
       int nisc;
-      if (! att->value (nisc) || nisc < 0)
+      if (! att->value(nisc) || nisc < 0)
       {
         cerr << "Single_Substructure_Query::_construct_from_msi_object: the '" << NAME_OF_NCON_IGNORE_SINGLY_CONNECTED <<
                 "' attribute requires a whole number\n";
@@ -4471,7 +4920,7 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
     }
     else if (NAME_OF_DO_NOT_PERCEIVE_SYMMETRIC_EQUIVALENTS == att->name())
     {
-      if (! att->value (_do_not_perceive_symmetry_equivalent_matches))
+      if (! att->value(_do_not_perceive_symmetry_equivalent_matches))
       {
         cerr << "Single_Substructure_Query::_construct_from_msi_object: the '" << NAME_OF_DO_NOT_PERCEIVE_SYMMETRIC_EQUIVALENTS <<
                 "' attribute requires a whole number\n";
@@ -4482,7 +4931,7 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
     }
     else if (NAME_OF_IMPLICIT_RING_CONDITION == att->name())
     {
-      if (! att->value (_implicit_ring_condition))
+      if (! att->value(_implicit_ring_condition))
       {
         cerr << "Single_Substructure_Query::_construct_from_msi_object: the '" << NAME_OF_IMPLICIT_RING_CONDITION <<
                 "' attribute requires a whole number\n";
@@ -4496,7 +4945,7 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
     }
     else if (NAME_OF_ALL_HITS_IN_SAME_FRAGMENT_ATTRIBUTE == att->name())
     {
-      if (! att->value (_all_hits_in_same_fragment))
+      if (! att->value(_all_hits_in_same_fragment))
       {
         cerr << "Single_Substructure_Query::_construct_from_msi_object: the '" << NAME_OF_ALL_HITS_IN_SAME_FRAGMENT_ATTRIBUTE <<
                 "' attribute requires a whole number\n";
@@ -4507,7 +4956,7 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
     }
     else if (NAME_OF_ONLY_MATCH_LARGEST_FRAGMENT_ATTRIBUTE == att->name())
     {
-      if (! att->value (_only_keep_matches_in_largest_fragment))
+      if (! att->value(_only_keep_matches_in_largest_fragment))
       {
         cerr << "Single_Substructure_Query::_construct_from_msi_object: the '" << NAME_OF_ONLY_MATCH_LARGEST_FRAGMENT_ATTRIBUTE <<
                 "' attribute requires a whole number\n";
@@ -4518,7 +4967,7 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
     }
     else if (NAME_OF_EMBEDDINGS_DO_NOT_OVERLAP_ATTRIBUTE == att->name())
     {
-      if (! att->value (_embeddings_do_not_overlap))
+      if (! att->value(_embeddings_do_not_overlap))
       {
         cerr << "Single_Substructure_Query::_construct_from_msi_object: the '" << NAME_OF_EMBEDDINGS_DO_NOT_OVERLAP_ATTRIBUTE <<
                 "' attribute requires a whole number\n";
@@ -4531,7 +4980,7 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
     }
     else if (NAME_OF_SORT_BY_PREFERENCE_VALUE_ATTRIBUTE == att->name())
     {
-      if (! att->value (_sort_by_preference_value))
+      if (! att->value(_sort_by_preference_value))
       {
         cerr << "Single_Substructure_Query::_construct_from_msi_object: the '" << NAME_OF_SORT_BY_PREFERENCE_VALUE_ATTRIBUTE <<
                 "' attribute requires a whole number\n";
@@ -4543,7 +4992,7 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
     else if (NAME_OF_SMILES_ATTRIBUTE == att->name())
     {
       Substructure_Atom * a = new Substructure_Atom;
-      if (! a->parse_smiles_specifier (att))
+      if (! a->parse_smiles_specifier(att))
       {
         delete a;
         cerr << "Single_Substructure_Query::_construct_from_msi_object: cannot parse '" << NAME_OF_SMILES_ATTRIBUTE << "'\n";
@@ -4555,7 +5004,7 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
     else if (NAME_OF_SMARTS_ATTRIBUTE == att->name())
     {
       const_IWSubstring smarts;
-      att->value (smarts);
+      att->value(smarts);
 
       if (! create_from_smarts(smarts))
       {
@@ -4567,7 +5016,7 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
     else if (NAME_OF_NUMERIC_VALUE_ATTRIBUTE == att->name())
     {
       double d;
-      if (! att->value (d))
+      if (! att->value(d))
       {
         cerr << "Single_Substructure_Query::_construct_from_msi_object: the " << NAME_OF_NUMERIC_VALUE_ATTRIBUTE <<
                 " must be numeric\n";
@@ -4575,7 +5024,7 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
         return 0;
       }
 
-      _numeric_value.add (d);
+      _numeric_value.add(d);
       attribute_recognised[i] = 1;
     }
     else if (NAME_OF_NO_MATCHED_ATOMS_BETWEEN_SPECIFIER == att->name())
@@ -4587,8 +5036,8 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
         return 0;
       }
 
-      int a1 = att->int_multi_value (0);
-      int a2 = att->int_multi_value (1);
+      int a1 = att->int_multi_value(0);
+      int a2 = att->int_multi_value(1);
       if (a1 < 0 || a2 < 0 || a1 == a2)
       {
         cerr << "Single_Substructure_Query::_construct_from_msi_object: the " << NAME_OF_NO_MATCHED_ATOMS_BETWEEN_SPECIFIER << " must have two valid numbers\n";
@@ -4596,9 +5045,9 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
         return 0;
       }
 
-      Bond * b = new Bond (a1, a2, SINGLE_BOND);
+      Bond * b = new Bond(a1, a2, SINGLE_BOND);
 
-      _no_matched_atoms_between.add (b);
+      _no_matched_atoms_between.add(b);
 
       attribute_recognised[i] = 1;
     }
@@ -4606,7 +5055,7 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
     {
       Link_Atom * l = new Link_Atom;
 
-      if (! l->construct_from_msi_attribute (att))
+      if (! l->construct_from_msi_attribute(att))
       {
         cerr << "Single_Substructure_Query::_construct_from_msi_object:invalid link atom specification\n";
         cerr << (*att) << endl;
@@ -4614,12 +5063,12 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
         return 0;
       }
 
-      _link_atom.add (l);
+      _link_atom.add(l);
       attribute_recognised[i] = 1;
     }
     else if (NAME_OF_DISTANCE_BETWEEN_HITS_NCHECK_ATTRIBUTE == att->name())
     {
-      if (! att->value (_matched_atoms_to_check_for_hits_too_close) || _matched_atoms_to_check_for_hits_too_close < 0)
+      if (! att->value(_matched_atoms_to_check_for_hits_too_close) || _matched_atoms_to_check_for_hits_too_close < 0)
       {
         cerr << "Single_Substructure_Query::_construct_from_msi_object:the '" << NAME_OF_DISTANCE_BETWEEN_HITS_NCHECK_ATTRIBUTE << " must be a whole positive number\n";
         cerr << (*att) << endl;
@@ -4630,7 +5079,7 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
     }
     else if (NAME_OF_FAIL_IF_EMBEDDINGS_TOO_CLOSE_ATTRIBUTE == att->name())
     {
-      if (! att->value (_fail_if_embeddings_too_close) || _fail_if_embeddings_too_close < 0)
+      if (! att->value(_fail_if_embeddings_too_close) || _fail_if_embeddings_too_close < 0)
       {
         cerr << "Single_Substructure_Query::_construct_from_msi_object:the '" << NAME_OF_FAIL_IF_EMBEDDINGS_TOO_CLOSE_ATTRIBUTE << " must be a whole positive number\n";
         cerr << (*att) << endl;
@@ -4641,7 +5090,7 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
     }
     else if (NAME_OF_ENVIRONMENT_MUST_MATCH_UNMATCHED_ATOMS_ATTRIBUTE == att->name())
     {
-      if (! att->value (_environment_must_match_unmatched_atoms) || _environment_must_match_unmatched_atoms < 0)
+      if (! att->value(_environment_must_match_unmatched_atoms) || _environment_must_match_unmatched_atoms < 0)
       {
         cerr << "Single_Substructure_Query::_construct_from_msi_object:the '" << NAME_OF_ENVIRONMENT_MUST_MATCH_UNMATCHED_ATOMS_ATTRIBUTE << " must be non-negative\n";
         cerr << (*att) << endl;
@@ -4649,6 +5098,14 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
       }
 
       attribute_recognised[i] = 1;
+    }
+    else if (NAME_OF_ENVIRONMENTS_CAN_SHARE_ATTACHMENT_POINTS == att->name())
+    {
+      if (! att->value(environments_can_share_attachment_points) || environments_can_share_attachment_points < 0)
+      {
+        cerr << "Single_Substructure_Query::_construct_from_msi_object: the '" << NAME_OF_ENVIRONMENTS_CAN_SHARE_ATTACHMENT_POINTS << " attribute must be a whole non negative number\n";
+        return 0;
+      }
     }
     else if (NAME_OF_SORT_MATCHES_BY == att->name())
     {
@@ -4712,7 +5169,7 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
   }
 
   int nat = 0;
-  if (! really_gruesome (_attached_heteroatom_count, msi, NAME_OF_ATTACHED_HETEROATOM_COUNT_SPECIFIER, 
+  if (! really_gruesome(_attached_heteroatom_count, msi, NAME_OF_ATTACHED_HETEROATOM_COUNT_SPECIFIER, 
                           nat, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
@@ -4720,122 +5177,128 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
 
   if (_hits_needed.is_set())   // from a numeric qualifier on a smarts
     ;
-  else if (! really_gruesome (_hits_needed, msi, NAME_OF_QUERY_HITS_NEEDED_ATTRIBUTE,
+  else if (! really_gruesome(_hits_needed, msi, NAME_OF_QUERY_HITS_NEEDED_ATTRIBUTE,
                          nat, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_ring_atoms_matched, msi, NAME_OF_RING_ATOMS_MATCHED_ATTRIBUTE,
+  if (! really_gruesome(_ring_atoms_matched, msi, NAME_OF_RING_ATOMS_MATCHED_ATTRIBUTE,
                          nat, 1, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_heteroatoms_matched, msi, NAME_OF_HETEROATOMS_MATCHED_ATTRIBUTE,
+  if (! really_gruesome(_heteroatoms_matched, msi, NAME_OF_HETEROATOMS_MATCHED_ATTRIBUTE,
                          nat, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (_heteroatoms.number_elements() && ! _attached_heteroatom_count.is_set())
-  {
-    cerr << "Single_Substructure_Query::_construct_from_msi_object: " << _heteroatoms.number_elements() <<
-            " heteroatoms defined, but no attached_heteroatom_count\n";
-    return 0;
-  }
-
-  if (! really_gruesome (_heteroatoms_in_molecule, msi, NAME_OF_HETEROATOMS_ATTRIBUTE,
+  if (! really_gruesome(_heteroatoms_in_molecule, msi, NAME_OF_HETEROATOMS_ATTRIBUTE,
                          nat, 0, MAX_NOT_SPECIFIED))
   {
     cerr << "Single_Substructure_Query::_construct_from_msi_object: Cannot parse '" << NAME_OF_HETEROATOMS_MATCHED_ATTRIBUTE << "' attribute(s)\n";
     return 0;
   }
 
-  if (! really_gruesome (_natoms, msi, NAME_OF_NATOMS_ATTRIBUTE, nat, 0, MAX_NOT_SPECIFIED))
+  if (_heteroatoms.number_elements() && 
+      (! _attached_heteroatom_count.is_set() && ! _heteroatoms_in_molecule.is_set()))
+  {
+    cerr << "Single_Substructure_Query::_construct_from_msi_object: " << _heteroatoms.number_elements() <<
+            " heteroatoms defined, but no attached_heteroatom_count\n";
+    return 0;
+  }
+
+  if (! really_gruesome(_natoms, msi, NAME_OF_NATOMS_ATTRIBUTE, nat, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_nrings, msi, NAME_OF_NRINGS_ATTRIBUTE, nat, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_nrings, msi, NAME_OF_NRINGS_ATTRIBUTE, nat, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_ncon, msi, NAME_OF_NCON_ATTRIBUTE, nat, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_ncon, msi, NAME_OF_NCON_ATTRIBUTE, nat, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_fused_rings, msi, NAME_OF_FUSED_RING_COUNT_SPECIFIER, nat, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_fused_rings, msi, NAME_OF_FUSED_RING_COUNT_SPECIFIER, nat, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_strongly_fused_rings, msi, NAME_OF_STRONGLY_FUSED_RING_COUNT_SPECIFIER, nat, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_strongly_fused_rings, msi, NAME_OF_STRONGLY_FUSED_RING_COUNT_SPECIFIER, nat, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_isolated_rings, msi, NAME_OF_ISOLATED_RING_COUNT_SPECIFIER, nat, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_isolated_rings, msi, NAME_OF_ISOLATED_RING_COUNT_SPECIFIER, nat, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_isolated_ring_objects, msi, NAME_OF_ISOLATED_RING_OBJECTS, nat, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_isolated_ring_objects, msi, NAME_OF_ISOLATED_RING_OBJECTS, nat, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_aromatic_rings, msi, NAME_OF_AROMATIC_RING_COUNT_SPECIFIER, nat, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_aromatic_rings, msi, NAME_OF_AROMATIC_RING_COUNT_SPECIFIER, nat, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_non_aromatic_rings, msi, NAME_OF_NON_AROMATIC_RING_COUNT_SPECIFIER, nat, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_non_aromatic_rings, msi, NAME_OF_NON_AROMATIC_RING_COUNT_SPECIFIER, nat, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_distance_between_hits, msi, NAME_OF_DISTANCE_BETWEEN_HITS_ATTRIBUTE, nat, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_distance_between_hits, msi, NAME_OF_DISTANCE_BETWEEN_HITS_ATTRIBUTE, nat, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_number_isotopic_atoms, msi, NAME_OF_NUMBER_ISOTOPIC_ATOMS_ATTRIBUTE, nat, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_number_isotopic_atoms, msi, NAME_OF_NUMBER_ISOTOPIC_ATOMS_ATTRIBUTE, nat, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_number_fragments, msi, NAME_OF_NUMBER_FRAGMENTS_ATTRIBUTE, nat, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_number_fragments, msi, NAME_OF_NUMBER_FRAGMENTS_ATTRIBUTE, nat, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_distance_between_root_atoms, msi, NAME_OF_DISTANCE_BETWEEN_ROOT_ATOMS_SPECIFIER, nat, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_distance_between_root_atoms, msi, NAME_OF_DISTANCE_BETWEEN_ROOT_ATOMS_SPECIFIER, nat, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_atoms_in_spinach, msi, NAME_OF_SPINACH_ATOMS_ATTRIBUTE, nat, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_atoms_in_spinach, msi, NAME_OF_SPINACH_ATOMS_ATTRIBUTE, nat, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_inter_ring_atoms, msi, NAME_OF_INTER_RING_ATOMS_ATTRIBUTE, nat, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_inter_ring_atoms, msi, NAME_OF_INTER_RING_ATOMS_ATTRIBUTE, nat, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_unmatched_atoms, msi, NAME_OF_UNMATCHED_ATOMS, nat, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_unmatched_atoms, msi, NAME_OF_UNMATCHED_ATOMS, nat, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! get_float_attribute (msi, NAME_OF_MIN_FRACTION_ATOMS_MATCHED, _min_fraction_atoms_matched, 0.0, 1.0))
+  if (! really_gruesome(_net_formal_charge, msi, NAME_OF_NET_FORMAL_CHARGE_ATTRIBUTE, nat, MIN_NOT_SPECIFIED,  MAX_NOT_SPECIFIED))
+  {
+    return 0;
+  }
+
+  if (! get_float_attribute(msi, NAME_OF_MIN_FRACTION_ATOMS_MATCHED, _min_fraction_atoms_matched, 0.0, 1.0))
     return 0;
 
-  if (! get_float_attribute (msi, NAME_OF_MAX_FRACTION_ATOMS_MATCHED, _max_fraction_atoms_matched, 0.0, 1.0))
+  if (! get_float_attribute(msi, NAME_OF_MAX_FRACTION_ATOMS_MATCHED, _max_fraction_atoms_matched, 0.0, 1.0))
     return 0;
 
   extending_resizable_array<Substructure_Atom *> completed;
@@ -4870,7 +5333,7 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
 
     if (NAME_OF_RING_SPECIFIER_OBJECT == mi.name())
     {
-      if ( ! _parse_ring_specifier_object (mi))
+      if ( ! _parse_ring_specifier_object(mi))
         return 0;
 
       nat++;
@@ -4879,7 +5342,7 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
 
     if (NAME_OF_RING_SYSTEM_SPECIFIER_OBJECT == mi.name())
     {
-      if ( ! _parse_ring_system_specifier_object (mi))
+      if ( ! _parse_ring_system_specifier_object(mi))
         return 0;
 
       nat++;
@@ -4888,7 +5351,7 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
 
     if (NAME_OF_ELEMENT_HITS_NEEDED_OBJECT == mi.name())
     {
-      if (! _parse_element_hits_needed_object (mi))
+      if (! _parse_element_hits_needed_object(mi))
         return 0;
 
       nat++;
@@ -4897,7 +5360,7 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
 
     if (NAME_OF_ELEMENTS_NEEDED_OBJECT == mi.name())
     {
-      if (! _parse_elements_needed_object (mi))
+      if (! _parse_elements_needed_object(mi))
         return 0;
 
       nat++;
@@ -4911,18 +5374,18 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
       continue;
     }
 
-    if (is_root_substructure_atom (mi))
+    if (is_root_substructure_atom(mi))
     {
       Substructure_Atom * r = new Substructure_Atom;
 
-      if (! r->construct_from_msi_object (mi, completed))
+      if (! r->construct_from_msi_object(mi, completed))
       {
         delete r;
         return 0;
       }
 
       nat++;
-      _root_atoms.add (r);
+      _root_atoms.add(r);
     }
     else if (0 == _root_atoms.number_elements())
     {
@@ -4932,7 +5395,7 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
     else
     {
       Substructure_Atom * a = new Substructure_Atom;
-      if (! a->construct_from_msi_object (mi, completed))
+      if (! a->construct_from_msi_object(mi, completed))
       {
         delete a;
         return 0;
@@ -4969,7 +5432,7 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
 
     if (nat > 0)
       ;
-    else if (_natoms.is_set() || _nrings.is_set() || _aromatic_rings.is_set() || _atoms_in_spinach.is_set() || _inter_ring_atoms.is_set())
+    else if (_natoms.is_set() || _nrings.is_set() || _aromatic_rings.is_set() || _atoms_in_spinach.is_set() || _inter_ring_atoms.is_set() || _net_formal_charge.is_set())
       ;
     else
     {
@@ -4986,7 +5449,7 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
 
       if (NAME_OF_ENVIRONMENT_OBJECT == mi.name())
       {
-        if (! _construct_environment_from_msi_object (mi, completed, _environment))
+        if (! _construct_environment_from_msi_object(mi, completed, _environment))
         {
           cerr << "Single_Substructure_Query::_construct_from_msi_object: environment interpretation failed\n";
           cerr << mi << endl;
@@ -4996,12 +5459,24 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
 
       else if (NAME_OF_ENVIROMENT_REJECTION_OBJECT == mi.name())
       {
-        if (! _construct_environment_from_msi_object (mi, completed, _environment_rejections))
+        if (! _construct_environment_from_msi_object(mi, completed, _environment_rejections))
         {
           cerr << "Single_Substructure_Query::_construct_from_msi_object: environment interpretation failed\n";
           cerr << mi << endl;
           return 0;
         }
+      }
+    }
+
+    if (environments_can_share_attachment_points >= 0)
+    {
+      for (int i = 0; i < _environment.number_elements(); ++i)
+      {
+        _environment[i]->set_environments_can_share_attachment_points(environments_can_share_attachment_points);
+      }
+      for (int i = 0; i < _environment_rejections.number_elements(); ++i)
+      {
+        _environment_rejections[i]->set_environments_can_share_attachment_points(environments_can_share_attachment_points);
       }
     }
   }
@@ -5013,7 +5488,7 @@ Single_Substructure_Query::_construct_from_msi_object (const msi_object & msi,
 }
 
 int
-Single_Substructure_Query::construct_from_msi_object (const msi_object & msi)
+Single_Substructure_Query::construct_from_msi_object(const msi_object & msi)
 {
   assert (ok());
 
@@ -5028,9 +5503,9 @@ Single_Substructure_Query::construct_from_msi_object (const msi_object & msi)
   int * attribute_recognised = NULL;
   int nat = msi.attribute_count();
   if (nat)
-    attribute_recognised = new_int (nat);
+    attribute_recognised = new_int(nat);
 
-  int rc = _construct_from_msi_object (msi, attribute_recognised);
+  int rc = _construct_from_msi_object(msi, attribute_recognised);
 
 // Now that all the atoms have been defined, we can read in any chirality
 
@@ -5044,7 +5519,7 @@ Single_Substructure_Query::construct_from_msi_object (const msi_object & msi)
         continue;
 
       attribute_recognised[i] = 1;
-      if (! _build_chirality_specification_from_msi_attribute (att->stringval()))
+      if (! _build_chirality_specification_from_msi_attribute(att->stringval()))
       {
         cerr << "Single_Substructure_Query::construct_from_msi_object:invalid chirality '" << (*att) << "'\n";
         return 0;
@@ -5066,7 +5541,8 @@ Single_Substructure_Query::construct_from_msi_object (const msi_object & msi)
     }
   }
 
-  DELETE_IF_NOT_NULL (attribute_recognised);
+  if (NULL != attribute_recognised)
+    delete [] attribute_recognised;
 
   _preferences_present = 0;
 
@@ -5115,25 +5591,25 @@ Single_Substructure_Query::read (iwstring_data_source & input)
 {
   assert (input.ok());
 
-  input.set_ignore_pattern ("^#");
+  input.set_ignore_pattern("^#");
   input.set_skip_blank_lines(1);
 
   msi_object msi;
 
-  if (! msi.read (input))
+  if (! msi.read(input))
   {
     return 0;
   }
 
-  input.set_ignore_pattern ("");
+  input.set_ignore_pattern("");
 
-  return construct_from_msi_object (msi);
+  return construct_from_msi_object(msi);
 }
 
 int
 Single_Substructure_Query::read (const char * fname)
 {
-  iwstring_data_source input (fname);
+  iwstring_data_source input(fname);
 
   if (! input.ok())
   {
@@ -5141,13 +5617,13 @@ Single_Substructure_Query::read (const char * fname)
     return 0;
   }
 
-  return read (input);
+  return read(input);
 }
 
 int
 Single_Substructure_Query::read (const IWString & fname)
 {
-  iwstring_data_source input (fname);
+  iwstring_data_source input(fname);
 
   if (! input.ok())
   {
@@ -5155,7 +5631,7 @@ Single_Substructure_Query::read (const IWString & fname)
     return 0;
   }
 
-  return read (input);
+  return read(input);
 }
 
 /*
@@ -5165,17 +5641,17 @@ Single_Substructure_Query::read (const IWString & fname)
 int
 Single_Substructure_Query::create_from_smiles (const IWString & smiles)
 {
-  if (! smiles.contains ('.'))
+  if (! smiles.contains('.'))
   {
     Substructure_Atom * a = new Substructure_Atom;
 
-    if (! a->parse_smiles_specifier (smiles))
+    if (! a->parse_smiles_specifier(smiles))
     {
       delete a;
       return 0;
     }
 
-    _root_atoms.add (a);
+    _root_atoms.add(a);
 
     return 1;
   }
@@ -5184,17 +5660,17 @@ Single_Substructure_Query::create_from_smiles (const IWString & smiles)
 
   int i = 0;
   const_IWSubstring token;
-  while (smiles.nextword (token, i))
+  while (smiles.nextword(token, i))
   {
     Substructure_Atom * a = new Substructure_Atom;
 
-    if (! a->parse_smiles_specifier (smiles))
+    if (! a->parse_smiles_specifier(smiles))
     {
       delete a;
       return 0;
     }
 
-    _root_atoms.add (a);
+    _root_atoms.add(a);
   }
 
   return _root_atoms.number_elements();
@@ -5210,7 +5686,7 @@ Single_Substructure_Query::_parse_and_consume_optional_leading_numeric_qualifier
   {
     smarts++;
 
-    if ((0 == (nchars = fetch_numeric (smarts, m)) )|| (m < 0))
+    if ((0 == (nchars = fetch_numeric(smarts, m)) )|| (m < 0))
     {
       cerr << "Single_Substructure_Query::_parse_and_consume_optional_leading_numeric_qualifiers: the '>' directive must be followed by a whole number\n";
       return 0;
@@ -5222,7 +5698,7 @@ Single_Substructure_Query::_parse_and_consume_optional_leading_numeric_qualifier
       return 0;
     }
 
-    if (! _hits_needed.set_min (m + 1))
+    if (! _hits_needed.set_min(m + 1))
       return 0;
 
     smarts += nchars;
@@ -5232,7 +5708,7 @@ Single_Substructure_Query::_parse_and_consume_optional_leading_numeric_qualifier
   {
     smarts++;
 
-    if ((0 == (nchars = fetch_numeric (smarts, m))) || (m < 0))
+    if ((0 == (nchars = fetch_numeric(smarts, m))) || (m < 0))
     {
       cerr << "Single_Substructure_Query::_parse_and_consume_optional_leading_numeric_qualifiers: the '<' directive must be followed by a whole number\n";
       return 0;
@@ -5244,13 +5720,13 @@ Single_Substructure_Query::_parse_and_consume_optional_leading_numeric_qualifier
       return 0;
     }
 
-    if (! _hits_needed.set_max (m - 1))
+    if (! _hits_needed.set_max(m - 1))
       return 0;
 
     smarts += nchars;
     nchars++;     // to account for the < at the beginning
   }
-  else if ((nchars = fetch_numeric (smarts, m)))
+  else if ((nchars = fetch_numeric(smarts, m)))
   {
     if (m < 0)
     {
@@ -5264,7 +5740,7 @@ Single_Substructure_Query::_parse_and_consume_optional_leading_numeric_qualifier
       return 0;
     }
 
-    if (! _hits_needed.add (m))
+    if (! _hits_needed.add(m))
       return 0;
 
     smarts += nchars;
@@ -5297,7 +5773,7 @@ Single_Substructure_Query::create_from_smarts (const IWString & smarts)
   if (smarts.nwords() > 1)
   {
     _comment = smarts;
-    _comment.remove_leading_words (1);
+    _comment.remove_leading_words(1);
   }
 
 #ifdef DEBUG_SSQ_CREATE_FROM_SMARTS
@@ -5306,7 +5782,7 @@ Single_Substructure_Query::create_from_smarts (const IWString & smarts)
 
   const_IWSubstring mysmarts = smarts;    // we may want to change it
 
-  if (! _parse_and_consume_optional_leading_numeric_qualifiers (mysmarts))
+  if (! _parse_and_consume_optional_leading_numeric_qualifiers(mysmarts))
   {
     cerr << "Single_Substructure_Query::create_from_smarts:invalid numeric specification '" << smarts << "'\n";
     return 0;
@@ -5338,11 +5814,11 @@ Single_Substructure_Query::create_from_smarts (const IWString & smarts)
 
   _respect_initial_atom_numbering = 1;
 
-  return _parse_smarts_specifier (mysmarts);
+  return _parse_smarts_specifier(mysmarts);
 }
 
 int
-Substructure_Query::write_msi (ostream & os, int & object_id, int indentation)
+Substructure_Query::write_msi (std::ostream & os, int & object_id, int indentation)
 {
   assert (ok());
   assert (os.good());
@@ -5353,13 +5829,13 @@ Substructure_Query::write_msi (ostream & os, int & object_id, int indentation)
   }
 
   if (1 == _number_elements)
-    return _things[0]->write_msi (os, object_id, "", indentation);
+    return _things[0]->write_msi(os, object_id, "", indentation);
 
 // We have a composite query;
 
   IWString ind;
   if (indentation)
-    ind.extend (indentation, ' ');
+    ind.extend(indentation, ' ');
 
   os << ind << "(" << object_id++ << ' ' << NAME_OF_COMPOSITE_QUERY_OBJECT << endl;
 
@@ -5371,11 +5847,11 @@ Substructure_Query::write_msi (ostream & os, int & object_id, int indentation)
   if (_each_component_search)
     os << ind << "  (A I " << NAME_OF_EACH_COMPONENT_SEARCH_ATTRIBUTE << ' ' << _each_component_search << ")\n";
     
-  if (_operator.all_operators_are ('|'))
+  if (_operator.all_operators_are('|'))
   {
     for (int i = 0; i < _number_elements; i++)
     {
-      if (! _things[i]->write_msi (os, object_id, "", indentation + 2))
+      if (! _things[i]->write_msi(os, object_id, "", indentation + 2))
         return 0;
     }
   }
@@ -5386,7 +5862,7 @@ Substructure_Query::write_msi (ostream & os, int & object_id, int indentation)
       const_IWSubstring op;
       if (i < _number_elements - 1)
       {
-        _operator.op (i, op);
+        _operator.op(i, op);
         if ('&' == op)
           op = NAME_OF_AND_OPERATOR;
         else if ('|' == op)
@@ -5402,7 +5878,7 @@ Substructure_Query::write_msi (ostream & os, int & object_id, int indentation)
         }
       }
 
-      if (! _things[i]->write_msi (os, object_id, op, indentation + 2))
+      if (! _things[i]->write_msi(os, object_id, op, indentation + 2))
         return 0;
     }
   }
@@ -5413,27 +5889,27 @@ Substructure_Query::write_msi (ostream & os, int & object_id, int indentation)
 }
 
 int
-Substructure_Query::write_msi (ostream & os)
+Substructure_Query::write_msi (std::ostream & os)
 {
   assert (ok());
   assert (os.good());
 
   int i = 0;
 
-  return write_msi (os, i, 0);
+  return write_msi(os, i, 0);
 }
 
 int
 Substructure_Query::write_msi (IWString & fname)
 {
-  ofstream os (fname.null_terminated_chars(), ios::out);
+  std::ofstream os(fname.null_terminated_chars(), std::ios::out);
   if (! os.good())
   {
     cerr << "Single_Substructure_Query::write: cannot open '" << fname << "'\n";
     return 0;
   }
 
-  return write_msi (os);
+  return write_msi(os);
 }
 
 int
@@ -5441,18 +5917,18 @@ Substructure_Query::read (iwstring_data_source & input)
 {
   assert (input.ok());
 
-  input.set_ignore_pattern ("^#");
+  input.set_ignore_pattern("^#");
 
   msi_object msi;
 
-  if (! msi.read (input))
+  if (! msi.read(input))
   {
     return 0;
   }
 
-  input.set_ignore_pattern ("");
+  input.set_ignore_pattern("");
 
-  return construct_from_msi_object (msi);
+  return construct_from_msi_object(msi);
 }
 
 static MDL_Molecule * 
@@ -5479,12 +5955,12 @@ read_first_molecule_from_file (const const_IWSubstring & fname)
 int
 Substructure_Query::read (const const_IWSubstring & zname)
 {
-  if (zname.starts_with ("SMARTS:"))
+  if (zname.starts_with("SMARTS:"))
   {
     const_IWSubstring smarts = zname;    // our arg is const
-    smarts.remove_leading_chars (7);
+    smarts.remove_leading_chars(7);
 
-    if (! create_from_smarts (smarts))
+    if (! create_from_smarts(smarts))
     {
       cerr << "Substructure_Query::read: cannot parse 'SMARTS:" << smarts << "'\n";
       return 0;
@@ -5492,29 +5968,29 @@ Substructure_Query::read (const const_IWSubstring & zname)
 
     return 1;
   }
-  else if (zname.starts_with ("SMILES:"))
+  else if (zname.starts_with("SMILES:"))
   {
     const_IWSubstring smiles = zname;    // our arg is const
-    smiles.remove_leading_chars (7);
+    smiles.remove_leading_chars(7);
 
     Single_Substructure_Query * q = new Single_Substructure_Query;
-    if (! q->create_from_smiles (smiles))
+    if (! q->create_from_smiles(smiles))
     {
       cerr << "Substructure_Query::read: cannot parse '" << zname << "'\n";
       delete q;
       return 0;
     }
 
-    add (q);
+    add(q);
 
     if (_number_elements > 1)
-      _operator.add_operator ('|');
+      _operator.add_operator('|');
 
     return 1;
   }
   else if (zname.starts_with("I:"))
   {
-    const_IWSubstring fname (zname);
+    const_IWSubstring fname(zname);
     fname.remove_leading_chars(2);
     MDL_Molecule * m = read_first_molecule_from_file(fname);
     if (NULL == m)
@@ -5535,33 +6011,33 @@ Substructure_Query::read (const const_IWSubstring & zname)
     if (_number_elements > 1)
       _operator.add_operator('|');
 
-      return 1;
+    return 1;
   }
 
-  iwstring_data_source input (zname);
+  iwstring_data_source input(zname);
   if (! input.ok())
   {
     cerr << "Substructure_Query::read: cannot open '" << zname << "'\n";
     return 0;
   }
 
-  return read (input);
+  return read(input);
 }
 
 int
 Substructure_Query::read (const IWString & fname)
 {
-  const_IWSubstring tmp (fname);
+  const_IWSubstring tmp(fname);
 
-  return read (tmp);
+  return read(tmp);
 }
 
 int
 Substructure_Query::read (const char * fname)
 {
-  const_IWSubstring tmp (fname);
+  const_IWSubstring tmp(fname);
 
-  return read (tmp);
+  return read(tmp);
 }
 
 int
@@ -5569,16 +6045,16 @@ Substructure_Query::create_from_smiles (const IWString & smiles)
 {
   Single_Substructure_Query * q = new Single_Substructure_Query;
 
-  if (! q->create_from_smiles (smiles))
+  if (! q->create_from_smiles(smiles))
   {
     delete q;
     return 0;
   }
 
-  add (q);
+  add(q);
 
   if (_number_elements > 1)
-    _operator.add_operator ('|');
+    _operator.add_operator('|');
 
   return 1;
 }
@@ -5598,17 +6074,17 @@ Substructure_Query::_parse_smarts_components (const IWString & smarts,
 
   int i = 0;
   const_IWSubstring token;
-  while (smarts.nextword (token, i, separator))
+  while (smarts.nextword(token, i, separator))
   {
     Single_Substructure_Query * q = new Single_Substructure_Query;
 
-    if (! q->create_from_smarts (token))
+    if (! q->create_from_smarts(token))
     {
       delete q;
       return 0;
     }
 
-    add (q);
+    add(q);
 
     rc++;
   }
@@ -5717,13 +6193,13 @@ Substructure_Query::_add_component_from_smarts (const const_IWSubstring & smarts
 {
   Single_Substructure_Query * q = new Single_Substructure_Query;
 
-  if (! q->create_from_smarts (smarts))
+  if (! q->create_from_smarts(smarts))
   {
     delete q;
     return 0;
   }
 
-  resizable_array_p<Single_Substructure_Query>::add (q);
+  resizable_array_p<Single_Substructure_Query>::add(q);
 
   if (IW_LOGEXP_UNDEFINED != op)
     _operator.add_operator(op);
@@ -5751,7 +6227,7 @@ Substructure_Query::create_from_smarts (const IWString & smarts)
   if (smarts.nwords() > 1)
   {
     _comment = smarts;
-    _comment.remove_leading_words (1);
+    _comment.remove_leading_words(1);
     smartslen = smarts.index(' ');
   }
   else
@@ -5791,7 +6267,7 @@ Substructure_Query::create_from_smarts (const IWString & smarts)
 
 #ifdef DEBUG_CREATE_FROM_SMARTS
   cerr << "After parsing " << number_elements() << " components, operator is\n";
-  _operator.debug_print (cerr);
+  _operator.debug_print(cerr);
 #endif
 
   return 1;
@@ -5801,33 +6277,33 @@ int
 Substructure_Query::_single_query_construct_from_msi_object (const msi_object & msi)
 {
   Single_Substructure_Query * tmp = new Single_Substructure_Query;
-  if (! tmp->construct_from_msi_object (msi))
+  if (! tmp->construct_from_msi_object(msi))
   {
     delete tmp;
     return 0;
   }
 
-  add (tmp);
+  add(tmp);
 
 // Does this query have an operator associated with it
 
   IWString op;
-  if (! msi.string_value_for_attribute (NAME_OF_OPERATOR_ATTRIBUTE, op))
+  if (! msi.string_value_for_attribute(NAME_OF_OPERATOR_ATTRIBUTE, op))
   {
     if (_number_elements > 1)
-      _operator.add_operator ('|');     // the OR operator is the default
+      _operator.add_operator('|');     // the OR operator is the default
 
     return 1;
   }
 
   if (NAME_OF_AND_OPERATOR == op)
-    _operator.add_operator ('&');
+    _operator.add_operator('&');
   else if (NAME_OF_OR_OPERATOR == op)
-    _operator.add_operator ('|');
+    _operator.add_operator('|');
   else if (NAME_OF_XOR_OPERATOR == op)
-    _operator.add_operator ('^');
+    _operator.add_operator('^');
   else if (NAME_OF_LOW_PRIORITY_AND_OPERATOR == op)
-    _operator.add_operator (';');
+    _operator.add_operator(';');
   else
   {
     cerr << "Substructure_Query::_single_query_construct_from_msi_object: which operator is this '" << op << "'\n";
@@ -5851,7 +6327,7 @@ Substructure_Query::_composite_query_construct_from_msi_object (const msi_object
   assert (0 == _operator.number_operators());
 
   int nmsi = msi.number_elements();
-  const msi_attribute * att = msi.attribute (NAME_OF_SMARTS_ATTRIBUTE);
+  const msi_attribute * att = msi.attribute(NAME_OF_SMARTS_ATTRIBUTE);
 
   if (0 == nmsi && NULL == att)
   {
@@ -5862,12 +6338,12 @@ Substructure_Query::_composite_query_construct_from_msi_object (const msi_object
 // Looks like we should do something about operators here
 
   int aptr = 0;
-  while (NULL != (att = msi.attribute (NAME_OF_SMARTS_ATTRIBUTE, aptr++)))
+  while (NULL != (att = msi.attribute(NAME_OF_SMARTS_ATTRIBUTE, aptr++)))
   {
     IWString smarts;
-    att->value (smarts);
+    att->value(smarts);
 
-    if (! create_from_smarts (smarts))
+    if (! create_from_smarts(smarts))
     {
       cerr << "Substructure_Query::_composite_query_construct_from_msi_object: cannot parse smarts\n";
       return 0;
@@ -5886,7 +6362,7 @@ Substructure_Query::_composite_query_construct_from_msi_object (const msi_object
   for (int i = 0; i < nmsi; i++)
   {
     Single_Substructure_Query * tmp = new Single_Substructure_Query;
-    if (! tmp->construct_from_msi_object (*(msi[i])))
+    if (! tmp->construct_from_msi_object(*(msi[i])))
     {
       delete tmp;
       return 0;
@@ -5899,9 +6375,9 @@ Substructure_Query::_composite_query_construct_from_msi_object (const msi_object
 #endif
 
     if (IW_LOGEXP_UNDEFINED != pending_operator)
-      add (tmp, pending_operator);
+      add(tmp, pending_operator);
     else
-      add (tmp);     // the OR operator is the default
+      add(tmp);     // the OR operator is the default
 
 #ifdef DEBUG_READ_COMPOSITE
     cerr << "Components " << _number_elements << " operators " << _operator.number_operators() << endl;
@@ -5915,7 +6391,7 @@ Substructure_Query::_composite_query_construct_from_msi_object (const msi_object
       break;
 
     IWString op;
-    if (! msi[i]->string_value_for_attribute (NAME_OF_OPERATOR_ATTRIBUTE, op))
+    if (! msi[i]->string_value_for_attribute(NAME_OF_OPERATOR_ATTRIBUTE, op))
       continue;        // pending_operator already set to undefined above
 
     if (NAME_OF_AND_OPERATOR == op)
@@ -5935,21 +6411,21 @@ Substructure_Query::_composite_query_construct_from_msi_object (const msi_object
 
   assert (_number_elements == _operator.number_operators() + 1);
 
-  att = msi.attribute (NAME_OF_COMMENT_ATTRIBUTE);
+  att = msi.attribute(NAME_OF_COMMENT_ATTRIBUTE);
   if (NULL != att)
-    att->value (_comment);
+    att->value(_comment);
 
-  att = msi.attribute (NAME_OF_EACH_COMPONENT_SEARCH_ATTRIBUTE);
+  att = msi.attribute(NAME_OF_EACH_COMPONENT_SEARCH_ATTRIBUTE);
   if (NULL != att)
   {
-    if (! att->value (_each_component_search))
+    if (! att->value(_each_component_search))
     {
       cerr << "Substructure_Query::_composite_query_construct_from_msi_object:invalid value for " << NAME_OF_EACH_COMPONENT_SEARCH_ATTRIBUTE << " attribute\n";
       return 0;
     }
   }
 
-  att = msi.attribute (NAME_OF_OPERATOR_ATTRIBUTE);
+  att = msi.attribute(NAME_OF_OPERATOR_ATTRIBUTE);
   if (NULL == att)
     return 1;
 
@@ -5957,16 +6433,16 @@ Substructure_Query::_composite_query_construct_from_msi_object (const msi_object
 // which may have come from the components
 
   IWString op;
-  att->value (op);
+  att->value(op);
 
   if (NAME_OF_AND_OPERATOR == op)
-    _operator.set_all_operators ('&');
+    _operator.set_all_operators('&');
   else if (NAME_OF_OR_OPERATOR == op)
-    _operator.set_all_operators ('|');
+    _operator.set_all_operators('|');
   else if (NAME_OF_XOR_OPERATOR == op)
-    _operator.set_all_operators ('^');
+    _operator.set_all_operators('^');
   else if (NAME_OF_LOW_PRIORITY_AND_OPERATOR == op)
-    _operator.set_all_operators (';');
+    _operator.set_all_operators(';');
   else
   {
     cerr << "Substructure_Query::_composite_query_construct_from_msi_object: what operator is this '" << op << "'\n";
@@ -5989,20 +6465,20 @@ Substructure_Query::construct_from_msi_object (const msi_object & msi)
 
   if (NAME_OF_QUERY_OBJECT == msi.name())
   {
-    rc = _single_query_construct_from_msi_object (msi);
+    rc = _single_query_construct_from_msi_object(msi);
     if (_number_elements)
       _comment = _things[0]->comment();
   }
   else if (NAME_OF_COMPOSITE_QUERY_OBJECT == msi.name())
   {
-    rc = _composite_query_construct_from_msi_object (msi);
+    rc = _composite_query_construct_from_msi_object(msi);
   }
-  else if (NULL != (att = msi.attribute (NAME_OF_SMARTS_ATTRIBUTE)))
+  else if (NULL != (att = msi.attribute(NAME_OF_SMARTS_ATTRIBUTE)))
   {
     IWString smarts;
-    att->value (smarts);
+    att->value(smarts);
 
-    if (! create_from_smarts (smarts))
+    if (! create_from_smarts(smarts))
     {
       cerr << "Substructure_Query::construct_from_msi_object: cannot parse smarts\n";
       return 0;
@@ -6016,7 +6492,7 @@ Substructure_Query::construct_from_msi_object (const msi_object & msi)
   }
 
   if (0 == rc)
-    resize (0);
+    resize(0);
 
   return rc;
 }
@@ -6026,29 +6502,29 @@ Substructure_Ring_Specification::construct_from_msi_object (const msi_object & m
 {
   int attributes_specified = 0;
 
-  if (! Substructure_Ring_Base::construct_from_msi_object (msi, attributes_specified))
+  if (! Substructure_Ring_Base::construct_from_msi_object(msi, attributes_specified))
   {
     cerr << "Substructure_Ring_Specification::construct_from_msi_object: base failed\n";
     return 0;
   }
 
-  if (! really_gruesome (_ring_size, msi, NAME_OF_RING_SIZE_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_ring_size, msi, NAME_OF_RING_SIZE_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
     return 0;
 
-  if (! really_gruesome (_fused, msi, NAME_OF_RING_FUSED_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_fused, msi, NAME_OF_RING_FUSED_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
     return 0;
 
-  if (! really_gruesome (_fused_aromatic_neighbours, msi, NAME_OF_FUSED_AROMATIC_NEIGHBOURS_SPECIFIER, attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_fused_aromatic_neighbours, msi, NAME_OF_FUSED_AROMATIC_NEIGHBOURS_SPECIFIER, attributes_specified, 0, MAX_NOT_SPECIFIED))
     return 0;
 
-  if (! really_gruesome (_fused_non_aromatic_neighbours, msi, NAME_OF_FUSED_NON_AROMATIC_NEIGHBOURS_SPECIFIER, attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_fused_non_aromatic_neighbours, msi, NAME_OF_FUSED_NON_AROMATIC_NEIGHBOURS_SPECIFIER, attributes_specified, 0, MAX_NOT_SPECIFIED))
     return 0;
 
-  const msi_attribute * att = msi.attribute (NAME_OF_AROMATICITY_ATTRIBUTE);
+  const msi_attribute * att = msi.attribute(NAME_OF_AROMATICITY_ATTRIBUTE);
 
   if (att)
   {
-    if (! att->value (_aromatic) || _aromatic< 0)
+    if (! att->value(_aromatic) || _aromatic< 0)
     {
       cerr << "Invalid aromaticity value\n";
       return 0;
@@ -6059,29 +6535,29 @@ Substructure_Ring_Specification::construct_from_msi_object (const msi_object & m
 }
 
 int
-Substructure_Ring_Specification::write_msi (ostream & os, int & object_id, int indentation) const
+Substructure_Ring_Specification::write_msi (std::ostream & os, int & object_id, int indentation) const
 {
   assert (ok());
   assert (os.good());
 
   IWString ind;
   if (indentation)
-    ind.extend (indentation, ' ');
+    ind.extend(indentation, ' ');
 
   os << ind << '(' << object_id++ << ' ' << NAME_OF_RING_SPECIFIER_OBJECT << endl;
 
-  (void) Substructure_Ring_Base::write_msi_attributes (os, object_id, ind);
+  (void) Substructure_Ring_Base::write_msi_attributes(os, object_id, ind);
 
-  _ring_size.write_msi (os, NAME_OF_RING_SIZE_ATTRIBUTE, indentation + 2);
+  _ring_size.write_msi(os, NAME_OF_RING_SIZE_ATTRIBUTE, indentation + 2);
 
   if (SUBSTRUCTURE_NOT_SPECIFIED != _aromatic)
     os << ind << "  (A I " << NAME_OF_AROMATICITY_ATTRIBUTE << ' ' << _aromatic << ")\n";
 
-  _fused.write_msi (os, NAME_OF_RING_FUSED_ATTRIBUTE, indentation + 2);
-  _fused_aromatic_neighbours.write_msi (os, NAME_OF_FUSED_AROMATIC_NEIGHBOURS_SPECIFIER, indentation + 2);
-  _fused_non_aromatic_neighbours.write_msi (os, NAME_OF_FUSED_NON_AROMATIC_NEIGHBOURS_SPECIFIER, indentation + 2);
-  _largest_number_of_bonds_shared_with_another_ring.write_msi (os, NAME_OF_LARGEST_NUMBER_SHARED_BONDS_SPECIFIER, indentation + 2);
-  _strongly_fused_ring_neighbours.write_msi (os, NAME_OF_STRONGLY_FUSED_RING_NEIGHBOUR_SPECIFIER, indentation + 2);
+  _fused.write_msi(os, NAME_OF_RING_FUSED_ATTRIBUTE, indentation + 2);
+  _fused_aromatic_neighbours.write_msi(os, NAME_OF_FUSED_AROMATIC_NEIGHBOURS_SPECIFIER, indentation + 2);
+  _fused_non_aromatic_neighbours.write_msi(os, NAME_OF_FUSED_NON_AROMATIC_NEIGHBOURS_SPECIFIER, indentation + 2);
+  _largest_number_of_bonds_shared_with_another_ring.write_msi(os, NAME_OF_LARGEST_NUMBER_SHARED_BONDS_SPECIFIER, indentation + 2);
+  _strongly_fused_ring_neighbours.write_msi(os, NAME_OF_STRONGLY_FUSED_RING_NEIGHBOUR_SPECIFIER, indentation + 2);
 
   os << ind << ")\n";
 
@@ -6089,8 +6565,8 @@ Substructure_Ring_Specification::write_msi (ostream & os, int & object_id, int i
 }
 
 int
-Substructure_Ring_Base::construct_from_msi_object (const msi_object & msi,
-                                        int & attributes_specified)
+Substructure_Ring_Base::construct_from_msi_object(const msi_object & msi,
+                                                  int & attributes_specified)
 {
   if (msi.number_elements())
   {
@@ -6102,12 +6578,12 @@ Substructure_Ring_Base::construct_from_msi_object (const msi_object & msi,
 
   for (int i = 0; i < nat; i++)
   {
-    const msi_attribute * att = msi.attribute (i);
+    const msi_attribute * att = msi.attribute(i);
 
     if (NAME_OF_REJECTION_ATTRIBUTE == att->name())
     {
       int tmp;
-      if (! att->value (tmp))
+      if (! att->value(tmp))
       {
         cerr << "Substructure_Ring_Base::construct_from_msi_object: the " << NAME_OF_REJECTION_ATTRIBUTE <<
                 " attribute must be a whole number\n";
@@ -6118,7 +6594,7 @@ Substructure_Ring_Base::construct_from_msi_object (const msi_object & msi,
     }
     else if (NAME_OF_ALL_HITS_IN_SAME_FRAGMENT_ATTRIBUTE == att->name())
     {
-      if (! att->value (_all_hits_in_same_fragment))
+      if (! att->value(_all_hits_in_same_fragment))
       {
         cerr << "Substructure_Ring_Specification::construct_from_msi_object: the " << NAME_OF_ALL_HITS_IN_SAME_FRAGMENT_ATTRIBUTE <<
                 " attribute must be a whole number\n";
@@ -6128,7 +6604,7 @@ Substructure_Ring_Base::construct_from_msi_object (const msi_object & msi,
     }
     else if (NAME_OF_ONLY_MATCH_LARGEST_FRAGMENT_ATTRIBUTE == att->name())
     {
-      if (! att->value (_only_keep_matches_in_largest_fragment))
+      if (! att->value(_only_keep_matches_in_largest_fragment))
       {
         cerr << "Substructure_Ring_Specification::construct_from_msi_object: the " << NAME_OF_ONLY_MATCH_LARGEST_FRAGMENT_ATTRIBUTE << " attribute must be a whole number\n";
         return 0;
@@ -6137,7 +6613,7 @@ Substructure_Ring_Base::construct_from_msi_object (const msi_object & msi,
     }
     else if (NAME_OF_COMMENT_ATTRIBUTE == att->name())
     {
-      (void) att->value (_comment);
+      (void) att->value(_comment);
     }
     else if (NAME_OF_ENVIRONMENT_OBJECT == att->name())
     {
@@ -6148,9 +6624,9 @@ Substructure_Ring_Base::construct_from_msi_object (const msi_object & msi,
       }
 
       const_IWSubstring env;
-      att->value (env);
+      att->value(env);
 
-      if (! _construct_environment (env))
+      if (! _construct_environment(env))
       {
         cerr << "Substructure_Ring_Base::construct_from_msi_object:invalid environment '" << (*att) << "'\n";
         return 0;
@@ -6158,9 +6634,19 @@ Substructure_Ring_Base::construct_from_msi_object (const msi_object & msi,
 
       attributes_specified++;
     }
+    else if (NAME_OF_ENVIRONMENT_CAN_MATCH_IN_RING_ATOMS == att->name())
+    {
+      if (! att->value(_environment_can_match_in_ring_atoms))
+      {
+        cerr << "Substructure_Ring_Base::construct_from_msi_object:invalid " << NAME_OF_ENVIRONMENT_CAN_MATCH_IN_RING_ATOMS << " specification\n";
+        return 0;
+      }
+
+      attributes_specified++;
+    }
     else if (NAME_OF_DEFINE_HETEROATOMS_ATTRIBUTE == att->name())
     {
-      if (! fetch_heteroatom_definitions (*att, _is_heteroatom))
+      if (! fetch_heteroatom_definitions(*att, _is_heteroatom))
       {
         cerr << "Substructure_Ring_Base::construct_from_msi_object:invalid heteroatom definitions '" << (*att) << "'\n";
         return 0;
@@ -6168,105 +6654,105 @@ Substructure_Ring_Base::construct_from_msi_object (const msi_object & msi,
     }
   }
 
-  if (! really_gruesome (_hits_needed, msi, NAME_OF_QUERY_HITS_NEEDED_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_hits_needed, msi, NAME_OF_QUERY_HITS_NEEDED_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
     return 0;
 
-  if (! really_gruesome (_ncon, msi, NAME_OF_NCON_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_ncon, msi, NAME_OF_NCON_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
     return 0;
 
-  if (! really_gruesome (_heteroatom_count, msi, NAME_OF_HETEROATOMS_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_heteroatom_count, msi, NAME_OF_HETEROATOMS_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
     return 0;
 
-  if (! really_gruesome (_attached_heteroatom_count, msi, NAME_OF_ATTACHED_HETEROATOM_COUNT_SPECIFIER, attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_attached_heteroatom_count, msi, NAME_OF_ATTACHED_HETEROATOM_COUNT_SPECIFIER, attributes_specified, 0, MAX_NOT_SPECIFIED))
     return 0;
 
-  if (! really_gruesome (_within_ring_unsaturation, msi, NAME_OF_UNSATURATION_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_within_ring_unsaturation, msi, NAME_OF_UNSATURATION_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
     return 0;
 
-  if (! really_gruesome (_atoms_with_pi_electrons, msi, NAME_OF_ATOMS_WITH_PI_ELECTRONS, attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_atoms_with_pi_electrons, msi, NAME_OF_ATOMS_WITH_PI_ELECTRONS, attributes_specified, 0, MAX_NOT_SPECIFIED))
     return 0;
 
-  if (! really_gruesome (_largest_number_of_bonds_shared_with_another_ring, msi, NAME_OF_LARGEST_NUMBER_SHARED_BONDS_SPECIFIER, attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_largest_number_of_bonds_shared_with_another_ring, msi, NAME_OF_LARGEST_NUMBER_SHARED_BONDS_SPECIFIER, attributes_specified, 0, MAX_NOT_SPECIFIED))
     return 0;
 
-  if (! really_gruesome (_strongly_fused_ring_neighbours, msi, NAME_OF_STRONGLY_FUSED_RING_NEIGHBOUR_SPECIFIER, attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_strongly_fused_ring_neighbours, msi, NAME_OF_STRONGLY_FUSED_RING_NEIGHBOUR_SPECIFIER, attributes_specified, 0, MAX_NOT_SPECIFIED))
     return 0;
 
   return 1;
 }
 
 int
-Substructure_Ring_System_Specification::construct_from_msi_object (const msi_object & msi)
+Substructure_Ring_System_Specification::construct_from_msi_object(const msi_object & msi)
 {
   int attributes_specified = 0;
 
-  if (! Substructure_Ring_Base::construct_from_msi_object (msi, attributes_specified))
+  if (! Substructure_Ring_Base::construct_from_msi_object(msi, attributes_specified))
     return 0;
 
   if (_atoms_with_pi_electrons.is_set())
     _need_per_atom_array = 1;
 
-  if (! really_gruesome (_rings_in_system, msi, NAME_OF_NRINGS_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_rings_in_system, msi, NAME_OF_NRINGS_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_ring_sizes, msi, NAME_OF_RING_SIZE_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_ring_sizes, msi, NAME_OF_RING_SIZE_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_aromatic_ring_count, msi, NAME_OF_AROMATIC_RING_COUNT_SPECIFIER, attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_aromatic_ring_count, msi, NAME_OF_AROMATIC_RING_COUNT_SPECIFIER, attributes_specified, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_non_aromatic_ring_count, msi, NAME_OF_NON_AROMATIC_RING_COUNT_SPECIFIER, attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_non_aromatic_ring_count, msi, NAME_OF_NON_AROMATIC_RING_COUNT_SPECIFIER, attributes_specified, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_degree_of_fusion, msi, NAME_OF_RING_FUSED_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_degree_of_fusion, msi, NAME_OF_RING_FUSED_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_atoms_in_system, msi, NAME_OF_NATOMS_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_atoms_in_system, msi, NAME_OF_NATOMS_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_strongly_fused_ring_count, msi, NAME_OF_STRONGLY_FUSED_RING_COUNT_SPECIFIER, attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_strongly_fused_ring_count, msi, NAME_OF_STRONGLY_FUSED_RING_COUNT_SPECIFIER, attributes_specified, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_number_spinach_groups, msi, NAME_OF_NUMBER_SPINACH_GROUPS, attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_number_spinach_groups, msi, NAME_OF_NUMBER_SPINACH_GROUPS, attributes_specified, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_number_non_spinach_groups, msi, NAME_OF_NUMBER_NON_SPINACH_GROUPS, attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_number_non_spinach_groups, msi, NAME_OF_NUMBER_NON_SPINACH_GROUPS, attributes_specified, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_atoms_in_spinach_group, msi, NAME_OF_ATOMS_IN_SPINACH_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_atoms_in_spinach_group, msi, NAME_OF_ATOMS_IN_SPINACH_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_length_of_spinach_group, msi, NAME_OF_LENGTH_OF_SPINACH_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_length_of_spinach_group, msi, NAME_OF_LENGTH_OF_SPINACH_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_distance_to_another_ring, msi, NAME_OF_DISTANCE_TO_ANOTHER_RING_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_distance_to_another_ring, msi, NAME_OF_DISTANCE_TO_ANOTHER_RING_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
 
-  if (! really_gruesome (_rings_that_must_match_ring_sizes, msi, NAME_OF_RINGS_THAT_MUST_MATCH_RING_SIZE_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
+  if (! really_gruesome(_rings_that_must_match_ring_sizes, msi, NAME_OF_RINGS_THAT_MUST_MATCH_RING_SIZE_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
   {
     return 0;
   }
@@ -6275,7 +6761,7 @@ Substructure_Ring_System_Specification::construct_from_msi_object (const msi_obj
 }
 
 int
-Substructure_Ring_Base::write_msi_attributes (ostream & os, int & object_id, const const_IWSubstring & ind) const
+Substructure_Ring_Base::write_msi_attributes (std::ostream & os, int & object_id, const const_IWSubstring & ind) const
 {
   if (_comment.length())
     os << ind << "  (A C " << NAME_OF_COMMENT_ATTRIBUTE << " \"" << _comment << "\")\n";
@@ -6285,12 +6771,12 @@ Substructure_Ring_Base::write_msi_attributes (ostream & os, int & object_id, con
 
   int indentation = ind.length();
 
-  _hits_needed.write_msi (os, NAME_OF_QUERY_HITS_NEEDED_ATTRIBUTE, indentation + 2);
-  _attached_heteroatom_count.write_msi (os, NAME_OF_ATTACHED_HETEROATOM_COUNT_SPECIFIER, indentation + 2);
-  _heteroatom_count.write_msi (os, NAME_OF_HETEROATOMS_ATTRIBUTE, indentation + 2);
-  _ncon.write_msi (os, NAME_OF_NCON_ATTRIBUTE, indentation + 2);
-  _within_ring_unsaturation.write_msi (os, NAME_OF_UNSATURATION_ATTRIBUTE, indentation + 2);
-  _atoms_with_pi_electrons.write_msi (os, NAME_OF_ATOMS_WITH_PI_ELECTRONS, indentation + 2);
+  _hits_needed.write_msi(os, NAME_OF_QUERY_HITS_NEEDED_ATTRIBUTE, indentation + 2);
+  _attached_heteroatom_count.write_msi(os, NAME_OF_ATTACHED_HETEROATOM_COUNT_SPECIFIER, indentation + 2);
+  _heteroatom_count.write_msi(os, NAME_OF_HETEROATOMS_ATTRIBUTE, indentation + 2);
+  _ncon.write_msi(os, NAME_OF_NCON_ATTRIBUTE, indentation + 2);
+  _within_ring_unsaturation.write_msi(os, NAME_OF_UNSATURATION_ATTRIBUTE, indentation + 2);
+  _atoms_with_pi_electrons.write_msi(os, NAME_OF_ATOMS_WITH_PI_ELECTRONS, indentation + 2);
 
   if (_all_hits_in_same_fragment)
     os << ind << "  (A I " << NAME_OF_ALL_HITS_IN_SAME_FRAGMENT_ATTRIBUTE << " 1)\n";
@@ -6307,32 +6793,32 @@ Substructure_Ring_Base::write_msi_attributes (ostream & os, int & object_id, con
 }
 
 int
-Substructure_Ring_System_Specification::write_msi (ostream & os, int & object_id, int indentation) const
+Substructure_Ring_System_Specification::write_msi(std::ostream & os, int & object_id, int indentation) const
 {
   assert (ok());
   assert (os.good());
 
   IWString ind;
   if (indentation)
-    ind.extend (indentation, ' ');
+    ind.extend(indentation, ' ');
 
   os << ind << '(' << object_id++ << ' ' << NAME_OF_RING_SYSTEM_SPECIFIER_OBJECT << endl;
 
-  (void) Substructure_Ring_Base::write_msi_attributes (os, object_id, ind);
+  (void) Substructure_Ring_Base::write_msi_attributes(os, object_id, ind);
 
-  _rings_in_system.write_msi (os, NAME_OF_NRINGS_ATTRIBUTE, indentation + 2);
-  _ring_sizes.write_msi (os, NAME_OF_RING_SIZE_ATTRIBUTE, indentation + 2);
-  _rings_that_must_match_ring_sizes.write_msi (os, NAME_OF_RINGS_THAT_MUST_MATCH_RING_SIZE_ATTRIBUTE, indentation + 2);
-  _aromatic_ring_count.write_msi (os, NAME_OF_AROMATIC_RING_COUNT_SPECIFIER, indentation + 2);
-  _non_aromatic_ring_count.write_msi (os, NAME_OF_NON_AROMATIC_RING_COUNT_SPECIFIER, indentation + 2);
-  _degree_of_fusion.write_msi (os, NAME_OF_RING_FUSED_ATTRIBUTE, indentation + 2);
-  _atoms_in_system.write_msi (os, NAME_OF_NATOMS_ATTRIBUTE, indentation + 2);
-  _strongly_fused_ring_count.write_msi (os, NAME_OF_STRONGLY_FUSED_RING_COUNT_SPECIFIER, indentation + 2);
-  _number_spinach_groups.write_msi (os, NAME_OF_NUMBER_SPINACH_GROUPS, indentation + 2);
-  _number_non_spinach_groups.write_msi (os, NAME_OF_NUMBER_NON_SPINACH_GROUPS, indentation + 2);
-  _atoms_in_spinach_group.write_msi (os, NAME_OF_ATOMS_IN_SPINACH_ATTRIBUTE, indentation + 2);
-  _length_of_spinach_group.write_msi (os, NAME_OF_LENGTH_OF_SPINACH_ATTRIBUTE, indentation + 2);
-  _distance_to_another_ring.write_msi (os, NAME_OF_DISTANCE_TO_ANOTHER_RING_ATTRIBUTE, indentation + 2);
+  _rings_in_system.write_msi(os, NAME_OF_NRINGS_ATTRIBUTE, indentation + 2);
+  _ring_sizes.write_msi(os, NAME_OF_RING_SIZE_ATTRIBUTE, indentation + 2);
+  _rings_that_must_match_ring_sizes.write_msi(os, NAME_OF_RINGS_THAT_MUST_MATCH_RING_SIZE_ATTRIBUTE, indentation + 2);
+  _aromatic_ring_count.write_msi(os, NAME_OF_AROMATIC_RING_COUNT_SPECIFIER, indentation + 2);
+  _non_aromatic_ring_count.write_msi(os, NAME_OF_NON_AROMATIC_RING_COUNT_SPECIFIER, indentation + 2);
+  _degree_of_fusion.write_msi(os, NAME_OF_RING_FUSED_ATTRIBUTE, indentation + 2);
+  _atoms_in_system.write_msi(os, NAME_OF_NATOMS_ATTRIBUTE, indentation + 2);
+  _strongly_fused_ring_count.write_msi(os, NAME_OF_STRONGLY_FUSED_RING_COUNT_SPECIFIER, indentation + 2);
+  _number_spinach_groups.write_msi(os, NAME_OF_NUMBER_SPINACH_GROUPS, indentation + 2);
+  _number_non_spinach_groups.write_msi(os, NAME_OF_NUMBER_NON_SPINACH_GROUPS, indentation + 2);
+  _atoms_in_spinach_group.write_msi(os, NAME_OF_ATOMS_IN_SPINACH_ATTRIBUTE, indentation + 2);
+  _length_of_spinach_group.write_msi(os, NAME_OF_LENGTH_OF_SPINACH_ATTRIBUTE, indentation + 2);
+  _distance_to_another_ring.write_msi(os, NAME_OF_DISTANCE_TO_ANOTHER_RING_ATTRIBUTE, indentation + 2);
 
   os << ind << ")\n";
 
@@ -6340,7 +6826,7 @@ Substructure_Ring_System_Specification::write_msi (ostream & os, int & object_id
 }
 
 int
-Elements_Needed::write_msi (ostream & os, 
+Elements_Needed::write_msi (std::ostream & os, 
                             const char * object_name,
                             int & object_id,
                             int indentation) const
@@ -6353,12 +6839,12 @@ Elements_Needed::write_msi (ostream & os,
 
   IWString ind;
   if (indentation)
-    ind.extend (indentation, ' ');
+    ind.extend(indentation, ' ');
 
   os << ind << "(" << object_id++ << ' ' << object_name << endl;
 
   os << ind << "  (A I " << NAME_OF_ATOMIC_NUMBER_ATTRIBUTE << ' ' << _z << ")\n";
-  Min_Max_Specifier<int>::write_msi (os, NAME_OF_QUERY_HITS_NEEDED_ATTRIBUTE, indentation + 2);
+  Min_Max_Specifier<int>::write_msi(os, NAME_OF_QUERY_HITS_NEEDED_ATTRIBUTE, indentation + 2);
 
   os << ind << ")\n";
 
@@ -6370,13 +6856,13 @@ Single_Substructure_Query::_parse_element_hits_needed_object (const msi_object &
 {
 
   Elements_Needed * e = new Elements_Needed();
-  if (! e->construct_from_msi_object (msi))
+  if (! e->construct_from_msi_object(msi))
   {
     delete e;
     return 0;
   }
 
-  _element_hits_needed.add (e);
+  _element_hits_needed.add(e);
 
   return 1;
 }
@@ -6386,13 +6872,13 @@ Single_Substructure_Query::_parse_elements_needed_object (const msi_object & msi
 {
 
   Elements_Needed * e = new Elements_Needed();
-  if (! e->construct_from_msi_object (msi))
+  if (! e->construct_from_msi_object(msi))
   {
     delete e;
     return 0;
   }
 
-  _elements_needed.add (e);
+  _elements_needed.add(e);
 
   return 1;
 }
@@ -6406,21 +6892,21 @@ Elements_Needed::construct_from_msi_object (const msi_object & msi)
     return 0;
   }
 
-  const msi_attribute * att = msi.attribute (NAME_OF_ATOMIC_NUMBER_ATTRIBUTE);
+  const msi_attribute * att = msi.attribute(NAME_OF_ATOMIC_NUMBER_ATTRIBUTE);
   if (NULL == att)
   {
     cerr << "Elements_Needed::construct_from_msi_object: must give '" << NAME_OF_ATOMIC_NUMBER_ATTRIBUTE << "' attribute\n";
     return 0;
   }
 
-  if (! att->value (_z) || ! REASONABLE_ATOMIC_NUMBER(_z))
+  if (! att->value(_z) || ! REASONABLE_ATOMIC_NUMBER(_z))
   {
     cerr << "Elements_Needed::construct_from_msi_object: bad " << NAME_OF_ATOMIC_NUMBER_ATTRIBUTE << " attribute\n";
     return 0;
   }
 
   int attributes_specified = 0;
-  if (! really_gruesome ((*this), msi,
+  if (! really_gruesome((*this), msi,
                  NAME_OF_QUERY_HITS_NEEDED_ATTRIBUTE, attributes_specified, 0, MAX_NOT_SPECIFIED))
   {
     cerr << "Elements_Needed::construct_from_msi_object: cannot parse " << NAME_OF_QUERY_HITS_NEEDED_ATTRIBUTE << " attribute\n";
@@ -6444,25 +6930,25 @@ Link_Atom::construct_from_msi_attribute (const msi_attribute * msi)
   int i = 0;
   const_IWSubstring token;
 
-  s.nextword (token, i);
+  s.nextword(token, i);
 
-  if (! token.numeric_value (_a1) || _a1 < 0)
+  if (! token.numeric_value(_a1) || _a1 < 0)
   {
     cerr << "Link_Atom::construct_from_msi_object:invalid a1 specification, must be a positive number'" << s << "'\n";
     return 0;
   }
 
-  s.nextword (token, i);
+  s.nextword(token, i);
 
-  if (! token.numeric_value (_a2) || _a2 < 0 || _a2 == _a1)
+  if (! token.numeric_value(_a2) || _a2 < 0 || _a2 == _a1)
   {
     cerr << "Link_Atom::construct_from_msi_object:invalid a2 specification, must be a positive number'" << s << "'\n";
     return 0;
   }
 
-  s.nextword (token, i);
+  s.nextword(token, i);
 
-  if (! _d.initialise (token))
+  if (! _d.initialise(token))
   {
     cerr << "Link_Atom::construct_from_msi_object:invalid distance specification '" << s << "'\n";
     return 0;
@@ -6474,7 +6960,7 @@ Link_Atom::construct_from_msi_attribute (const msi_attribute * msi)
 int
 Link_Atom::initialise_from_smarts (const_IWSubstring const & s)
 {
-  if (s.starts_with ('{') && s.ends_with ('}'))
+  if (s.starts_with('{') && s.ends_with('}'))
     ;
   else 
   {
@@ -6482,9 +6968,9 @@ Link_Atom::initialise_from_smarts (const_IWSubstring const & s)
     return 0;
   }
 
-  const_IWSubstring tmp (s);
-  tmp.remove_leading_chars (1);
-  tmp.chop (1);
+  const_IWSubstring tmp(s);
+  tmp.remove_leading_chars(1);
+  tmp.chop(1);
 
   if (0 == tmp.length())
   {
@@ -6492,7 +6978,7 @@ Link_Atom::initialise_from_smarts (const_IWSubstring const & s)
     return 0;
   }
 
-  if (! _d.initialise (tmp))
+  if (! _d.initialise(tmp))
   {
     cerr << "Link_Atom::initialise_from_smarts:invalid range specification '" << tmp << "'\n";
     return 0;
@@ -6502,12 +6988,12 @@ Link_Atom::initialise_from_smarts (const_IWSubstring const & s)
 }
 
 int
-Link_Atom::write_msi (ostream & os, 
+Link_Atom::write_msi (std::ostream & os, 
                       const IWString & ind,
                       const char * attname) const
 {
   os << ind << "  (A C " << attname << " \"" << _a1 << ' ' << _a2 << ' ';
-  _d.write_compact_representation (os);
+  _d.write_compact_representation(os);
 
   os << "\")\n";
 
@@ -6521,7 +7007,7 @@ Link_Atom::write_msi (ostream & os,
 */
 
 int
-Link_Atom::write_M_LIN(atom_number_t zatom, ostream & output) const
+Link_Atom::write_M_LIN(atom_number_t zatom, std::ostream & output) const
 {
   output << "M  LIN " << zatom << ' ' << _a1 << ' ' << _a2 << " implement this";
   output << '\n';
@@ -6532,22 +7018,21 @@ Link_Atom::write_M_LIN(atom_number_t zatom, ostream & output) const
 int
 Single_Substructure_Query::add_link_atom (const Link_Atom & ila)
 {
-  Link_Atom * l = new Link_Atom (ila);
+  Link_Atom * l = new Link_Atom(ila);
 
-  const Substructure_Atom * a = query_atom_with_initial_atom_number (ila.a1());
+  const Substructure_Atom * a = query_atom_with_initial_atom_number(ila.a1());
 
   cerr << "Initial atom number " << ila.a1() << " becomes query atom " <<  a->unique_id() << endl;
 
-  l->set_a1 (a->unique_id());
+  l->set_a1(a->unique_id());
 
-  a = query_atom_with_initial_atom_number (ila.a2());
+  a = query_atom_with_initial_atom_number(ila.a2());
 
   cerr << "Initial atom number " << ila.a2() << " becomes query atom " <<  a->unique_id() << endl;
 
-  l->set_a2 (a->unique_id());
+  l->set_a2(a->unique_id());
 
-  _link_atom.add (l);
+  _link_atom.add(l);
 
   return 1;
 }
-

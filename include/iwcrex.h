@@ -1,28 +1,13 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef IW_CREX_H
 #define IW_CREX_H
 
 #include "iwstring.h"
+#include "iwgrep-2.5.h"
+#include "iwlregex.h"
 
 #include <iostream>
-using namespace std;
+using std::cerr;
+using std::endl;
 
 /*
   In order to make all regular expression mechanisms interchangeable,
@@ -54,7 +39,7 @@ class IW_Regular_Expression_Template
     ~IW_Regular_Expression_Template ();
 
     int ok () const;
-    int debug_print (ostream &) const;
+    int debug_print (std::ostream &) const;
 
     const IWString & source () const { return _source;};
 
@@ -120,15 +105,14 @@ typedef IW_Regular_Expression_Template<IW_lregex> IW_Regular_Expression;
 #else
 
 //class IW_sed_405_regex;
-class IW_grep_25_regex;
-class IW_gnu_regex;
+//class IW_grep_25_regex;
+//class IW_gnu_regex;
 
-#include "iwgrep-2.5.h"
 typedef IW_Regular_Expression_Template<IW_grep_25_regex> IW_Regular_Expression;
 
 #endif
 
-#if (IW_IMPLEMENTATIONS_EXPOSED) || defined(IWCREX_IMPLEMENTATION)
+#if defined(IW_IMPLEMENTATIONS_EXPOSED) || defined(IWCREX_IMPLEMENTATION)
 
 template <typename T>
 void
@@ -217,7 +201,7 @@ IW_Regular_Expression_Template<T>::ok () const
 
 template <typename T>
 int
-IW_Regular_Expression_Template<T>::debug_print (ostream & os) const
+IW_Regular_Expression_Template<T>::debug_print (std::ostream & os) const
 {
   os << "Details on IW_Regular_Expression_Template:";
 
@@ -246,8 +230,11 @@ IW_Regular_Expression_Template<T>::set_pattern (const char * s)
   if (NULL == _matcher)
     _matcher = new T;
 
-  _matcher->set_use_extended (_use_extended);
-  _matcher->set_ignore_case (_ignore_case);
+  if (_use_extended)
+    _matcher->set_use_extended (_use_extended);
+
+  if (_ignore_case)
+    _matcher->set_ignore_case (_ignore_case);
 
   _source.resize_keep_storage (0);
 

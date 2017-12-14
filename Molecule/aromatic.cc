@@ -1,22 +1,5 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
+#include <memory>
 
 /*
   In order to get the private Molecule:: functions in this file,
@@ -33,17 +16,16 @@
 #include "cmdline.h"
 #include "misc.h"
 #include "iwbits.h"
-#include "iw_auto_array.h"
+#include "iw_stl_hash_set.h"
 
-#ifdef USE_IWMALLOC
-#include "iwmalloc.h"
-#endif
 #include "molecule.h"
 #include "path.h"
 #include "misc2.h"
 #include "aromatic.h"
 #include "temp_detach_atoms.h"
 #include "smiles.h"
+#include "charge_calculation.h"
+#include "toggle_kekule_form.h"
 #include "misc2.h"
 
 /*
@@ -102,6 +84,29 @@ set_allow_pipeline_pilot_aromaticity_on_input(int s)
   allow_pipeline_pilot_aromaticity_on_input = s;
 }
 
+static int strongly_fused_rings_can_be_aromatic = 1;
+
+void
+set_strongly_fused_rings_can_be_aromatic(int s)
+{
+  strongly_fused_rings_can_be_aromatic = s;
+}
+
+static int file_scope_allow_any_even_number_of_pi_electrons = 0;
+
+void set_allow_any_even_number_of_pi_electrons(int s)
+{
+  file_scope_allow_any_even_number_of_pi_electrons = s;
+}
+
+static int file_scope_aromatic_rings_must_contain_unsaturation = 1;
+
+void 
+set_aromatic_rings_must_contain_unsaturation(const int s)
+{
+  file_scope_aromatic_rings_must_contain_unsaturation = s;
+}
+
 int
 Molecule::_allocate_aromaticity()
 {
@@ -110,9 +115,9 @@ Molecule::_allocate_aromaticity()
     if (0 == _number_elements)
       return 1;
 
-    _aromaticity = (aromaticity_type_t *) new_int (_number_elements, AROMATICITY_NOT_DETERMINED);
-    int nr = nrings();
-    assert (nr >= 0);
+    _aromaticity = (aromaticity_type_t *) new_int(_number_elements, AROMATICITY_NOT_DETERMINED);
+
+    assert(nrings() >= 0);
 
     return 1;
   }
@@ -123,7 +128,7 @@ Molecule::_allocate_aromaticity()
 int
 Molecule::aromaticity (atom_number_t a, aromaticity_type_t & result)
 {
-  assert (ok_atom_number (a));
+  assert (ok_atom_number(a));
 
   if (NULL == _aromaticity)
     _compute_aromaticity();
@@ -141,10 +146,10 @@ Molecule::is_aromatic (atom_number_t a)
 {
   aromaticity_type_t arom;
 
-  if (! aromaticity (a, arom))
+  if (! aromaticity(a, arom))
     return 0;
 
-  return IS_AROMATIC_ATOM (arom);
+  return IS_AROMATIC_ATOM(arom);
 }
 
 int
@@ -161,7 +166,7 @@ Molecule::is_permanent_aromatic ( const atom_number_t & a ) const
 {
   assert (ok_atom_number(a));
 
-  return _things[ a ]->permanent_aromatic();
+  return _things[a]->permanent_aromatic();
 }
 
 int
@@ -209,7 +214,7 @@ Molecule::contains_aromatic_atoms()
 
   for (int i = 0; i < _number_elements; i++)
   {
-    if (IS_AROMATIC_ATOM (_aromaticity[i]))
+    if (IS_AROMATIC_ATOM(_aromaticity[i]))
       return 1;
   }
 
@@ -230,12 +235,39 @@ Molecule::aromatic_atom_count()
   int rc = 0;
   for (int i = 0; i < _number_elements; i++)
   {
-    if (IS_AROMATIC_ATOM (_aromaticity[i]))
+    if (IS_AROMATIC_ATOM(_aromaticity[i]))
       rc++;
   }
 
   return rc;
 }
+
+int
+Molecule::aromatic_ring_count ()
+{
+  if (0 == _number_elements)
+    return 0;
+
+  const int nr = nrings();
+  if (0 == nr)
+    return 0;
+
+  if (NULL == _aromaticity)
+    _compute_aromaticity();
+
+
+  int rc = 0;
+  for (int i = 0; i < nr; ++i)
+  {
+    const Ring * ri = _sssr_rings[i];
+
+    if (ri->is_aromatic())
+      rc++;
+  }
+
+  return rc;
+}
+
 
 /*
   A quick test to see whether or not aromaticity has been computed.
@@ -258,17 +290,17 @@ Molecule::aromaticity_computed() const
 int
 Molecule::lone_pair_count (atom_number_t a, int & result)
 {
-  assert (ok_atom_number (a));
+  assert (ok_atom_number(a));
 
-  return _things[a]->lone_pair_count (result);
+  return _things[a]->lone_pair_count(result);
 }
 
 int
 Molecule::pi_electrons (atom_number_t zatom, int & pe)
 {
-  assert (ok_atom_number (zatom));
+  assert (ok_atom_number(zatom));
 
-  return _things[zatom]->pi_electrons (pe);
+  return _things[zatom]->pi_electrons(pe);
 }
 
 /*
@@ -357,6 +389,8 @@ set_global_aromaticity_type (int na)
     global_aromaticity_determination_type = Pipeline_Pilot;
   else if (PUBCHEM_AROMATICITY == na)
     global_aromaticity_determination_type = PUBCHEM_AROMATICITY;
+  else if (EVERYTHING_HAS_A_PI_ELECTRON == na)
+    global_aromaticity_determination_type = EVERYTHING_HAS_A_PI_ELECTRON;
   else
   {
     cerr << "set_global_aromaticity_type: unknown aromaticity type " << na << endl;
@@ -388,8 +422,12 @@ set_all_bonds_in_aromatic_ring_must_be_aromatic (int s)
   all_bonds_in_aromatic_ring_must_be_aromatic = s;
 }
 
+/*
+  Depends on ring membership having been called - so the bonds know their ring membership
+*/
+
 int
-Molecule::_doubly_bonded_to_something_outside_ring(atom_number_t zatom)
+Molecule::_doubly_bonded_to_something_outside_ring(atom_number_t zatom) const
 {
   const Atom * a = _things[zatom];
 
@@ -409,6 +447,46 @@ Molecule::_doubly_bonded_to_something_outside_ring(atom_number_t zatom)
   return 0;
 }
 
+/*
+  Need to differentiate two kinds of Phosphorus environments
+    P1(C(=P(=C1C1=C(C(C)(C)C)C=C(C=C1C(C)(C)C)C(C)(C)C)C)C1=C(C(C)(C)C)C=C(C=C1C(C)(C)C)C(C)(C)C)C(C)(C)C PBCHM101753934
+
+    O=[p]1[nH][pH][n]1 PBCHM22761484
+    O=P1=NPN1
+
+  In the first one, both double bonds are in the ring, whereas in the second one, there is a non ring double bond
+*/
+
+int
+Molecule::_both_double_bonds_in_set(const Set_of_Atoms & p,
+                                    const atom_number_t zatom) const
+{
+  const Atom * a = _things[zatom];
+  const int acon = a->ncon();
+  assert (3 == acon);
+
+  for (int i = 0; i < acon; ++i)
+  {
+    const Bond * b = a->item(i);
+
+    if (! b->is_double_bond())
+      continue;
+
+    const atom_number_t o = b->other(zatom);
+
+    if (8 != _things[o]->atomic_number())
+      continue;
+
+    if (0 == b->nrings())   // definitely not part of a ring system
+      return 0;
+
+    if (! p.contains(o))   // a little tricky here, perhaps it is in a ring, but not being processed right now, hard to know what is right
+      return 0;
+  }
+
+  return 1;
+}
+
 //#define DEBUG_AROMATICITY_DETERMINATION
 
 /*
@@ -421,11 +499,11 @@ Molecule::_doubly_bonded_to_something_outside_ring(atom_number_t zatom)
 */
 
 int
-Molecule::_determine_aromaticity (const Set_of_Atoms & p,
-                                  aromaticity_type_t & result,
-                                  int & impossible_aromatic,
-                                  int * pi_electron_count,
-                                  int aromaticity_determination_type)
+Molecule::_determine_aromaticity(const Set_of_Atoms & p,
+                                 aromaticity_type_t & result,
+                                 int & impossible_aromatic,
+                                 int * pi_electron_count,
+                                 int aromaticity_determination_type)
 {
   int np = p.number_elements();
   assert (np > 2);
@@ -435,6 +513,8 @@ Molecule::_determine_aromaticity (const Set_of_Atoms & p,
 #ifdef DEBUG_AROMATICITY_DETERMINATION
   cerr << "Begin aromaticity determination for " << p << endl;
 #endif
+
+  int unsaturation = 0;
 
   int pe = 0;    // accumulator for pi electrons
   for (int i = 0; i < np; i++)
@@ -475,11 +555,12 @@ Molecule::_determine_aromaticity (const Set_of_Atoms & p,
 
 #ifdef DEBUG_AROMATICITY_DETERMINATION
     int foo;
-    cerr << "Atom " << j << " (atomic number " << atomic_number (j) << ")";
-    if (pi_electrons (j, foo))
+    cerr << "Atom " << j << " (atomic number " << atomic_number(j) << ")";
+    if (pi_electrons(j, foo))
       cerr << " has " << foo << " pi electrons\n";
     else
       cerr << " cannot determine pi electron count\n";
+    cerr << " precomputed " << pi_electron_count[j] << endl;
 #endif
 
 //  There is some complexity associated with the pi electron count.
@@ -489,13 +570,14 @@ Molecule::_determine_aromaticity (const Set_of_Atoms & p,
     int tmp;
     if (pi_electron_count[j] >= 0)       // value already computed
       tmp = pi_electron_count[j];
-    else if (! aj->pi_electrons (tmp))    // try to compute it
+    else if (! aj->pi_electrons(tmp))    // try to compute it
     {
       impossible_aromatic = 1;     // we don't know how!!
       return 0;
     }
     else
     {
+//    cerr << "Computing pi electron count for " << j << " type " << smarts_equivalent_for_atom(j) << " value " << tmp << endl;
       if (2 == jcon && 6 == aj->atomic_number() && 4 == aj->nbonds())    // Oct 2001, the ring N1=C=N-C=C1 was aromatic
       {
         impossible_aromatic = 1;
@@ -509,17 +591,20 @@ Molecule::_determine_aromaticity (const Set_of_Atoms & p,
 //  Mostly this is to catch saturated carbon, but may also catch others...
 
 #ifdef DEBUG_AROMATICITY_DETERMINATION
-    cerr << "Atom has " << tmp << " pi electrons, ncon = " << ncon (j) <<
-            " nbonds(j) = " << nbonds (j) << endl;
+    cerr << "Atom has " << tmp << " pi electrons, ncon = " << ncon(j) <<
+            " nbonds(j) = " << nbonds(j) << endl;
 #endif
 
-    int jbonds = aj->nbonds();
-    if (0 == tmp && jcon == jbonds)
+    const int jbonds = aj->nbonds();
+    if (0 == tmp && jcon == jbonds)    // no pi electrons and fully saturated
     {
       impossible_aromatic = 1;
       result = NOT_AROMATIC;
       return 1;
     }
+
+    if (jbonds > jcon)
+      unsaturation++;
 
     const atomic_number_t zj = aj->atomic_number();
 
@@ -529,6 +614,20 @@ Molecule::_determine_aromaticity (const Set_of_Atoms & p,
     if (6 == zj || 7 == zj)   // the most common cases
       ;
     else if (53 == zj || 35 == zj || 17 == zj)
+    {
+      impossible_aromatic = 1;
+      result = NOT_AROMATIC;
+      return 1;
+    }
+#ifdef SD3V4_NOT_AROMATIC
+    else if (16 == zj && 3 == jcon && 4 == jbonds)   // Jan 2017 S12=NN(O)NC1=CC(=NC2=C)C PBCHM57260347  - do not aromatise. But what about CC1=N(=O)C=CC=C1
+    {
+      impossible_aromatic = 1;
+      result = NOT_AROMATIC;
+      return 1;
+    }
+#endif
+    else if (15 == zj && 3 == jcon && 5 == jbonds && _both_double_bonds_in_set(p, j))     // P1(C(=P(=C1C1=C(C(C)(C)C)C=C(C=C1C(C)(C)C)C(C)(C)C)C)C1=C(C(C)(C)C)C=C(C=C1C(C)(C)C)C(C)(C)C)C(C)(C)C PBCHM101753934
     {
       impossible_aromatic = 1;
       result = NOT_AROMATIC;
@@ -554,8 +653,8 @@ Molecule::_determine_aromaticity (const Set_of_Atoms & p,
     if (Pearlman == aromaticity_determination_type || WangFuLai == aromaticity_determination_type)
     {
       if (7 == zj && 0 == aj->formal_charge() &&
-          ((3 == jcon && 3 == jbonds) ||      // 30 aug added the condition '3 == nbonds (j)'
-          (2 == jcon && 1 == hcount (j))))
+          ((3 == jcon && 3 == jbonds) ||      // 30 aug added the condition '3 == nbonds(j)'
+          (2 == jcon && 1 == hcount(j))))
       {
 #ifdef DEBUG_AROMATICITY_DETERMINATION
         cerr << "Found 3 connected N in ring\n";
@@ -566,6 +665,17 @@ Molecule::_determine_aromaticity (const Set_of_Atoms & p,
         return 1;
       }
     }
+
+//  Jan 2001. The algorithm was aromatising the ring in
+//  N1(C2=NN=C(S2)C(C)(C)C)C=N(C)=NC1=O 183291
+//  CN1=NC(=O)N(C)C=1
+//  Don't aromatise any 5 connected Nitrogen with two double bonds in the ring
+
+// Aug 2002. Wow, this is hard. If you draw the ring in its charge separated form, then it is aromatic. But in
+// the form drawn, Daylight doesn't consider it aromatic. For now I'm leaving it non-aromatic..., but not
+// happy about this.. It affects a relatively small number of molecules
+
+// Don't forget about N2=CSC(=NC#N)N=2 
 
     if (7 != zj)    // only interested in Nitrogen atoms here
       ;
@@ -579,7 +689,7 @@ Molecule::_determine_aromaticity (const Set_of_Atoms & p,
     }
     else if (jcon == jbonds)    // fully saturated, not interested
       ;
-    else if (2 == jcon && 4 == jbonds)   // case of ring 
+    else if (2 == jcon && 4 == jbonds)   // case of ring from 297336
     {
       result = NOT_AROMATIC;
       return 1;
@@ -591,13 +701,13 @@ Molecule::_determine_aromaticity (const Set_of_Atoms & p,
 
       for (int k = 0; k < jcon; k++)
       {
-        const Bond * b = aj->item (k);
+        const Bond * b = aj->item(k);
         if (b->is_single_bond())
           continue;
 
-        atom_number_t ak = b->other (j);
+        atom_number_t ak = b->other(j);
 
-        if (! p.contains (ak))    // found a double bond outside the system, there can't be two in the ring system
+        if (! p.contains(ak))    // found a double bond outside the system, there can't be two in the ring system
           break;
 
         if (INVALID_ATOM_NUMBER == double_bond_1_in_system)
@@ -656,9 +766,15 @@ Molecule::_determine_aromaticity (const Set_of_Atoms & p,
       return 1;
     }
 
+//  If the atom looks like C=O, then that is OK to have no pi electrons
+
     if (EVERYTHING_HAS_A_PI_ELECTRON == aromaticity_determination_type)
     {
-      if (0 == tmp)
+      if (tmp > 0)
+        ;
+      else if (3 == jcon && 6 == aj->atomic_number() && 1 == doubly_bonded_oxygen_count(j))
+        ;
+      else
       {
         impossible_aromatic = 1;
         result = NOT_AROMATIC;
@@ -688,7 +804,7 @@ Molecule::_determine_aromaticity (const Set_of_Atoms & p,
 
       for (int k = 0; k < jcon && tmp >= 0; k++)
       {
-        const Bond * b = aj->item (k);
+        const Bond * b = aj->item(k);
 
         if (b->is_single_bond())
           continue;
@@ -700,27 +816,35 @@ Molecule::_determine_aromaticity (const Set_of_Atoms & p,
           return 1;
         }
 
-        atom_number_t l = b->other (j);
+        atom_number_t l = b->other(j);
 
         const Atom * al = _things[l];
 
 //      Apr 2004. Conversations with Vijay. c=C does not contribute
 
-        if (Vijay_Gombar == aromaticity_determination_type && 6 == zj && 6 == al->atomic_number() && ! p.contains (l))
+        if (Vijay_Gombar == aromaticity_determination_type && 6 == zj && 6 == al->atomic_number() && ! p.contains(l))
         {
           tmp--;
           continue;
         }
 
+//      The atom types must be different, and either
+//        atom l is non ring
+//        atom l is not in this ring, nor are atoms j and l in any ring together.
+
+//      Note an extra wrinkle here. In order to maximise our ability to read
+//      Daylight "aromatic" smiles, we only decrement the pi count if the
+//      ring atom is a carbon.
+
         if (zj == al->atomic_number())    // both atom types the same, ignore
           continue;
 
-        if (p.contains (l))
+        if (p.contains(l))
           continue;
 
 //      Atom J is doubly bonded to something outside the ring
 
-        if (1 == al->ncon() || is_non_ring_atom (l) || (! in_same_ring (j, l)))
+        if (1 == al->ncon() || is_non_ring_atom(l) || (! in_same_ring(j, l)))
         {
           if (16 == zj)    // mar 2004. The S atom in O=C1NS(=O)NC2=CC=CC=C12 p30a contributes electrons
             ;
@@ -757,11 +881,16 @@ Molecule::_determine_aromaticity (const Set_of_Atoms & p,
 #endif
   }
 
+  if (0 == unsaturation && file_scope_aromatic_rings_must_contain_unsaturation)    // P12P3P1[P-]P(P2)[P-]3 PBCHM15961351
+  {
+    result = NOT_AROMATIC;
+    return 1;
+  }
+
   if (EVERYTHING_HAS_A_PI_ELECTRON == aromaticity_determination_type)
     result = AROMATIC;
   else if (Simple_4n_plus_2 == aromaticity_determination_type &&
-      allow_two_electron_systems_to_be_aromatic() &&
-      2 == pe)
+      allow_two_electron_systems_to_be_aromatic() && 2 == pe)
     result = AROMATIC;
   else if (pe > 2 && 2 == pe % 4)
     result = AROMATIC;
@@ -823,20 +952,20 @@ Molecule::_make_bonds_aromatic (const Ring * r)
 
   for (int i = 0; i < rsize; i++)
   {
-    atom_number_t a1 = r->item (i);
+    atom_number_t a1 = r->item(i);
     Atom * a = _things[a1];
 
     int acon = a->ncon();
     for (int j = 0; j < acon; j++)
     {
-      Bond * b = a->item (j);
+      Bond * b = a->item(j);
 
       if (b->is_aromatic())    // may have been done here
         continue;
 
-      atom_number_t k = b->other (a1);
+      atom_number_t k = b->other(a1);
 
-      if (r->contains (k))     // the (a1,k) bond is in the ring
+      if (r->contains(k))     // the (a1,k) bond is in the ring
         b->set_aromatic();
     }
   }
@@ -849,10 +978,10 @@ Molecule::set_aromaticity (atom_number_t zatom,
                            aromaticity_type_t arom,
                            int invalidate_smiles_when_done)
 {
-  assert (ok_atom_number (zatom));
-  assert (OK_ATOM_AROMATICITY (arom));
+  assert (ok_atom_number(zatom));
+  assert (OK_ATOM_AROMATICITY(arom));
 
-  if (AROMATIC == arom && is_non_ring_atom (zatom) && warn_aromatic_chain_atoms)
+  if (AROMATIC == arom && is_non_ring_atom(zatom) && warn_aromatic_chain_atoms)
     cerr << "Molecule::set_aromaticity: warning atom " << zatom << " is not in a ring\n";
 
   if (NULL == _aromaticity)
@@ -875,7 +1004,7 @@ int
 Molecule::set_permanent_aromatic (atom_number_t zatom,
                                   int s)
 {
-  _things[zatom]->set_permanent_aromatic (s);
+  _things[zatom]->set_permanent_aromatic(s);
 
   return 1;
 }
@@ -893,9 +1022,9 @@ Molecule::set_aromaticity_two_atoms (atom_number_t a1, atom_number_t a2,
                                      const aromaticity_type_t arom,
                                      int invalidate_smiles_when_done)
 {
-  assert (are_bonded (a1, a2));
+  assert (are_bonded(a1, a2));
 
-  if (AROMATIC == arom && (is_non_ring_atom (a1) || is_non_ring_atom (a2)) && warn_aromatic_chain_atoms)
+  if (AROMATIC == arom && (is_non_ring_atom(a1) || is_non_ring_atom(a2)) && warn_aromatic_chain_atoms)
     cerr << "Molecule::set_aromaticity_two_atoms: warning atom " << a1 << " or " << a2 << " is not in a ring\n";
 
   compute_aromaticity_if_needed();
@@ -914,8 +1043,8 @@ Molecule::set_aromaticity_two_atoms (atom_number_t a1, atom_number_t a2,
     need_to_invalidate_smiles = 1;
   }
 
-  Bond * b = const_cast<Bond *> (_things[a1]->bond_to_atom (a1));
-  if (IS_AROMATIC_ATOM (arom))
+  Bond * b = const_cast<Bond *> (_things[a1]->bond_to_atom(a1));
+  if (IS_AROMATIC_ATOM(arom))
     b->set_aromatic();
   else
     b->set_non_aromatic();
@@ -961,7 +1090,7 @@ Molecule::_update_aromaticity (const Ring & zring,
         if (AROMATICITY_NOT_DETERMINED == _aromaticity[j])
           _aromaticity[j] = AROMATIC;
         else
-          SET_AROMATIC_ATOM (_aromaticity[j]);
+          SET_AROMATIC_ATOM(_aromaticity[j]);
       }
     }
     else
@@ -983,7 +1112,7 @@ Molecule::_update_aromaticity (const Ring & zring,
         if (AROMATICITY_NOT_DETERMINED == _aromaticity[j])
           _aromaticity[j] = NOT_AROMATIC;
         else
-          SET_ALIPHATIC_ATOM (_aromaticity[j]);
+          SET_ALIPHATIC_ATOM(_aromaticity[j]);
       }
     }
     else
@@ -1016,18 +1145,18 @@ Molecule::_update_aromaticity (const Ring & zring,
 int
 Molecule::_update_aromaticity (int ring_number, aromaticity_type_t arom)
 {
-  assert (OK_ATOM_AROMATICITY (arom));
+  assert (OK_ATOM_AROMATICITY(arom));
 
   if (NULL == _aromaticity)
     _allocate_aromaticity();
 
   Ring * r = _sssr_rings[ring_number];
-  r->set_aromaticity (arom);
+  r->set_aromaticity(arom);
 
   if (AROMATIC == arom)
-    _make_bonds_aromatic (r);
+    _make_bonds_aromatic(r);
 
-  return _update_aromaticity (*r, arom);
+  return _update_aromaticity(*r, arom);
 }
 
 //#define DEBUG_COMPUTE_AROMATICITY_FOR_RING
@@ -1046,8 +1175,7 @@ Molecule::__compute_aromaticity_for_ring (const Ring & p,
 
   unshared_pi_electrons = 0;
 
-  if (! _determine_aromaticity (p, arom, impossible_aromatic, e_count,
-                                aromaticity_rules))
+  if (! _determine_aromaticity(p, arom, impossible_aromatic, e_count, aromaticity_rules))
     return 0;
 
 #ifdef DEBUG_COMPUTE_AROMATICITY_FOR_RING
@@ -1095,13 +1223,13 @@ Molecule::__compute_aromaticity_for_ring (const Ring & p,
     if (nrings(j) > 1)
       continue;
 
-    int jcon = ncon (j);
+    int jcon = ncon(j);
     for (int k = 0; k < jcon; k++)
     {
       atom_number_t l;
       bond_type_t   bt;
-      other_and_type (j, k, l, bt);
-      if (p->contains (l) && ! IS_SINGLE_BOND (bt))
+      other_and_type(j, k, l, bt);
+      if (p->contains(l) && ! IS_SINGLE_BOND(bt))
         return 1;
     }
   }
@@ -1109,6 +1237,20 @@ Molecule::__compute_aromaticity_for_ring (const Ring & p,
   impossible_aromatic = 1;
   return 1;
 #else
+
+// Sept 96. Implement a rule that if there is only one unshared atom
+// and it is an O, S or Se, then the ring is not aromatic.
+// Pearlman's rules make any such ring non-aromatic. Daylight makes
+// it non aromatic if there is one such group, but allows aromatic
+// for more than one occurrence
+// For example:   O1C2=CC=CC=C2OOC2=C1C=CC=C2
+// or             C12=C3C4=C(C=CC=C4)OC1=CC=CC2=CC=C3 PBCHM67456
+
+// Jun 97, hmmm, seems that isn't correct either. Consider
+// ClC1=C(F)C=C2C(=C1)N1C(=C(C2=O)C(=O)O)SC2=CC=CC=C12 PBCHM13626885
+// which has a five membered ring with an S (or O) atom as the only
+// unshared atom. Daylight 4.51 makes that ring aromatic. Therefore
+// we make the rule for five membered rings only
 
   int sose_count = 0;       // the number of single ring O, S or Se
   int unshared_atom_count = 0;
@@ -1140,7 +1282,7 @@ Molecule::__compute_aromaticity_for_ring (const Ring & p,
   cerr << "Ring has " << unshared_atom_count << " unshared atoms, sose = " << sose_count << endl;
 #endif
 
-// Make sure we allow for ..............................................................................
+// Make sure we allow for C12=C(N(C)C3=C1C=CC=C3)SC1=C(C3=C2C(=O)N(C)C3=O)C2=C(C=CC=C2)N1 
 
   if (1 == unshared_atom_count && 1 == sose_count)
   {
@@ -1199,16 +1341,13 @@ build_fused_system (Set_of_Atoms & ring_system,
   int neighbours = r->fused_ring_neighbours();
   for (int i = 0; i < neighbours; i++)
   {
-    const Ring * n = r->fused_neighbour (i);
+    const Ring * n = r->fused_neighbour(i);
 
     int nrn = n->ring_number();
-    if (system_identifier == rings_in_fused_system[nrn])
+    if (system_identifier == rings_in_fused_system[nrn])    // already detected
       continue;
 
-    if (! ok_to_include[nrn])
-      continue;
-
-    if (n->number_elements() < min_aromatic_ring_size)   // or should we just quit
+    if (! ok_to_include[nrn] || n->number_elements() < min_aromatic_ring_size)
       continue;
 
 //  cerr << "Ring " << (*r) << " and " << (*n) << " share " << r->compute_bonds_shared_with(*n) << " bonds\n";
@@ -1219,17 +1358,24 @@ build_fused_system (Set_of_Atoms & ring_system,
       continue;
 
     rings_in_fused_system[nrn] = system_identifier;
-    if (ring_system.add_non_duplicated_elements (*n))
-      rc += build_fused_system (ring_system, n, system_identifier, rings_in_fused_system, ok_to_include, impossible_aromatic);
+    if (ring_system.add_non_duplicated_elements(*n))
+      rc += build_fused_system(ring_system, n, system_identifier, rings_in_fused_system, ok_to_include, impossible_aromatic);
   }
 
   return rc;
 }
 
-//#define DEBUG_AROM_BY_SINGLE_FUSIONS
+//#define DEBUG_DETERMINE_AROMATICITY_BY_SINGLE_FUSIONS
+
+/*
+  Note there is a problem with non-uniqueness here. We should have a canonical means of choosing which
+  ring gets added first.
+
+  c12coc([n]1)c1ccccc12
+*/
 
 int
-Molecule::_determine_aromaticity_by_single_fusions (int * pi_electron_count,
+Molecule::_determine_aromaticity_by_single_fusions_to_ring(int * pi_electron_count,
                                                     int aromaticity_rules,
                                                     int * rings_in_fused_system,
                                                     int * ok_to_include,
@@ -1237,7 +1383,7 @@ Molecule::_determine_aromaticity_by_single_fusions (int * pi_electron_count,
                                                     const Ring * r)
 {
 #ifdef DEBUG_DETERMINE_AROMATICITY_BY_SINGLE_FUSIONS
-  cerr << "Trying to expand ring " << (*r) << endl;
+  cerr << "Trying to expand " << (*r) << endl;
 #endif
 
   if (1 != r->fused_ring_neighbours())
@@ -1246,15 +1392,23 @@ Molecule::_determine_aromaticity_by_single_fusions (int * pi_electron_count,
   Set_of_Atoms ring_system;
   ring_system += *r;
 
-// We use the ring number as the system identifier.
-
-  int system_identifier = r->ring_number() + 1;
+  const int system_identifier = r->ring_number() + 1;    // just a number to use, could be anything
 
   assert (0 == ok_to_include[r->ring_number()]);
 
   ok_to_include[r->ring_number()] = 1;
-  int system_size = build_fused_system (ring_system, r, system_identifier, rings_in_fused_system, ok_to_include, impossible_aromatic);
+  int system_size = build_fused_system(ring_system, r, system_identifier, rings_in_fused_system, ok_to_include, impossible_aromatic);
   ok_to_include[r->ring_number()] = 0;
+
+#ifdef DEBUG_DETERMINE_AROMATICITY_BY_SINGLE_FUSIONS
+  cerr << "Found " << system_size << " fused system size, id " << system_identifier << " :";
+  const int nr = nrings();
+  for (int i = 0; i < nr; ++i)
+  {
+    cerr << ' ' << rings_in_fused_system[i];
+  }
+  cerr << endl;
+#endif
 
   if (1 == system_size)     // probably two aliphatic rings together
     return 0;
@@ -1262,29 +1416,37 @@ Molecule::_determine_aromaticity_by_single_fusions (int * pi_electron_count,
   aromaticity_type_t arom;
   int tmp;      // no interest in impossible aromatic at this stage
 
-  if (_determine_aromaticity (ring_system, arom, tmp,
-                pi_electron_count, aromaticity_rules) && AROMATIC == arom)
-    return 1;
-  else
+  if (! _determine_aromaticity(ring_system, arom, tmp, pi_electron_count, aromaticity_rules))
     return 0;
+
+#ifdef DEBUG_DETERMINE_AROMATICITY_BY_SINGLE_FUSIONS
+  cerr << "Aromaticity found to be " << arom << " arom? " << (AROMATIC == arom) << endl;
+#endif
+
+  return (AROMATIC == arom);
 }
 
 /*
   This is the last ditch attempt at finding aromaticity.
   We have some still undetermined rings in fused systems.
+
+  Note there is a problem with non-uniqueness here. We should have a canonical means of choosing which
+  ring gets added first.
 */
 
+//#define DEBUG_AROM_BY_SINGLE_FUSIONS
+
 int
-Molecule::_determine_aromaticity_by_single_fusions (int * ring_already_done,
-                                                    int * pi_electron_count,
-                                                    const int * impossible_aromatic,
-                                                    int aromaticity_rules)
+Molecule::_determine_aromaticity_by_single_fusions(int * ring_already_done,
+                                                   int * pi_electron_count,
+                                                   const int * impossible_aromatic,
+                                                   int aromaticity_rules)
 {
   int rc = 0;
 
-  int nr = _sssr_rings.number_elements();
+  const int nr = _sssr_rings.number_elements();
 
-  int * rings_in_fused_system   = new_int (nr); iw_auto_array<int> free_rings_in_fused_system (rings_in_fused_system);
+  int * rings_in_fused_system = new int[nr]; std::unique_ptr<int[]> free_rings_in_fused_system(rings_in_fused_system);
 
 #ifdef DEBUG_AROM_BY_SINGLE_FUSIONS
   cerr << "Performing single fusion aromaticity determination\n";
@@ -1300,22 +1462,30 @@ Molecule::_determine_aromaticity_by_single_fusions (int * ring_already_done,
       continue;
 
     const Ring * ri = _sssr_rings[i];
-    if (ri->number_elements() < min_aromatic_ring_size)
-      continue;
 
 #ifdef DEBUG_AROM_BY_SINGLE_FUSIONS
-    cerr << "Looking for single fusions to ring :" << ringi (i) << endl;
+    cerr << "Looking for single fusions to :" << ringi(i) << endl;
 #endif
 
-    if (_determine_aromaticity_by_single_fusions (pi_electron_count, aromaticity_rules,
-                                rings_in_fused_system,
-                                ring_already_done, impossible_aromatic, ri))
+    std::fill_n(rings_in_fused_system, nr, 0);
+
+    if (_determine_aromaticity_by_single_fusions_to_ring(pi_electron_count, aromaticity_rules,
+                                rings_in_fused_system, ring_already_done, impossible_aromatic, ri))
     {
-      _update_aromaticity (i, AROMATIC);
-      ring_already_done[i] = 1;
-      rc++;
+      for (auto j = 0; j < nr; ++j)
+      {
+        if (rings_in_fused_system[j])
+        {
+          _update_aromaticity(j, AROMATIC);
+          ring_already_done[j] = 1;
+          rc++;
+        }
+      }
+//    _update_aromaticity (i, AROMATIC);
+//    ring_already_done[i] = 1;
+//    rc++;
 #ifdef DEBUG_AROM_BY_SINGLE_FUSIONS
-      cerr << "Ring " << *ri << " made aromatic by single ring fusion\n";
+      cerr << *ri << " made aromatic by single ring fusion\n";
 #endif
     }
   }
@@ -1333,7 +1503,7 @@ Molecule::_compute_aromaticity_for_ring (int ring_number,
                                          int & unshared_pi_electrons,
                                          int aromaticity_rules)
 {
-  const Ring * r = ringi (ring_number);
+  const Ring * r = ringi(ring_number);
 
 #ifdef DEBUG_COMPUTE_AROMATICITY_FOR_RING
   cerr << "Compute arom for ring " << (*r) << endl;
@@ -1367,11 +1537,11 @@ Molecule::_compute_aromaticity_for_ring (int ring_number,
 
 #ifdef DEBUG_COMPUTE_AROMATICITY_FOR_RING
   cerr << "Compute_aromaticity_for_ring " << (*r) << endl;
-  cerr << "Arom = " << arom << " impossible = " << impossible_aromatic << endl;
+  cerr << "Arom = " << arom << " impossible = " << impossible_aromatic << " rc " << rc << endl;
 #endif
 
   if (rc)
-    _update_aromaticity (ring_number, arom);
+    _update_aromaticity(ring_number, arom);
 
   return rc;
 }
@@ -1398,7 +1568,7 @@ Molecule::_combine_non_arom_ring (int zring,
   cerr << "Combine non arom ring processing ring " << zring << endl;
 #endif
 
-  const Ring * r = ringi (zring);
+  const Ring * r = ringi(zring);
 
   if (zring != r->ring_number())
   {
@@ -1408,10 +1578,10 @@ Molecule::_combine_non_arom_ring (int zring,
   assert (zring == r->ring_number());
 
   Ring ring_system;
-  ring_system.resize (_number_elements);
+  ring_system.resize(_number_elements);
   ring_system += *r;
 
-  int system_size = build_fused_system (ring_system, r, system_identifier, rings_in_system, include_in_ring_systems, NULL);
+  int system_size = build_fused_system(ring_system, r, system_identifier, rings_in_system, include_in_ring_systems, NULL);
 
 #ifdef DEBUG_COMBINE_NON_AROM_RING
   cerr << "System size from ring " << zring << " is " << system_size << endl;
@@ -1427,7 +1597,7 @@ Molecule::_combine_non_arom_ring (int zring,
   int tmp;    // we don't worry about the impossible_aromatic return at this stage
 
   int rc = 0;
-  if (_determine_aromaticity (ring_system, arom, tmp,
+  if (_determine_aromaticity(ring_system, arom, tmp,
                 pi_electron_count, aromaticity_rules) && AROMATIC == arom)
   {
     for (int i = 0; i < nr; i++)    // update all unprocessed rings in the system
@@ -1435,7 +1605,7 @@ Molecule::_combine_non_arom_ring (int zring,
       if (system_identifier == rings_in_system[i])
       {
         rc++;
-        _update_aromaticity (i, arom);
+        _update_aromaticity(i, arom);
         ring_already_done[i] = 1;
       }
     }
@@ -1460,7 +1630,7 @@ Molecule::_determine_aromaticity_of_fused_systems (int * ring_already_done,
 {
   int nr = _sssr_rings.number_elements();
 
-  int * tmp = new_int (nr); iw_auto_array<int> free_tmp (tmp);
+  int * tmp = new_int(nr); std::unique_ptr<int[]> free_tmp(tmp);
 
   int rc = 0;
   for (int i = 0; i < nr; i++)
@@ -1468,7 +1638,7 @@ Molecule::_determine_aromaticity_of_fused_systems (int * ring_already_done,
     if (ring_already_done[i] || ! include_in_ring_systems[i])
       continue;
 
-    rc += _combine_non_arom_ring (i, fused_system_identifier++, ring_already_done, pi_electron_count,
+    rc += _combine_non_arom_ring(i, fused_system_identifier++, ring_already_done, pi_electron_count,
                                   include_in_ring_systems, aromaticity_rules, tmp);
   }
 
@@ -1489,7 +1659,7 @@ Molecule::_unshared_pi_electrons (const Ring * r,
   int rs = r->number_elements();
   for (int i = 0; i < rs; i++)
   {
-    atom_number_t j = r->item (i);
+    atom_number_t j = r->item(i);
 
     if (0 == pi_electrons[j])
       continue;
@@ -1516,16 +1686,16 @@ Molecule::_unshared_pi_electrons (const Ring * r,
     int multiple_bond_to_heteroatom_outside_ring = 0;
     for (int k = 0; k < acon; k++)
     {
-      const Bond * b = a->item (k);
+      const Bond * b = a->item(k);
 
       if (b->is_single_bond())
         continue;
 
-      atom_number_t l = b->other (j);
+      atom_number_t l = b->other(j);
       if (a->atomic_number() == _things[l]->atomic_number())
         continue;
 
-      if (1 == _things[l]->ncon() || is_non_ring_atom (l) || ! r->contains (l))
+      if (1 == _things[l]->ncon() || is_non_ring_atom(l) || ! r->contains(l))
       {
         multiple_bond_to_heteroatom_outside_ring = 1;
         break;
@@ -1568,7 +1738,7 @@ Molecule::_determine_aromaticity_of_fused_systems (int * ring_already_done,
   int callabort = 0;
   for (int i = 0; i < nr; i++)
   {
-    const Ring * r = ringi (i);
+    const Ring * r = ringi(i);
     if (r->ring_number() != i)
     {
       cerr << "Molecule::_determine_aromaticity_of_fused_systems ring not numbered properly, nr = " << nr << endl;
@@ -1588,29 +1758,30 @@ Molecule::_determine_aromaticity_of_fused_systems (int * ring_already_done,
       include_in_ring_systems[i] = 0;
     else if (ring_already_done[i])    // aromatic, yes, include it
       ;
-    else if (0 == _unshared_pi_electrons (ringi(i), pi_electron_count))
+    else if (0 == _unshared_pi_electrons(ringi(i), pi_electron_count))
     {
       include_in_ring_systems[i] = 0;
       rings_with_zero_unshared_pi_electrons.add(i);
     }
 
 #ifdef DEBUG_INCLUDE_IN_RING_SYSTEMS
-    cerr << "Ring " << i << ' ' << ringi (i) << " done = " << ring_already_done[i] << " include in systems = " << include_in_ring_systems[i] << endl;
+    cerr << "Ring " << i << ' ' << ringi(i) << " done = " << ring_already_done[i] << " include in systems = " << include_in_ring_systems[i] << endl;
 #endif
   }
 
   int fused_system_identifier = _number_elements + 1;   // _determine_aromaticity_of_fused_systems needs a unique identifier for each system
 
-  int rc = _determine_aromaticity_of_fused_systems (ring_already_done,
-                                                    pi_electron_count,
-                                                    include_in_ring_systems,
-                                                    aromaticity_rules,
-                                                    fused_system_identifier);
+  int rc = _determine_aromaticity_of_fused_systems(ring_already_done,
+                                                   pi_electron_count,
+                                                   include_in_ring_systems,
+                                                   aromaticity_rules,
+                                                   fused_system_identifier);
 
-// Are we all done
-
-  if (locate_item_in_array (0, nr, ring_already_done) < 0)   // all rings done!
+  if (locate_item_in_array(0, nr, ring_already_done) < 0)   // all rings done!
     return rc;
+
+// Looking at lilly number 082015 we see that Daylight allows growth across
+// a ring with zero unshared electrons if that will achieve aromaticity
 
 #ifdef DEBUG_INCLUDE_IN_RING_SYSTEMS
   cerr << "Rings remain unprocessed\n";
@@ -1618,12 +1789,13 @@ Molecule::_determine_aromaticity_of_fused_systems (int * ring_already_done,
   {
     cerr << "ring " << i << " status " << ring_already_done[i] << endl;
   }
+  cerr << rings_with_zero_unshared_pi_electrons.number_elements() << " rings have zero pi electrons\n";
 #endif
 
 // We will now be trying several means of maximising perceived aromaticity
 
   if (0 == rings_with_zero_unshared_pi_electrons.number_elements())
-    return _determine_aromaticity_by_single_fusions (ring_already_done,
+    return _determine_aromaticity_by_single_fusions(ring_already_done,
                                                      pi_electron_count,
                                                      impossible_aromatic,
                                                      aromaticity_rules);
@@ -1642,13 +1814,13 @@ Molecule::_determine_aromaticity_of_fused_systems (int * ring_already_done,
   }
 #endif
 
-  rc = _determine_aromaticity_of_fused_systems (ring_already_done,
+  rc = _determine_aromaticity_of_fused_systems(ring_already_done,
                                                     pi_electron_count,
                                                     include_in_ring_systems,
                                                     aromaticity_rules,
                                                     fused_system_identifier);
 
-  if (locate_item_in_array (0, nr, ring_already_done) < 0)
+  if (locate_item_in_array(0, nr, ring_already_done) < 0)
     return rc;
 
 // We still have one or more aliphatic rings.
@@ -1659,15 +1831,139 @@ Molecule::_determine_aromaticity_of_fused_systems (int * ring_already_done,
                                                    aromaticity_rules);
 }
 
+/*
+  Locate COUNT extra rings which can be fused to the ring numbers in RINGS
+*/
 
+/*int
+identify_fused_rings (Molecule * m,
+                      resizable_array<int> & rings,
+                      int count,
+                      const int * impossible_aromatic)
+{
+  int rc = 0;
+  int rings_in_molecule = m->nrings();
 
+#ifdef DEBUG_IDENTIFY_FUSED_RINGS
+  cerr << "Looking for rings fused to " << rings << endl;
+#endif
 
+  while (rc < count)
+  {
+    int found_this_iteration = 0;
+    for (int i = 0; i < rings.number_elements(); i++)
+    {
+      const Ring * ri = m->ringi (rings[i]);
+      for (int j = 0; j < rings_in_molecule; j++)
+      {
+        if (impossible_aromatic[j])
+          continue;
+
+        if (rings.contains (j))
+          continue;
+
+        const Ring * rj = m->ringi (j);
+
+#ifdef DEBUG_IDENTIFY_FUSED_RINGS
+        cerr << "Let's see if ring " << j << " can join\n";
+#endif
+        if (rj->fused_system_identifier() != ri->fused_system_identifier())
+          continue;
+
+        if (ri->is_fused_to (rj))
+        {
+#ifdef DEBUG_IDENTIFY_FUSED_RINGS
+          cerr << "Ring " << * rj << " fused to " << *ri << endl;
+#endif
+          rings.add (j);
+          rc++;
+          if (rc >= count)
+            return rc;
+          found_this_iteration++;
+        }
+      }
+    }
+    if (0 == found_this_iteration)
+      return rc;
+  }
+
+  return rc;
+}*/
 
 //#define DEBUG_COMPUTE_AROMATICITY_WITH_FUSED_RINGS
 
+/*
+  We have one or more rings which have not been classified as aromatic,
+  but which are fused to other rings. See if we can get aromaticity by
+  combining them.
+*/
 
+/*int
+Molecule::_compute_aromaticity_with_fused_rings (int * already_done,
+                                const int * impossible_aromatic,
+                                int * pi_electron_count,
+                                int aromaticity_rules)
+{
+  int nr = nrings();
 
+#ifdef DEBUG_COMPUTE_AROMATICITY_WITH_FUSED_RINGS
+  cerr << "Compute_aromaticity_with_fused_rings\n";
+  for (int i = 0; i < nr; i++)
+  {
+    cerr << "Ring " << i << " already_done = " << already_done[i];
+    if (impossible_aromatic[i])
+      cerr << " impossible aromatic";
+    cerr << endl;
+  }
+#endif
 
+// The for "count =" loop successively adds rings to ring i, until we get an aromatic combo.
+// We should probably take the largest fused set, and then successively remove rings, and
+// take the largest aromatic combination(s)
+// Will do that some day...
+
+  for (int i = 0; i < nr; i++)
+  {
+    if (already_done[i])
+      continue;
+
+    for (int count = 1; 0 == already_done[i]; count++)
+    {
+      resizable_array<int> rings;
+      rings.add (i);
+
+      if (count > identify_fused_rings (this, rings, count, impossible_aromatic))   // did not find that many rings to fuse.
+      {
+        already_done[i] = 1;    // give up!
+        break;
+      }
+
+      Set_of_Atoms super_ring;
+      for (int j = 0; j < rings.number_elements(); j++)
+      {
+        const Ring * rj = ringi (rings[j]);
+        super_ring.add_non_duplicated_elements (*rj);
+      }
+
+      aromaticity_type_t arom;
+      int impossible_aromatic;
+
+      if (_determine_aromaticity (super_ring, arom, impossible_aromatic,
+               pi_electron_count, aromaticity_rules) &&
+           AROMATIC == arom)
+      {
+        for (int j = 0; j < rings.number_elements(); j++)
+        {
+          int k = rings[j];
+          _update_aromaticity (k, arom);
+          already_done[k] = 1;
+        }
+      }
+    }
+  }
+
+  return 1;
+}*/
 
 /*
   Main entry point for aromaticity determinations
@@ -1676,11 +1972,11 @@ Molecule::_determine_aromaticity_of_fused_systems (int * ring_already_done,
 //#define DEBUG_COMPUTE_AROMATICITY
 
 int
-Molecule::_compute_aromaticity (int * already_done,
-                                int * impossible_aromatic,
-                                int * pi_electron_count,
-                                int * unshared_pi_electrons,
-                                int aromaticity_rules)
+Molecule::_compute_aromaticity(int * already_done,
+                               int * impossible_aromatic,
+                               int * pi_electron_count,
+                               int * unshared_pi_electrons,
+                               int aromaticity_rules)
 {
 // Force SSSR determination - or maybe ESSSR
 
@@ -1698,9 +1994,18 @@ Molecule::_compute_aromaticity (int * already_done,
 
   for (int i = 0; i < nr; i++)
   {
+    const Ring * ri = ringi(i);
+
     aromaticity_type_t arom = AROMATICITY_NOT_DETERMINED;
-    if (! _compute_aromaticity_for_ring (i, arom, impossible_aromatic[i],
-              pi_electron_count, unshared_pi_electrons[i], aromaticity_rules))
+
+    if (! strongly_fused_rings_can_be_aromatic && ri->strongly_fused_ring_neighbours())   // no ring strongly fused ring can be aromatic
+    {
+      already_done[i] = 1;
+      undetermined_rings--;
+      impossible_aromatic[i] = 1;
+    }
+    else if (! _compute_aromaticity_for_ring(i, arom, impossible_aromatic[i],
+                              pi_electron_count, unshared_pi_electrons[i], aromaticity_rules))
     {
       already_done[i] = 1;    // unable to discern is the same as non-aromatic at this level
       undetermined_rings--;
@@ -1711,13 +2016,19 @@ Molecule::_compute_aromaticity (int * already_done,
       already_done[i] = 1;
       undetermined_rings--;
     }
-    else if (_sssr_rings[i]->number_elements() > max_aromatic_ring_size)
+    else if (ri->number_elements() > max_aromatic_ring_size)
     {
       already_done[i] = 1;
       undetermined_rings--;
       impossible_aromatic[i] = 1;
     }
-    else if (ringi(i)->is_fused())     // let's wait and see if it can be combined into an aromatic system
+    else if (ri->number_elements() < min_aromatic_ring_size)
+    {
+      already_done[i] = 1;
+      undetermined_rings--;
+      impossible_aromatic[i] = 1;
+    }
+    else if (ri->is_fused())     // let's wait and see if it can be combined into an aromatic system
       ;
     else if (NOT_AROMATIC == arom)    // stand-alone non-aromatic
     {
@@ -1735,18 +2046,18 @@ Molecule::_compute_aromaticity (int * already_done,
   cerr << "There are " << undetermined_rings << " rings remaining\n";
   for (int i = 0; i < nr; i++)
   {
-    const Ring * r = ringi (i);
+    const Ring * r = ringi(i);
     cerr << "Ring " << i << ' ' << (*r) << ' ';
     if (r->is_aromatic())
-      cerr << "aromatic";
+      cerr << "aromatic ";
     if (r->is_non_aromatic())
-      cerr << "non aromatic";
+      cerr << "non aromatic ";
     if (impossible_aromatic[i])
-      cerr << "impossible";
+      cerr << "impossible ";
     if (r->undetermined_aromaticity())
-      cerr << "undetermined";
+      cerr << "undetermined ";
     if (already_done[i])
-      cerr << " COMPLETE";
+      cerr << "COMPLETE";
     cerr << endl;
   }
 #endif
@@ -1758,9 +2069,9 @@ Molecule::_compute_aromaticity (int * already_done,
 // non aromatic by themselves. First look at entire fused systems and see if
 // any of them can be classified as aromatic in their entirety
 
-   int * tmp = new_int (nr, 1); iw_auto_array<int> free_tmp (tmp);
+   int * tmp = new_int(nr, 1); std::unique_ptr<int[]> free_tmp(tmp);
 
-   rc = _determine_aromaticity_of_fused_systems (already_done, pi_electron_count,
+   rc = _determine_aromaticity_of_fused_systems(already_done, pi_electron_count,
                                 impossible_aromatic, aromaticity_rules, tmp);
 
    return rc;
@@ -1803,7 +2114,7 @@ Molecule::_compute_aromaticity()
   }
   else
   {
-    set_vector (_aromaticity, _number_elements, NOT_AROMATIC);
+    set_vector(_aromaticity, _number_elements, NOT_AROMATIC);
 
     return 1;
   }
@@ -1812,29 +2123,31 @@ Molecule::_compute_aromaticity()
   {
     if (_things[i]->permanent_aromatic())
       _aromaticity[i] = AROMATIC;
-    else if (is_non_ring_atom (i))
+    else if (is_non_ring_atom(i))
       _aromaticity[i] = NOT_AROMATIC;
     else
       _aromaticity[i] = AROMATICITY_NOT_DETERMINED;
   }
 
-  int * already_done = new_int (nr); iw_auto_array<int> free_already_done (already_done);
+// We need some temporary arrays, allocate from one
+
+  const int needed = nr + nr + nr + _number_elements;
+  int * already_done = new int[needed]; std::unique_ptr<int[]> free_already_done(already_done);
+
+  std::fill_n(already_done, nr + nr + nr, 0);
 
 // We need to know which rings cannot be aromatic
 
-  int * impossible_aromatic = new_int (nr); iw_auto_array<int> free_impossible_aromatic (impossible_aromatic);
+  int * impossible_aromatic =   already_done + nr;
+  int * unshared_pi_electrons = already_done + nr + nr;
+  int * pi_electron_count =     already_done + nr + nr + nr;
 
-// Initialise the array of pi_electrons with a negative number, which
-// will be used to signify not yet computed.
+  std::fill_n(pi_electron_count, _number_elements, -99);
 
-  int * pi_electron_count = new_int(_number_elements, -99); iw_auto_array<int> free_pi_electron_count(pi_electron_count);
-
-  int * unshared_pi_electrons = new_int(nr); iw_auto_array<int> free_unshared_pi_electrons(unshared_pi_electrons);
-
-  int rc = _compute_aromaticity (already_done, impossible_aromatic,
-                                 pi_electron_count,
-                                 unshared_pi_electrons,
-                                 global_aromaticity_determination_type);
+  int rc = _compute_aromaticity(already_done, impossible_aromatic,
+                                pi_electron_count,
+                                unshared_pi_electrons,
+                                global_aromaticity_determination_type);
   return rc;
 }
 
@@ -1846,7 +2159,11 @@ Molecule::_compute_aromaticity()
 int
 Molecule::compute_aromaticity()
 {
-  DELETE_IF_NOT_NULL (_aromaticity);
+  if (NULL != _aromaticity)
+  {
+    delete [] _aromaticity;
+    _aromaticity = NULL;
+  }
 
   for (int i = 0; i < _bond_list.number_elements(); i++)
   {
@@ -1863,8 +2180,8 @@ Molecule::compute_aromaticity()
 }
 
 int
-Molecule::in_same_aromatic_ring (atom_number_t a1,
-                                 atom_number_t a2)
+Molecule::in_same_aromatic_ring(atom_number_t a1,
+                                atom_number_t a2)
 {
   (void) ring_membership();
 
@@ -1874,10 +2191,10 @@ Molecule::in_same_aromatic_ring (atom_number_t a1,
     return 0;
 
   aromaticity_type_t arom;
-  if (! aromaticity (a1, arom) || (! IS_AROMATIC_ATOM (arom)))
+  if (! aromaticity(a1, arom) || (! IS_AROMATIC_ATOM(arom)))
     return 0;
 
-  if (! aromaticity (a2, arom) || (! IS_AROMATIC_ATOM (arom)))
+  if (! aromaticity(a2, arom) || (! IS_AROMATIC_ATOM(arom)))
     return 0;
 
 // At this stage, both atoms are aromatic. See if we can find an aromatic
@@ -1885,21 +2202,49 @@ Molecule::in_same_aromatic_ring (atom_number_t a1,
 
   for (int i = 0; i < nr; i++)
   {
-    const Ring * ri = ringi (i);
+    const Ring * ri = ringi(i);
     if (! ri->is_aromatic())
       continue;
 
-    if (ri->contains (a1) && ri->contains (a2))
+    if (ri->contains(a1) && ri->contains(a2))
       return 1;
   }
 
   return 0;
 }
 
-
+/*
+  Aug 2000.
+  this is incorrect, and no longer needed
 
 int
-display_standard_aromaticity_options (ostream & os)
+Molecule::add_aromaticity_to_bonds()
+{
+  if (0 == nrings())
+    return 0;
+
+  if (NULL == _aromaticity)
+    _compute_aromaticity();
+
+  int nb = _bond_list.number_elements();
+  for (int i = 0; i < nb; i++)
+  {
+    Bond * b = _bond_list[i];
+    atom_number_t a1 = b->a1();
+    atom_number_t a2 = b->a2();
+
+    if (IS_AROMATIC_ATOM (_aromaticity[a1]) && IS_AROMATIC_ATOM (_aromaticity[a2]) &&
+        in_same_ring (a1, a2))
+    {
+      b->set_aromatic();
+    }
+  }
+
+  return 1;
+}*/
+
+int
+display_standard_aromaticity_options (std::ostream & os)
 {
   os << "  -A <qualifier> Aromaticity, enter \"-A help\" for options\n";
 
@@ -1907,13 +2252,14 @@ display_standard_aromaticity_options (ostream & os)
 }
 
 int
-display_all_aromaticity_options (ostream & os)
+display_all_aromaticity_options (std::ostream & os)
 {
   os << "  -A D           use Daylight aromaticity definitions\n";
   os << "  -A P           use Pearlman aromaticity definitions\n";
   os << "  -A WFL         use Wang Fu Lai aromaticity definitions (modified Pearlman)\n";
   os << "  -A VJ          use Vijay Gombar definitions\n";
   os << "  -A ALLPI       aromatic ring if every atom has pi electrons!\n";
+  os << "  -A EVEN        aromatic ring if any even number of pi electrons\n";
   os << "  -A M           enable mixed mode aromaticity (arom and aliph)\n";
   os << "  -A I           enable input of aromatic structures\n";
   os << "  -A O           output aromatic structure files\n";
@@ -1931,6 +2277,9 @@ display_all_aromaticity_options (ostream & os)
   os << "  -A nabar       try to aromatise rings with just some bonds marked aromatic\n";
   os << "  -A arom:       aromatic bonds in smiles written as :\n";
   os << "  -A ipp         when reading smiles, allow aromatic forms from Pipeline Pilot\n";
+  os << "  -A sfrna       strongly fused can never be aromatic\n";
+  os << "  -A arallsat    a ring can be aromatic even if it contains all fully saturated atoms\n";
+//os << "  -A RDY         relax all rules to read Daylight \"aromatic\" smiles\n";
 
   return os.good();
 }
@@ -2023,13 +2372,13 @@ discard_non_aromatic_kekule_input()
 static const Element *
 create_permanent_aromatic (const const_IWSubstring & c)
 {
-  const Element * rc = get_element_from_symbol_no_case_conversion (c);
+  const Element * rc = get_element_from_symbol_no_case_conversion(c);
   if (NULL == rc)
-    rc = create_element_with_symbol (c);
+    rc = create_element_with_symbol(c);
 
   assert (NULL != rc);
 
-  const_cast<Element *> (rc)->set_permanent_aromatic (1);
+  const_cast<Element *>(rc)->set_permanent_aromatic(1);
 
 
   return rc;
@@ -2073,6 +2422,13 @@ string_to_aromaticity_type (const const_IWSubstring & a,
     return EVERYTHING_HAS_A_PI_ELECTRON;
   }
 
+  if ("EVEN" == a)
+  {
+    atype = "EVEN";
+    file_scope_allow_any_even_number_of_pi_electrons = 1;
+    return ANY_EVEN_NUMBER_OF_PI_ELECTRONS;
+  }
+
   if ("PP" == a)
   {
     atype = "PipeLine_Pilot";
@@ -2094,11 +2450,11 @@ process_standard_aromaticity_options (Command_Line & cl, int verbose,
 {
   int i = 0;
   const_IWSubstring c;
-  while (cl.value (aflag, c, i++))
+  while (cl.value(aflag, c, i++))
   {
     IWString atype;
 
-    int a = string_to_aromaticity_type (c, atype);
+    int a = string_to_aromaticity_type(c, atype);
 
     if (0 != a)     // recognised as one of the basic types
     {
@@ -2108,8 +2464,8 @@ process_standard_aromaticity_options (Command_Line & cl, int verbose,
     }
     else if ('O' == c)
     {
-      set_include_aromaticity_in_smiles (1);
-      set_write_aromatic_bonds (1);
+      set_include_aromaticity_in_smiles(1);
+      set_write_aromatic_bonds(1);
       if (verbose)
         cerr << "Aromaticity included in all structure files written\n";
     }
@@ -2121,54 +2477,54 @@ process_standard_aromaticity_options (Command_Line & cl, int verbose,
     }
     else if ('I' == c)
     {
-      set_input_aromatic_structures (1);
+      set_input_aromatic_structures(1);
       if (verbose)
         cerr << "Aromatic structures can be input\n";
     }
     else if ('K' == c)
     {
-      set_input_aromatic_structures (1);
-      set_allow_input_without_valid_kekule_form (1);
+      set_input_aromatic_structures(1);
+      set_allow_input_without_valid_kekule_form(1);
       if (verbose)
         cerr << "\"Aromatic\" structures with no valid kekule form can be input\n";
     }
     else if ('2' == c)
     {
-      set_allow_two_electron_systems_to_be_aromatic (1);
+      set_allow_two_electron_systems_to_be_aromatic(1);
       if (verbose)
         cerr << "\"Aromatic\" rings may have only two pi electrons\n";
     }
     else if ('C' == c)
     {
-      set_input_aromatic_structures (1);
-      set_allow_delocalised_carbonyl_bonds (1);
+      set_input_aromatic_structures(1);
+      set_allow_delocalised_carbonyl_bonds(1);
       if (verbose)
         cerr << "Delocalised carbonyl bonds can be input (MDL file only)\n";
     }
     else if ('S' == c)
     {
-      set_input_aromatic_structures (1);
-      set_discard_non_aromatic_kekule_input (1);
+      set_input_aromatic_structures(1);
+      set_discard_non_aromatic_kekule_input(1);
       if (verbose)
         cerr << "Non aromatic Kekule input will be discarded\n";
     }
     else if ('N' == c)
     {
-      set_input_aromatic_structures (1);
-      set_convert_chain_aromatic_bonds (1);
+      set_input_aromatic_structures(1);
+      set_convert_chain_aromatic_bonds(1);
       if (verbose)
         cerr << "Aromatic bonds in chains will be ingored\n";
     }
     else if ("okchain" == c)
     {
-      set_input_aromatic_structures (1);
-      set_aromatic_chain_bonds_are_ok (1);
+      set_input_aromatic_structures(1);
+      set_aromatic_chain_bonds_are_ok(1);
       if (verbose)
         cerr << "Aromatic chain atoms allowed!\n";
     }
     else if ("tryn+" == c)
     {
-      set_input_aromatic_structures (1);
+      set_input_aromatic_structures(1);
       kekule_try_positive_nitrogen = 1;
 
       if (verbose)
@@ -2176,49 +2532,49 @@ process_standard_aromaticity_options (Command_Line & cl, int verbose,
     }
     else if ("tryo+" == c)
     {
-      set_input_aromatic_structures (1);
+      set_input_aromatic_structures(1);
       kekule_try_positive_oxygen = 1;
 
       if (verbose)
         cerr << "Will try putting a positive charge on otherwise failing rings (oxygen)\n";
     }
-    else if (c.starts_with ("usmidflt="))
+    else if (c.starts_with("usmidflt="))
     {
-      c.remove_leading_chars (9);
+      c.remove_leading_chars(9);
 
-      a = string_to_aromaticity_type (c, atype);
+      a = string_to_aromaticity_type(c, atype);
       if (0 == a)
       {
         cerr << "Unrecognised default unique smiles aromaticity type '" << c << "'\n";
         return 0;
       }
 
-      set_default_unique_smiles_aromaticity (a);
+      set_default_unique_smiles_aromaticity(a);
 
       if (verbose)
         cerr << "All unique smiles generated with " << atype << " aromaticity rules\n";
     }
-    else if (c.starts_with ("perm="))
+    else if (c.starts_with("perm="))
     {
-      c.remove_leading_chars (5);
+      c.remove_leading_chars(5);
 
       create_permanent_aromatic(c);
     }
     else if ("oknk" == c)
     {
-      set_input_aromatic_structures (1);
-      set_non_kekule_systems_ok_to_be_aromatic (1);
+      set_input_aromatic_structures(1);
+      set_non_kekule_systems_ok_to_be_aromatic(1);
       if (verbose)
         cerr << "Non Kekule ring systems can be aromatic\n";
     }
     else if ("nokekule" == c)
     {
-      set_input_aromatic_structures (1);
+      set_input_aromatic_structures(1);
       set_perform_kekule_perception(0);
     }
     else if ("nabar" == c)
     {
-      set_all_bonds_in_aromatic_ring_must_be_aromatic (0);
+      set_all_bonds_in_aromatic_ring_must_be_aromatic(0);
       if (verbose)
         cerr << "Will try to aromatise rings with just some bonds aromatic\n";
     }
@@ -2234,10 +2590,22 @@ process_standard_aromaticity_options (Command_Line & cl, int verbose,
       if (verbose)
         cerr << "When reading, will allow aromaticity types from Pipeline Pilot\n";
     }
+    else if ("sfrna" == c)
+    {
+      strongly_fused_rings_can_be_aromatic = 0;
+      if (verbose)
+        cerr << "Strongly fused rings cannot be aromatic\n";
+    }
+    else if ("arallsat" == c)
+    {
+      file_scope_aromatic_rings_must_contain_unsaturation = 0;
+      if (verbose)
+        cerr << "Rings with no unsaturation can be aromatic\n";
+    }
     else if ("help" == c)
     {
-      display_all_aromaticity_options (cerr);
-      exit (1);    // Note very different behaviour for help!
+      display_all_aromaticity_options(cerr);
+      exit(1);    // Note very different behaviour for help!
     }
     else
     {
@@ -2256,7 +2624,7 @@ process_standard_aromaticity_options (Command_Line & cl, int verbose,
   Note that the aromatic_atoms and aromatic_bonds arrays come from somewhere else
 
   Jan 2005. Ran into the case of 
-  ..............................................................................
+  N12C(=NC=C1)C1=CC=CC=C1C=C2 PBCHM597765
   as an sd file, where the two 6 membered rings in the fused system had aromatic
   bonds between all the atoms, but the fused 5 membered ring had Kekule single
   and double bonds. The whole system cannot be made aromatic without considering
@@ -2291,6 +2659,10 @@ class Kekule_Temporary_Arrays
 
     int * _pi_electrons;
 
+//  Some variables are only set if the molecule is larg//  Some variables are only set if the molecule is large.
+
+    int * _smallest_ring_size;   // for each atom, what is the size of the smallest ring containing it
+
     int _additional_fused_pi_electrons;
 
   public:
@@ -2317,6 +2689,8 @@ class Kekule_Temporary_Arrays
 
     void set_additional_fused_pi_electrons (int s)  { _additional_fused_pi_electrons = s;}
     int  additional_fused_pi_electrons    () const { return _additional_fused_pi_electrons;}
+
+    int  establish_smallest_ring_size (Molecule &);
 };
 
 Kekule_Temporary_Arrays::Kekule_Temporary_Arrays (int matoms,
@@ -2331,16 +2705,21 @@ Kekule_Temporary_Arrays::Kekule_Temporary_Arrays (int matoms,
 
   _process_these_atoms = new int[matoms];
 
-  copy_vector (_process_these_atoms, _aromatic_atoms, matoms);
+  copy_vector(_process_these_atoms, _aromatic_atoms, matoms);
 
-  _process_these_rings = new_int (nr, 1);
+  _process_these_rings = new_int(nr, 1);
 
   _vary_hcount = new int[matoms];
-  _vary_bonds = new_int (matoms, 1);
+  _vary_bonds = new_int(matoms, 1);
 
-  _implicit_hydrogens_needed = new_int (matoms);
+  _implicit_hydrogens_needed = new_int(matoms);
 
   _pi_electrons = new int[matoms];
+
+  if (_nr > 6)
+    _smallest_ring_size = new int[matoms];
+  else
+    _smallest_ring_size = NULL;
 
   _additional_fused_pi_electrons = 0;
 
@@ -2364,7 +2743,38 @@ Kekule_Temporary_Arrays::~Kekule_Temporary_Arrays()
 
   delete [] _pi_electrons;
 
+  if (NULL != _smallest_ring_size)
+    delete [] _smallest_ring_size;
+
   return;
+}
+
+int
+Kekule_Temporary_Arrays::establish_smallest_ring_size (Molecule & m)
+{
+  if (NULL == _smallest_ring_size)
+    return 0;
+
+  assert (_nr == m.nrings());
+
+  set_vector(_smallest_ring_size, m.natoms(), m.natoms());    // the non ring atoms will never be changed, OK
+
+  for (auto i = 0; i < _nr; ++i)
+  {
+    const Ring * ri = m.ringi(i);
+
+    const int ring_size = ri->number_elements();
+
+    for (int j = 0; j < ring_size; ++j)
+    {
+      const atom_number_t k = ri->item(j);
+
+      if (ring_size < _smallest_ring_size[k])
+        _smallest_ring_size[k] = ring_size;
+    }
+  }
+
+  return 1;
 }
 
 /*
@@ -2388,10 +2798,10 @@ Molecule::_bonds_to_atom_cannot_vary (Kekule_Temporary_Arrays & kta,
 */
 
 int
-Molecule::_identify_continuation_atom (atom_number_t stop_atom,
-                                       atom_number_t aprev,
-                                       atom_number_t zatom,
-                                       const int * aromatic_atom) const
+Molecule::_identify_continuation_atom(atom_number_t stop_atom,
+                                      atom_number_t aprev,
+                                      atom_number_t zatom,
+                                      const int * aromatic_atom) const
 {
   const Atom * a = _things[zatom];
 
@@ -2401,7 +2811,7 @@ Molecule::_identify_continuation_atom (atom_number_t stop_atom,
 
   for (int i = 0; i < acon; i++)
   {
-    atom_number_t j = a->other (zatom, i);
+    atom_number_t j = a->other(zatom, i);
 
     if (aprev == j)
       continue;
@@ -2429,15 +2839,15 @@ Molecule::_identify_continuation_atom (atom_number_t stop_atom,
   a single bond. Using that information, can we then infer
   some information about the next atom in the ring.
 
-  Because of things like ................................................
+  Because of things like OC1=CC=CC=C1N1N2N1C1=C2C=C(NC(=O)C(=C)C)C=C1 PBCHM59858191
   we need to keep track of one atom on the ring to stop at
 */
 
 int
-Molecule::_must_be_single_bond_between (Kekule_Temporary_Arrays & kta,
-                                        atom_number_t stop_atom, 
-                                        atom_number_t aprev,
-                                        atom_number_t zatom)
+Molecule::_must_be_single_bond_between(Kekule_Temporary_Arrays & kta,
+                                       atom_number_t stop_atom, 
+                                       atom_number_t aprev,
+                                       atom_number_t zatom)
 {
   Atom * a = _things[zatom];
 
@@ -2446,7 +2856,7 @@ Molecule::_must_be_single_bond_between (Kekule_Temporary_Arrays & kta,
 
   const int * process_these_atoms = kta.process_these_atoms();
 
-  atom_number_t continuation_atom = _identify_continuation_atom (stop_atom, aprev, zatom, process_these_atoms);
+  atom_number_t continuation_atom = _identify_continuation_atom(stop_atom, aprev, zatom, process_these_atoms);
 
 #ifdef DEBUG_MUST_BE_SINGLE_BOND_BETWEEN
   cerr << "Molecule::_must_be_single_bond_between:from " << aprev << " to " << zatom << " continue-> " << continuation_atom << endl;
@@ -2460,6 +2870,9 @@ Molecule::_must_be_single_bond_between (Kekule_Temporary_Arrays & kta,
   Atom * c = _things[continuation_atom];
 
   if (c->ncon() < c->nbonds())    // already got a double bond, cannot have another one - what about n=O groups?
+    return 1;
+
+  if (0 == implicit_hydrogens(continuation_atom))
     return 1;
 
 // Are we dealing with a pyrrole type Nitrogen atom?
@@ -2479,12 +2892,14 @@ Molecule::_must_be_single_bond_between (Kekule_Temporary_Arrays & kta,
 
 //  cerr << "Atom " << zatom << " no longer varying bonds\n";
     vary_bonds[zatom] = 0;
-    return _must_be_single_bond_between (kta, stop_atom, zatom, continuation_atom);
+    return _must_be_single_bond_between(kta, stop_atom, zatom, continuation_atom);
   }
   else
     return 1;
 
-  a->set_bond_type_to_atom (continuation_atom, DOUBLE_BOND);
+//cerr << "LINE " << __LINE__ << " setting db btw " << zatom << " " << smarts_equivalent_for_atom(zatom) << " and " << continuation_atom << " " << smarts_equivalent_for_atom(continuation_atom) << endl;
+
+  a->set_bond_type_to_atom(continuation_atom, DOUBLE_BOND);
   _things[continuation_atom]->set_modified();
 
 #ifdef DEBUG_MUST_BE_SINGLE_BOND_BETWEEN
@@ -2504,20 +2919,20 @@ Molecule::_must_be_single_bond_between (Kekule_Temporary_Arrays & kta,
 // We have now set PREV-ZATOM=CONTINUATION_ATOM
 // Can we go further around the ring
 
-  atom_number_t c2 = _identify_continuation_atom (stop_atom, zatom, continuation_atom, process_these_atoms);
+  atom_number_t c2 = _identify_continuation_atom(stop_atom, zatom, continuation_atom, process_these_atoms);
 
   if (INVALID_ATOM_NUMBER == c2)
     return 1;
 
-  return _must_be_single_bond_between (kta, stop_atom, continuation_atom, c2);
+  return _must_be_single_bond_between(kta, stop_atom, continuation_atom, c2);
 }
 
 int
-Molecule::_is_pyrrole_type_nitrogen (atom_number_t zatom,
-                                     atom_number_t & a1,
-                                     atom_number_t & a2,
-                                     atom_number_t & a3,
-                                     const int * process_these_atoms) const
+Molecule::_is_pyrrole_type_nitrogen(atom_number_t zatom,
+                                    atom_number_t & a1,
+                                    atom_number_t & a2,
+                                    atom_number_t & a3,
+                                    const int * process_these_atoms) const
 {
   a1 = INVALID_ATOM_NUMBER;
   a2 = INVALID_ATOM_NUMBER;
@@ -2543,14 +2958,14 @@ Molecule::_is_pyrrole_type_nitrogen (atom_number_t zatom,
 
   if (2 == n->ncon())
   {
-    a1 = n->other (zatom, 0);
-    a2 = n->other (zatom, 1);
+    a1 = n->other(zatom, 0);
+    a2 = n->other(zatom, 1);
     return 1;
   }
 
   for (int i = 0; i < 3; i++)
   {
-    atom_number_t j = n->other (zatom, i);
+    atom_number_t j = n->other(zatom, i);
 
     if (process_these_atoms[j] != process_these_atoms[zatom])
       continue;
@@ -2567,9 +2982,9 @@ Molecule::_is_pyrrole_type_nitrogen (atom_number_t zatom,
 }
 
 int
-Molecule::_is_furan_or_thiophene (atom_number_t zatom,
-                                  atom_number_t & a1,
-                                  atom_number_t & a2) const
+Molecule::_is_furan_or_thiophene(atom_number_t zatom,
+                                 atom_number_t & a1,
+                                 atom_number_t & a2) const
 {
   a1 = INVALID_ATOM_NUMBER;
   a2 = INVALID_ATOM_NUMBER;
@@ -2591,7 +3006,7 @@ Molecule::_is_furan_or_thiophene (atom_number_t zatom,
   if (2 != o->ncon())   // rare
     return 0;
 
-// ................................................
+// Sc1[sH-]c2c([n]1)cccc2 000000160780
 
 //cerr << "Atom " << o->atomic_symbol() << " has " << o->implicit_hydrogens() << " IH\n";
 
@@ -2602,14 +3017,14 @@ Molecule::_is_furan_or_thiophene (atom_number_t zatom,
   else if (0 != o->formal_charge())
     return 0;
 
-  a1 = o->other (zatom, 0);
-  a2 = o->other (zatom, 1);
+  a1 = o->other(zatom, 0);
+  a2 = o->other(zatom, 1);
 
   return 1;
 }
 
 int
-Molecule::_is_nitrogen_double_bond_to_something_outside_ring (atom_number_t zatom)
+Molecule::_is_nitrogen_double_bond_to_something_outside_ring(atom_number_t zatom)
 {
   const Atom * a = _things[zatom];
 
@@ -2633,14 +3048,14 @@ Molecule::_is_nitrogen_double_bond_to_something_outside_ring (atom_number_t zato
 
   for (int i = 0; i < 3; i++)
   {
-    const Bond * b = a->item (i);
+    const Bond * b = a->item(i);
 
     if (! b->is_double_bond())
       continue;
 
-    atom_number_t j = b->other (zatom);
+    atom_number_t j = b->other(zatom);
 
-    if (! in_same_ring (zatom, j))
+    if (! in_same_ring(zatom, j))
       return 1;
   }
 
@@ -2648,9 +3063,9 @@ Molecule::_is_nitrogen_double_bond_to_something_outside_ring (atom_number_t zato
 }
 
 int
-Molecule::_is_aromatic_carbonyl (atom_number_t zatom,
-                                 atom_number_t & a1,
-                                 atom_number_t & a2) const
+Molecule::_is_aromatic_carbonyl(atom_number_t zatom,
+                                atom_number_t & a1,
+                                atom_number_t & a2) const
 {
   a1 = INVALID_ATOM_NUMBER;
   a2 = INVALID_ATOM_NUMBER;
@@ -2670,9 +3085,9 @@ Molecule::_is_aromatic_carbonyl (atom_number_t zatom,
 
   for (int i = 0; i < 3; i++)
   {
-    const Bond * b = c->item (i);
+    const Bond * b = c->item(i);
 
-    atom_number_t j = b->other (zatom);
+    atom_number_t j = b->other(zatom);
 
     if (b->is_double_bond())
     {
@@ -2702,7 +3117,7 @@ Molecule::_is_aromatic_carbonyl (atom_number_t zatom,
 */
 
 int
-Molecule::_do_obvious_bond_order_settings (Kekule_Temporary_Arrays & kta)
+Molecule::_do_obvious_bond_order_settings(Kekule_Temporary_Arrays & kta)
 {
   const int * process_these_atoms = kta.process_these_atoms();
 
@@ -2724,7 +3139,7 @@ Molecule::_do_obvious_bond_order_settings (Kekule_Temporary_Arrays & kta)
     }
 
 #ifdef DEBUG_DO_OBVIOUS_BOND_ORDER_SETTINGS
-    cerr << "Atom " << i << " (" << atomic_symbol (i) << ") has " << a->nbonds() << " bonds, ih = " << a->implicit_hydrogens();
+    cerr << "Atom " << i << " (" << atomic_symbol(i) << ") has " << a->nbonds() << " bonds, ih = " << a->implicit_hydrogens();
     if (a->implicit_hydrogens_known())
       cerr << ", H fixed";;
     if (a->formal_charge())
@@ -2791,7 +3206,7 @@ Molecule::_do_obvious_bond_order_settings (Kekule_Temporary_Arrays & kta)
 
     for (int j = 0; j < icon; j++)
     {
-      const Bond * b = a->item (j);
+      const Bond * b = a->item(j);
 
       if (b->is_triple_bond())
       {
@@ -2799,6 +3214,10 @@ Molecule::_do_obvious_bond_order_settings (Kekule_Temporary_Arrays & kta)
           cerr << "Molecule::_do_obvious_bond_order_settings: atom " << i << " has a triple bond\n";
         return 0;
       }
+
+//    To ensure max compatibility with Daylight, allow n(=O) to vary
+//    12 Sept 96. Ran into this case,  C=N(=C)C which had been aromatisised.
+//    Therefore we generalise the rule to any kind of 4 bonded Nitrogen.
 
       if (b->is_double_bond())
       {
@@ -2836,11 +3255,11 @@ Molecule::_do_obvious_bond_order_settings (Kekule_Temporary_Arrays & kta)
 
     a3 = INVALID_ATOM_NUMBER;
 
-    if (_is_furan_or_thiophene (i, a1, a2))
+    if (_is_furan_or_thiophene(i, a1, a2))
       ;
-    else if (_is_pyrrole_type_nitrogen (i, a1, a2, a3, process_these_atoms))
+    else if (_is_pyrrole_type_nitrogen(i, a1, a2, a3, process_these_atoms))
       ;
-    else if (_is_aromatic_carbonyl (i, a1, a2))
+    else if (_is_aromatic_carbonyl(i, a1, a2))
       ;
     else
       continue;
@@ -2852,10 +3271,10 @@ Molecule::_do_obvious_bond_order_settings (Kekule_Temporary_Arrays & kta)
     cerr << endl;
 #endif
 
-    _must_be_single_bond_between (kta, i, i, a1);
-    _must_be_single_bond_between (kta, i, i, a2);
+    _must_be_single_bond_between(kta, i, i, a1);
+    _must_be_single_bond_between(kta, i, i, a2);
     if (INVALID_ATOM_NUMBER != a3)
-      _must_be_single_bond_between (kta, i, i, a3);
+      _must_be_single_bond_between(kta, i, i, a3);
   }
 
 #ifdef DEBUG_DO_OBVIOUS_BOND_ORDER_SETTINGS
@@ -2871,10 +3290,10 @@ Molecule::_do_obvious_bond_order_settings (Kekule_Temporary_Arrays & kta)
 }
 
 int
-Molecule::_count_pi_electrons_in_any_fused_but_kekule_form_rings (Kekule_Temporary_Arrays & kta,
+Molecule::_count_pi_electrons_in_any_fused_but_kekule_form_rings(Kekule_Temporary_Arrays & kta,
                                                         const resizable_array<const Ring *> & rings)
 {
-  kta.set_additional_fused_pi_electrons (0);
+  kta.set_additional_fused_pi_electrons(0);
 
   int fsid = rings[0]->fused_system_identifier();
 
@@ -2889,30 +3308,30 @@ Molecule::_count_pi_electrons_in_any_fused_but_kekule_form_rings (Kekule_Tempora
 
   for (int i = 0; i < nr; i++)
   {
-    const Ring * ri = ringi (i);
+    const Ring * ri = ringi(i);
 
     if (ri->fused_system_identifier() != fsid)
       continue;
 
-    if (rings.contains (ri))
+    if (rings.contains(ri))
       continue;
 
-    if (! ri->any_members_set_in_array (process_these_atoms))  // maybe a ring system was divided into disjoint pieces
+    if (! ri->any_members_set_in_array(process_these_atoms))  // maybe a ring system was divided into disjoint pieces
       continue;
 
     for (int j = 0; j < ri->number_elements(); j++)
     {
-      atom_number_t k = ri->item (j);
+      atom_number_t k = ri->item(j);
       if (process_these_atoms[k])
         continue;
 
       int pi;
-      (void) _things[k]->pi_electrons (pi);
+      (void) _things[k]->pi_electrons(pi);
       extra_pi_electrons += pi;
     }
   }
 
-  kta.set_additional_fused_pi_electrons (extra_pi_electrons);
+  kta.set_additional_fused_pi_electrons(extra_pi_electrons);
 
   return 1;
 }
@@ -2923,7 +3342,7 @@ Molecule::_count_pi_electrons_in_any_fused_but_kekule_form_rings (Kekule_Tempora
 */
 
 int
-Molecule::_a_atoms_found_this_set_of_rings (const Kekule_Temporary_Arrays & kta,
+Molecule::_a_atoms_found_this_set_of_rings(const Kekule_Temporary_Arrays & kta,
                                         const resizable_array<const Ring *> & rings)
 {
   int nr = rings.number_elements();
@@ -2936,7 +3355,7 @@ Molecule::_a_atoms_found_this_set_of_rings (const Kekule_Temporary_Arrays & kta,
 
     for (int j = 0; j < ring_size; j++)
     {
-      atom_number_t k = ri->item (j);
+      atom_number_t k = ri->item(j);
 
       const Atom * ak = _things[k];
 
@@ -2958,7 +3377,7 @@ Molecule::_a_atoms_found_this_set_of_rings (const Kekule_Temporary_Arrays & kta,
 */
 
 int
-Molecule::_kekule_all_atoms_and_bonds_in_system_aromatic (Kekule_Temporary_Arrays & kta,
+Molecule::_kekule_all_atoms_and_bonds_in_system_aromatic(Kekule_Temporary_Arrays & kta,
                                 const resizable_array<const Ring *> & rings)
 {
 //cerr << "Calling _kekule_all_atoms_and_bonds_in_system_aromatic\n";
@@ -2975,20 +3394,20 @@ Molecule::_kekule_all_atoms_and_bonds_in_system_aromatic (Kekule_Temporary_Array
 
     for (int j = 0; j < ring_size; j++)
     {
-      atom_number_t k = ri->item (j);
+      atom_number_t k = ri->item(j);
 
       Atom * ak = _things[k];
 
-      ak->set_permanent_aromatic (1);
+      ak->set_permanent_aromatic(1);
 //    cerr << "Atom " << k << " becomes permanent aromatic\n";
 
       int kcon = ak->ncon();
 
       for (int l = 0; l < kcon; l++)
       {
-        Bond * b = ak->item (l);
+        Bond * b = ak->item(l);
 
-        atom_number_t m = b->other (k);
+        atom_number_t m = b->other(k);
 
         if (aromatic_atoms[k] != aromatic_atoms[m])    // bond either outside the ring, or to a different aromatic system (biphenyl)
           continue;
@@ -3001,7 +3420,7 @@ Molecule::_kekule_all_atoms_and_bonds_in_system_aromatic (Kekule_Temporary_Array
 //        cerr << "'" << name() << "' atoms " << b->a1() << " to " << b->a2() << endl;
         }
 
-        b->set_permanent_aromatic (1);
+        b->set_permanent_aromatic(1);
       }
     }
   }
@@ -3018,7 +3437,7 @@ Molecule::_kekule_all_atoms_and_bonds_in_system_aromatic (Kekule_Temporary_Array
 */
 
 int
-Molecule::_do_obvious_hcount_adjustments (Kekule_Temporary_Arrays & kta)
+Molecule::_do_obvious_hcount_adjustments(Kekule_Temporary_Arrays & kta)
 {  
   const int * process_these_atoms = kta.process_these_atoms();
   int * vary_hcount = kta.vary_hcount();
@@ -3077,7 +3496,7 @@ Molecule::_do_obvious_hcount_adjustments (Kekule_Temporary_Arrays & kta)
     {
       vary_hcount[i] = 0;
       if (a->implicit_hydrogens() != implicit_hydrogens_needed[i])
-        a->set_implicit_hydrogens (implicit_hydrogens_needed[i], 1);
+        a->set_implicit_hydrogens(implicit_hydrogens_needed[i], 1);
       continue;
     }
 
@@ -3087,7 +3506,8 @@ Molecule::_do_obvious_hcount_adjustments (Kekule_Temporary_Arrays & kta)
       ;
     else if (! a->valence_ok())
     {
-      cerr << "Atom " << i << " (" << atomic_symbol (i) << ") ncon = " << icon << " has an abnormal valence\n";
+      if (display_abnormal_valence_messages())
+        cerr << "Atom " << i << " (" << atomic_symbol(i) << ") ncon = " << icon << " has an abnormal valence\n";
       return 0;
     }
 
@@ -3097,7 +3517,7 @@ Molecule::_do_obvious_hcount_adjustments (Kekule_Temporary_Arrays & kta)
       continue;
 
     int ih;
-    if (! a->compute_implicit_hydrogens (ih))   // how could this happen
+    if (! a->compute_implicit_hydrogens(ih))   // how could this happen
     {
       cerr << "Yipes, cannot compute implicit hydrogens for atom " << i << endl;
       continue;
@@ -3109,20 +3529,20 @@ Molecule::_do_obvious_hcount_adjustments (Kekule_Temporary_Arrays & kta)
     const atomic_number_t z = a->atomic_number();
 
     if (3 == icon)
-      a->set_implicit_hydrogens (0);
+      a->set_implicit_hydrogens(0);
     else if (6 == z)
-      a->set_implicit_hydrogens (1);
+      a->set_implicit_hydrogens(1);
     else if (1 == ih && 7 == z)
     {
-      a->set_implicit_hydrogens (0);
+      a->set_implicit_hydrogens(0);
       vary_hcount[i] = 1;
     }
     else if (8 == z)
-      a->set_implicit_hydrogens (0);    // especially to deal with O+
+      a->set_implicit_hydrogens(0);    // especially to deal with O+
     else if (15 == z)      // P can be aromatic - for now I'm not dealing with the case of [PH] as an aromatic
     {
       if (2 == a->ncon())
-        a->set_implicit_hydrogens (0);
+        a->set_implicit_hydrogens(0);
       vary_hcount[i] = 0;
     }
     else if (16 == z)
@@ -3130,12 +3550,12 @@ Molecule::_do_obvious_hcount_adjustments (Kekule_Temporary_Arrays & kta)
       if (1 == a->formal_charge())
         vary_hcount[i] = 1;
 
-      a->set_implicit_hydrogens (0);
+      a->set_implicit_hydrogens(0);
     }
     else if (2 == ih)
     {
       vary_hcount[i] = 1;
-      a->set_implicit_hydrogens (0);    // may change it later
+      a->set_implicit_hydrogens(0);    // may change it later
     }
   }
 
@@ -3145,10 +3565,10 @@ Molecule::_do_obvious_hcount_adjustments (Kekule_Temporary_Arrays & kta)
   {
     if (process_these_atoms[i])
     {
-      cerr << "Atom " << i << " (" << atomic_symbol (i) << ") ncon = " <<
-              ncon (i) << " hcount = " << implicit_hydrogens (i);
-      if (formal_charge (i))
-        cerr << " fc = " << formal_charge (i);
+      cerr << "Atom " << i << " (" << atomic_symbol(i) << ") ncon = " <<
+              ncon(i) << " hcount = " << implicit_hydrogens(i);
+      if (formal_charge(i))
+        cerr << " fc = " << formal_charge(i);
 
       cerr << " vary hcount = " << vary_hcount[i] << endl;
     }
@@ -3159,12 +3579,12 @@ Molecule::_do_obvious_hcount_adjustments (Kekule_Temporary_Arrays & kta)
 }
 
 int
-Molecule::__kekule_arom_test_rings (const int * process_these_atoms,
-                                    const resizable_array<const Ring *> & rings,
-                                    aromaticity_type_t * ring_aromaticity,
-                                    aromaticity_type_t * atom_aromaticity,
-                                    int * pi_e,
-                                    int * unshared_pi_electrons)
+Molecule::__kekule_arom_test_rings(const int * process_these_atoms,
+                                   const resizable_array<const Ring *> & rings,
+                                   aromaticity_type_t * ring_aromaticity,
+                                   aromaticity_type_t * atom_aromaticity,
+                                   int * pi_e,
+                                   int * unshared_pi_electrons)
 {
 
 #ifdef DEBUG_KEKULE
@@ -3186,7 +3606,7 @@ Molecule::__kekule_arom_test_rings (const int * process_these_atoms,
     aromaticity_type_t arom;
     int impossible_aromatic;
     const Ring * r = rings[i];
-    if (! __compute_aromaticity_for_ring (*r, arom, impossible_aromatic, pi_e,
+    if (! __compute_aromaticity_for_ring(*r, arom, impossible_aromatic, pi_e,
                                           unshared_pi_electrons[i], Simple_4n_plus_2))
       return 0;
 
@@ -3197,8 +3617,8 @@ Molecule::__kekule_arom_test_rings (const int * process_these_atoms,
 //  requires every atom in R to be fused to an aromatic ring.
 
     ring_aromaticity[i] = arom;
-//  cerr << "Ring is " << arom << endl;
-    r->set_vector (atom_aromaticity, arom);
+    cerr << "Ring " << *r << " is " << arom << endl;
+    r->set_vector(atom_aromaticity, arom);
   }
 
 #ifdef DEBUG_KEKULE
@@ -3257,7 +3677,7 @@ Molecule::__kekule_arom_test_rings (const int * process_these_atoms,
 
   int rings_in_molecule = _sssr_rings.number_elements();
 
-  int * already_done = new_int (rings_in_molecule, 1); iw_auto_array<int> free_already_done (already_done);
+  int * already_done = new_int(rings_in_molecule, 1); std::unique_ptr<int[]> free_already_done(already_done);
 
   for (int i = 0; i < nr; i++)
   {
@@ -3265,11 +3685,11 @@ Molecule::__kekule_arom_test_rings (const int * process_these_atoms,
     already_done[r->ring_number()] = 0;    // process ring J
   }
 
-  int * impossible_aromatic_not_used = new_int (nr); iw_auto_array<int> free_impossible_aromatic_not_used (impossible_aromatic_not_used);
+  int * impossible_aromatic_not_used = new_int(rings_in_molecule); std::unique_ptr<int[]> free_impossible_aromatic_not_used(impossible_aromatic_not_used);
 
-  int * tmp = new_int (rings_in_molecule, 1); iw_auto_array<int> free_tmp (tmp);
+  int * tmp = new_int(rings_in_molecule, 1); std::unique_ptr<int[]> free_tmp(tmp);
 
-  int rc = _determine_aromaticity_of_fused_systems (already_done,
+  int rc = _determine_aromaticity_of_fused_systems(already_done,
                                                     pi_e,
                                                     impossible_aromatic_not_used,
                                                     Simple_4n_plus_2,
@@ -3296,20 +3716,20 @@ Molecule::__kekule_arom_test_rings (const int * process_these_atoms,
 */
 
 int
-Molecule::_kekule_arom_test_rings (Kekule_Temporary_Arrays & kta,
-                                   const resizable_array<const Ring *> & rings)
+Molecule::_kekule_arom_test_rings(Kekule_Temporary_Arrays & kta,
+                                  const resizable_array<const Ring *> & rings)
 {
   const int * process_these_atoms = kta.process_these_atoms();
 
   int nr = rings.number_elements();
 
-  aromaticity_type_t * ra = new aromaticity_type_t[nr]; iw_auto_array<aromaticity_type_t> free_ra (ra);
+  aromaticity_type_t * ra = new aromaticity_type_t[nr]; std::unique_ptr<aromaticity_type_t[]> free_ra(ra);
 
-  set_vector (ra, nr, AROMATICITY_NOT_DETERMINED);
+  set_vector(ra, nr, AROMATICITY_NOT_DETERMINED);
 
-  aromaticity_type_t * aa = new aromaticity_type_t[_number_elements]; iw_auto_array<aromaticity_type_t> free_aa (aa);
+  aromaticity_type_t * aa = new aromaticity_type_t[_number_elements]; std::unique_ptr<aromaticity_type_t[]> free_aa(aa);
 
-  set_vector (aa, _number_elements, AROMATICITY_NOT_DETERMINED);
+  set_vector(aa, _number_elements, AROMATICITY_NOT_DETERMINED);
 
   int * pi_e = kta.pi_electrons();
 
@@ -3319,15 +3739,15 @@ Molecule::_kekule_arom_test_rings (Kekule_Temporary_Arrays & kta,
       continue;
 
     int tmp;
-    if (! _things[i]->pi_electrons (tmp))
+    if (! _things[i]->pi_electrons(tmp))
       return 0;
 
     pi_e[i] = tmp;
   }
 
-  int * unshared_pi_electrons = new_int (nr); iw_auto_array<int> free_unshared_pi_electrons (unshared_pi_electrons);
+  int * unshared_pi_electrons = new_int(nr); std::unique_ptr<int[]> free_unshared_pi_electrons(unshared_pi_electrons);
 
-  return __kekule_arom_test_rings (process_these_atoms, rings, ra, aa, pi_e, unshared_pi_electrons);
+  return __kekule_arom_test_rings(process_these_atoms, rings, ra, aa, pi_e, unshared_pi_electrons);
 }
 
 #define KEKULE_READY_TO_PROCESS -1
@@ -3339,14 +3759,14 @@ Molecule::_kekule_arom_test_rings (Kekule_Temporary_Arrays & kta,
 */
 
 int
-Molecule::_bonded_to_heteroatom_outside_system (atom_number_t zatom,
-                                                const int * aromatic_system)
+Molecule::_bonded_to_heteroatom_outside_system(atom_number_t zatom,
+                                               const int * aromatic_system)
 {
   Atom * a = _things[zatom];
 
   int acon = a->ncon();
 //cerr << "Atom " << zatom << " ncon " << acon << " ih " << implicit_hydrogens(zatom) << " bonds " << a->nbonds() << endl;
-  if (acon + implicit_hydrogens (zatom) == a->nbonds())
+  if (acon + implicit_hydrogens(zatom) == a->nbonds())
     return 0;
 
 #ifdef DEBUG_KEKULE
@@ -3370,11 +3790,11 @@ Molecule::_bonded_to_heteroatom_outside_system (atom_number_t zatom,
 
   for (int i = 0; i < acon; i++)
   {
-    const Bond * b = a->item (i);
+    const Bond * b = a->item(i);
     if (b->is_single_bond())
       continue;
 
-    atom_number_t j = b->other (zatom);
+    atom_number_t j = b->other(zatom);
 
 //  The atom types must differ
 
@@ -3385,8 +3805,8 @@ Molecule::_bonded_to_heteroatom_outside_system (atom_number_t zatom,
 //    atom j is non ring
 //    atom j is not in this ring, nor are atoms j and l in any ring together.
 
-    if (is_non_ring_atom (j) ||
-        (0 == aromatic_system[j] && ! in_same_ring (zatom, j)))
+    if (is_non_ring_atom(j) ||
+        (0 == aromatic_system[j] && ! in_same_ring(zatom, j)))
       return 1;
   }
 
@@ -3401,8 +3821,8 @@ Molecule::_bonded_to_heteroatom_outside_system (atom_number_t zatom,
 */
 
 int
-Molecule::_kekule_identify_next_atom (const int * process_these,
-                                      atom_number_t & zatom) const
+Molecule::_kekule_identify_next_atom(const int * process_these,
+                                     atom_number_t & zatom) const
 {
   int found = 0;
   for (int i = 0; i < _number_elements; i++)
@@ -3419,7 +3839,7 @@ Molecule::_kekule_identify_next_atom (const int * process_these,
     int icon = a->ncon();
     for (int j = 0; j < icon; j++)
     {
-      atom_number_t k = a->other (i, j);
+      atom_number_t k = a->other(i, j);
       if (KEKULE_PROCESSED == process_these[k])
       {
         zatom = i;
@@ -3457,15 +3877,21 @@ looks_like_valid_kekule_system (const Kekule_Temporary_Arrays & kta,
 
   int extra_pi_electrons = kta.additional_fused_pi_electrons();
 
-  if (0 == extra_pi_electrons)
-    return 0;
+  if (extra_pi_electrons)
+  {
+    pi_electron_count += extra_pi_electrons;
 
-  pi_electron_count += extra_pi_electrons;
+    if (pi_electron_count < 6)
+      return 0;
 
-  if (pi_electron_count < 6)
-    return 0;
+    if (2 == (pi_electron_count % 4))
+      return 1;
+  }
 
-  return (2 == (pi_electron_count % 4));
+  if (file_scope_allow_any_even_number_of_pi_electrons && 0 == pi_electron_count % 2)
+    return 1;
+
+  return 0;
 }
 
 /*
@@ -3474,7 +3900,7 @@ looks_like_valid_kekule_system (const Kekule_Temporary_Arrays & kta,
 */
 
 int
-Molecule::_count_pi_electrons (atom_number_t zatom,
+Molecule::_count_pi_electrons(atom_number_t zatom,
                               const int * process_these_atoms,
                               int & result)
 {
@@ -3494,7 +3920,7 @@ Molecule::_count_pi_electrons (atom_number_t zatom,
     else
       result = 1;
   }
-  else if (! a->pi_electrons (result))
+  else if (! a->pi_electrons(result))
     return 0;
 
 //cerr << "Atom " << zatom << " computed to have " << result << " pi electrons\n";
@@ -3506,7 +3932,7 @@ Molecule::_count_pi_electrons (atom_number_t zatom,
 
   if (2 == acon)    // cannot have any bonds outside the ring system
     ;
-  else if (_bonded_to_heteroatom_outside_system (zatom, process_these_atoms))
+  else if (_bonded_to_heteroatom_outside_system(zatom, process_these_atoms))
   {
 //  cerr << "Atom " << zatom << " bonded to heteroatom outside ring\n";
     if (16 == a->atomic_number() && 4 == acon && 5 == a->nbonds() && allow_pipeline_pilot_aromaticity_on_input && 0 == a->formal_charge())
@@ -3529,44 +3955,26 @@ Molecule::_count_pi_electrons (atom_number_t zatom,
 */
 
 int
-Molecule::_bond_only_in_small_carbocycle (atom_number_t a0,
-                                          atom_number_t a1)
+Molecule::_bond_only_in_small_carbocycle(atom_number_t a0,
+                                         atom_number_t a1)
 {
   int nr = _sssr_rings.number_elements();
 
   for (int i = 0; i < nr; i++)
   {
-    const Ring * ri = ringi (i);
+    const Ring * ri = ringi(i);
 
-    if (! ri->contains_bond (a0, a1))
+    if (! ri->contains_bond(a0, a1))
       continue;
 
     if (ri->number_elements() > 5)   // in a larger ring
       return 0;
 
-    if (count_heteroatoms (*ri) > 0)  // found in a non-carbocycle
+    if (count_heteroatoms(*ri) > 0)  // found in a non-carbocycle
       return 0;
   }
 
   return 1;
-}
-
-int
-Molecule::count_heteroatoms (const Set_of_Atoms & r) const
-{
-  int n = r.number_elements();
-
-  int rc = 0;
-
-  for (int i = 0; i < n; i++)
-  {
-    atom_number_t j = r[i];
-
-    if (6 != _things[j]->atomic_number())
-      rc++;
-  }
-
-  return rc;
 }
 
 /*
@@ -3579,7 +3987,7 @@ Molecule::count_heteroatoms (const Set_of_Atoms & r) const
 */
 
 int
-Molecule::_sort_possible_continuations_by_ring_size (atom_number_t anchor,
+Molecule::_sort_possible_continuations_by_ring_size(atom_number_t anchor,
                                                     Set_of_Atoms & p)
 {
   assert (p.number_elements() > 1);
@@ -3587,13 +3995,13 @@ Molecule::_sort_possible_continuations_by_ring_size (atom_number_t anchor,
   atom_number_t a0 = p[0];
   atom_number_t a1 = p[1];
 
-  if (_bond_only_in_small_carbocycle (anchor, a0))
+  if (_bond_only_in_small_carbocycle(anchor, a0))
   {
-    p.swap_elements (0, 1);
+    p.swap_elements(0, 1);
     return 1;
   }
 
-  if (_bond_only_in_small_carbocycle (anchor, a1))
+  if (_bond_only_in_small_carbocycle(anchor, a1))
     return 1;
 
   resizable_array<int> ring_sizes;
@@ -3602,11 +4010,11 @@ Molecule::_sort_possible_continuations_by_ring_size (atom_number_t anchor,
   {
     atom_number_t j = p[i];
 
-    ring_sizes.add (ring_containing_atom (j)->number_elements());
+    ring_sizes.add(ring_containing_atom(j)->number_elements());
   }
 
   if (ring_sizes[0] > ring_sizes[1])
-    p.swap_elements (0, 1);
+    p.swap_elements(0, 1);
 
   return 1;
 }
@@ -3619,7 +4027,7 @@ Molecule::_sort_possible_continuations_by_ring_size (atom_number_t anchor,
 */
 
 int
-Molecule::__find_kekule_form_current_config (const resizable_array<const Ring *> & rings,
+Molecule::__find_kekule_form_current_config(const resizable_array<const Ring *> & rings,
                                 Kekule_Temporary_Arrays & kta,
                                 atom_number_t zatom,
                                 int pi_electron_count)
@@ -3632,7 +4040,7 @@ Molecule::__find_kekule_form_current_config (const resizable_array<const Ring *>
 // so asking for pi electrons for a carbon, may be misleading
 
   int pi;
-  if (! _count_pi_electrons (zatom, process_these_atoms, pi))
+  if (! _count_pi_electrons(zatom, process_these_atoms, pi))
     return 0;
 
   pi_electron_count += pi;
@@ -3652,14 +4060,16 @@ Molecule::__find_kekule_form_current_config (const resizable_array<const Ring *>
 
   for (int i = 0; i < acon; i++)
   {
-    atom_number_t j = a->other (zatom, i);
+    atom_number_t j = a->other(zatom, i);
 
     if (KEKULE_READY_TO_PROCESS == process_these_atoms[j])
-      possible_continuations.add (j);
+      possible_continuations.add(j);
   }
 
   if (possible_continuations.number_elements() > 1)
-    _sort_possible_continuations_by_ring_size (zatom, possible_continuations);
+    _sort_possible_continuations_by_ring_size(zatom, possible_continuations);
+
+// Why is this a loop, it only processes the first one?
 
   for (int i = 0; i < possible_continuations.number_elements(); i++)
   {
@@ -3669,7 +4079,7 @@ Molecule::__find_kekule_form_current_config (const resizable_array<const Ring *>
     cerr << "From atom " << zatom << " continuing kekule search with atom " << j << endl;
 #endif
 
-    return _find_kekule_form (rings, kta, j, pi_electron_count);
+    return _find_kekule_form(rings, kta, j, pi_electron_count);
   }
 
 // Could not find a continuation atom directly bonded to atom A,
@@ -3677,12 +4087,12 @@ Molecule::__find_kekule_form_current_config (const resizable_array<const Ring *>
 
   atom_number_t astart;
 #ifdef DEBUG_KEKULE
-  if (_kekule_identify_next_atom (process_these_atoms, astart))
+  if (_kekule_identify_next_atom(process_these_atoms, astart))
     cerr << "Atom " << astart << " identified as new start atom\n";
 #endif
 
-  if (_kekule_identify_next_atom (process_these_atoms, astart))
-    return _find_kekule_form (rings, kta, astart, pi_electron_count);
+  if (_kekule_identify_next_atom(process_these_atoms, astart))
+    return _find_kekule_form(rings, kta, astart, pi_electron_count);
 
 // Cound not find any unprocessed atoms. Is this a kekule form????
 
@@ -3690,20 +4100,20 @@ Molecule::__find_kekule_form_current_config (const resizable_array<const Ring *>
   cerr << "Checking for possible aromatic " << pi_electron_count << endl;
 #endif
 
-  if (looks_like_valid_kekule_system (kta, pi_electron_count))
+  if (looks_like_valid_kekule_system(kta, pi_electron_count))
     return 1;
 
   if (pi_electron_count < 6)
     return 0;
 
 // When I first implemented this, I rejected things which had an odd number
-// of electrons, but I quickly ran into a counter-example, 
-// ..........................................................
+// of electrons, but I quickly ran into a counter-example,
+// N12C(=NC3=CC=CC=C3C1=O)SCC2=O PBCHM11481368
 
 // Now things get interesting. We do not have a 4n + 2 system, but the
 // system may consist of aromatic rings.
 
-  int rc = _kekule_arom_test_rings (kta, rings);
+  int rc = _kekule_arom_test_rings(kta, rings);
 
 #ifdef DEBUG_KEKULE
   cerr << "Final determination " << rc << endl;
@@ -3731,7 +4141,7 @@ Molecule::_find_kekule_form_current_config (const resizable_array<const Ring *> 
 
   process_these_atoms[a] = KEKULE_PROCESSED;
 
-  int rc = __find_kekule_form_current_config (rings, kta, a, pi_electron_count);
+  int rc = __find_kekule_form_current_config(rings, kta, a, pi_electron_count);
 
   process_these_atoms[a] = KEKULE_READY_TO_PROCESS;
 
@@ -3761,19 +4171,19 @@ Molecule::_find_kekule_form (const resizable_array<const Ring *> & rings,
 #endif
 
   if (0 == vary_bonds[zatom])
-    return _find_kekule_form_current_config (rings, kta, zatom, pi_electron_count);
+    return _find_kekule_form_current_config(rings, kta, zatom, pi_electron_count);
 
   int * vary_hcount = kta.vary_hcount();
 
   Atom * a = _things[zatom];
 
 #ifdef DEBUG_KEKULE
-  cerr << "_find_kekule_form:continuing with atom " << zatom << " (" << a->atomic_symbol() << ") nbonds = " << nbonds (zatom) << " hcount = " <<
+  cerr << "_find_kekule_form:continuing with atom " << zatom << " (" << a->atomic_symbol() << ") nbonds = " << nbonds(zatom) << " hcount = " <<
           a->implicit_hydrogens() << " vary hcount = " << vary_hcount[zatom] << " vary bonds = " << vary_bonds[zatom] << endl;
 #endif
 
   if (vary_hcount[zatom])     // first try no implicit hydrogens
-    a->set_implicit_hydrogens (0);
+    a->set_implicit_hydrogens(0);
 
   int bonds_found  = 0;
   int unprocessed_neighbours = 0;
@@ -3781,14 +4191,14 @@ Molecule::_find_kekule_form (const resizable_array<const Ring *> & rings,
   int acon = a->ncon();
   for (int i = 0; i < acon; i++)
   {
-    Bond * b = a->item (i);
+    Bond * b = a->item(i);
 
     if (b->is_single_bond())
       bonds_found++;
     else if (b->is_double_bond())
       bonds_found += 2;
 
-    atom_number_t j = b->other (zatom);
+    atom_number_t j = b->other(zatom);
 
     if (KEKULE_READY_TO_PROCESS == process_these_atoms[j])    // other connection not yet processed
     {
@@ -3833,9 +4243,9 @@ Molecule::_find_kekule_form (const resizable_array<const Ring *> & rings,
   int bonds_needed = e->normal_valence() + a->formal_charge();
   if (bonds_needed < a->nbonds() && e->number_alternate_valences())
   {
-    bonds_needed = e->alternate_valence (0) + a->formal_charge();
+    bonds_needed = e->alternate_valence(0) + a->formal_charge();
     if (bonds_needed < a->nbonds() && e->number_alternate_valences() > 1)
-      bonds_needed = e->alternate_valence (1) + a->formal_charge();
+      bonds_needed = e->alternate_valence(1) + a->formal_charge();
   }
 
 #ifdef DEBUG_KEKULE
@@ -3869,10 +4279,10 @@ Molecule::_find_kekule_form (const resizable_array<const Ring *> & rings,
   {
     if (file_scope_display_no_kekule_form_message)
     {
-      cerr << _molecule_name << " atom " << zatom << " (" << atomic_symbol (zatom) << ") has " << bonds_found <<
+      cerr << _molecule_name << " atom " << zatom << " (" << atomic_symbol(zatom) << " D" << a->ncon() << ") has " << bonds_found <<
               " and needs " << bonds_needed << endl;
-      cerr << "Atom has formal charge " << formal_charge (zatom) << " and " <<
-              implicit_hydrogens (zatom) << " implicit hydrogens\n";
+      cerr << "Atom has formal charge " << formal_charge(zatom) << " and " <<
+              implicit_hydrogens(zatom) << " implicit hydrogens\n";
       cerr << "Impossible\n";
     }
     return 0;
@@ -3888,7 +4298,7 @@ Molecule::_find_kekule_form (const resizable_array<const Ring *> & rings,
     if (a->implicit_hydrogens())    // already has an H
       return 0;
 
-    a->set_implicit_hydrogens (1);
+    a->set_implicit_hydrogens(1);
     bonds_found++;
   }
 
@@ -3897,7 +4307,7 @@ Molecule::_find_kekule_form (const resizable_array<const Ring *> & rings,
 // If we already have a full complement of bonds, proceed with this configuration
 
   if (bonds_found >= bonds_needed)
-    return _find_kekule_form_current_config (rings, kta, zatom, pi_electron_count);
+    return _find_kekule_form_current_config(rings, kta, zatom, pi_electron_count);
 
 // At this stage, we are short a bond. That bond must be gained either by
 // placing a bond, or adding a hydrogen.
@@ -3910,9 +4320,9 @@ Molecule::_find_kekule_form (const resizable_array<const Ring *> & rings,
 
   for (int i = 0; i < acon; i++)
   {
-    const Bond * b = a->item (i);
+    const Bond * b = a->item(i);
 
-    atom_number_t j = b->other (zatom);
+    atom_number_t j = b->other(zatom);
 
 #ifdef DEBUG_KEKULE
     cerr << "From atom " << zatom << " what about atom " << j << " vary_bonds = " << vary_bonds[j] << endl;
@@ -3929,14 +4339,14 @@ Molecule::_find_kekule_form (const resizable_array<const Ring *> & rings,
 //  Make sure we handle O=c1[nH]c(=O)[n][n+]c1 BRN6406992R
 //  We may need to form =[N+]= within an aromatic ring. Strange...
 
-    if (_is_nitrogen_double_bond_to_something_outside_ring (j))
+    if (_is_nitrogen_double_bond_to_something_outside_ring(j))
       ;
     else if (7 == aj->atomic_number() && 2 == aj->ncon() && 1 == aj->formal_charge() && 3 == aj->nbonds() && 0 == aj->implicit_hydrogens())
       ;
     else if (aj->unsaturated())
       continue;
 
-    try_double_bond_to.add (j);
+    try_double_bond_to.add(j);
   }
 
 #ifdef DEBUG_KEKULE
@@ -3947,13 +4357,13 @@ Molecule::_find_kekule_form (const resizable_array<const Ring *> & rings,
 // for two possibilities
 
   if (try_double_bond_to.number_elements() > 1)
-    _sort_possible_continuations_by_ring_size (zatom, try_double_bond_to);
+    _sort_possible_continuations_by_ring_size(zatom, try_double_bond_to);
 
   for (int i = 0; i < try_double_bond_to.number_elements(); i++)
   {
     atom_number_t j = try_double_bond_to[i];
 
-    Bond * b = const_cast<Bond *> (a->bond_to_atom (j));
+    Bond * b = const_cast<Bond *>(a->bond_to_atom(j));
 
 #ifdef DEBUG_KEKULE
     cerr << "From atom " << zatom << " what about atom " << j << " vary_bonds = " << vary_bonds[j] << endl;
@@ -3961,16 +4371,18 @@ Molecule::_find_kekule_form (const resizable_array<const Ring *> & rings,
 
     Atom * aj = _things[j];
 
-    if (_is_nitrogen_double_bond_to_something_outside_ring (j))
+    if (_is_nitrogen_double_bond_to_something_outside_ring(j))
       ;
     else if (7 == aj->atomic_number() && 2 == aj->ncon() && 1 == aj->formal_charge() && 3 == aj->nbonds() && 0 == aj->implicit_hydrogens())
       ;
     else if (16 == aj->atomic_number() && 4 == aj->ncon() && allow_pipeline_pilot_aromaticity_on_input && 5 == aj->nbonds() && 0 == aj->formal_charge())
       ;
+    else if (7 == aj->atomic_number() && 3 == aj->ncon() && 0 == aj->formal_charge() && 3 == aj->nbonds())
+      continue;
     else if (aj->nbonds() > aj->ncon())    // likely already been set recursively
       continue;
 
-    b->set_bond_type (DOUBLE_BOND);
+    b->set_bond_type(DOUBLE_BOND);
     a->invalidate_computed_values_after_bond_change();
     aj->invalidate_computed_values_after_bond_change();
 
@@ -3978,14 +4390,14 @@ Molecule::_find_kekule_form (const resizable_array<const Ring *> & rings,
     cerr << "Just set double bond between atoms " << zatom << " and " << j << endl;
 #endif
 
-    if (_find_kekule_form_current_config (rings, kta, zatom, pi_electron_count))
+    if (_find_kekule_form_current_config(rings, kta, zatom, pi_electron_count))
       return 1;
 
 #ifdef DEBUG_KEKULE
     cerr << "Reset bond between " << zatom << " and " << j << " back to single\n";
 #endif
 
-    b->set_bond_type (SINGLE_BOND);
+    b->set_bond_type(SINGLE_BOND);
     a->invalidate_computed_values_after_bond_change();
     aj->invalidate_computed_values_after_bond_change();
   }
@@ -4003,15 +4415,15 @@ Molecule::_find_kekule_form (const resizable_array<const Ring *> & rings,
     cerr << "Adding a hydrogen to atom " << zatom << endl;
 #endif
 
-    a->set_implicit_hydrogens (1);
-    if (_find_kekule_form_current_config (rings, kta, zatom, pi_electron_count))
+    a->set_implicit_hydrogens(1);
+    if (_find_kekule_form_current_config(rings, kta, zatom, pi_electron_count))
       return 1;
 
 #ifdef DEBUG_KEKULE
     cerr << "Removing implicit hydrogen from atom " << zatom << endl;
 #endif
 
-    a->set_implicit_hydrogens (0);
+    a->set_implicit_hydrogens(0);
   }
 
 #ifdef DEBUG_KEKULE
@@ -4084,17 +4496,17 @@ Molecule::_find_kekule_form_ring_system (Kekule_Temporary_Arrays & kta,
 
 //cerr << "'a' atoms " << kta.a_atoms_found() << endl;
 
-  if (kta.a_atoms_found() && _a_atoms_found_this_set_of_rings (kta, rings))
-    return _kekule_all_atoms_and_bonds_in_system_aromatic (kta, rings);
+  if (kta.a_atoms_found() && _a_atoms_found_this_set_of_rings(kta, rings))
+    return _kekule_all_atoms_and_bonds_in_system_aromatic(kta, rings);
 
-  if (! _do_obvious_hcount_adjustments (kta))
+  if (! _do_obvious_hcount_adjustments(kta))
   {
     if (file_scope_display_no_kekule_form_message)
       cerr << "Molecule::_find_kekule_form: bad hcount detected\n";
     return 0;
   }
 
-  if (! _do_obvious_bond_order_settings (kta))
+  if (! _do_obvious_bond_order_settings(kta))
   {
     if (file_scope_display_no_kekule_form_message)
       cerr << "Molecule::_find_kekule_form: bad bonding detected\n";
@@ -4103,7 +4515,7 @@ Molecule::_find_kekule_form_ring_system (Kekule_Temporary_Arrays & kta,
 
 // The case of 2238787
 
-  _count_pi_electrons_in_any_fused_but_kekule_form_rings (kta, rings);
+  _count_pi_electrons_in_any_fused_but_kekule_form_rings(kta, rings);
 
 #ifdef DEBUG_KEKULE
   cerr << "Start kekule search\n";
@@ -4112,9 +4524,9 @@ Molecule::_find_kekule_form_ring_system (Kekule_Temporary_Arrays & kta,
     if (! process_these_atoms[i])
       continue;
 
-    cerr << "Atom " << i << " (" << atomic_symbol (i) << ") ";
-    if (implicit_hydrogens (i))
-      cerr << implicit_hydrogens (i) << " implicit_hydrogens ";
+    cerr << "Atom " << i << " (" << atomic_symbol(i) << ") ";
+    if (implicit_hydrogens(i))
+      cerr << implicit_hydrogens(i) << " implicit_hydrogens ";
     if (kta.vary_hcount()[i])
       cerr << "vary hcount ";
     if (kta.vary_bonds()[i])
@@ -4124,15 +4536,15 @@ Molecule::_find_kekule_form_ring_system (Kekule_Temporary_Arrays & kta,
 #endif
 
   atom_number_t astart;
-  int system_size = _identify_kekule_search_starting_atom (kta, astart);
+  int system_size = _identify_kekule_search_starting_atom(kta, astart);
 
 #ifdef DEBUG_KEKULE
-  cerr << "Starting Kekule search with atom " << astart << " '" << smarts_equivalent_for_atom (astart) << "', system_size " << system_size << " atoms\n";
+  cerr << "Starting Kekule search with atom " << astart << " '" << smarts_equivalent_for_atom(astart) << "', system_size " << system_size << " atoms\n";
 #endif
 
   int pi_electron_count = 0;
 
-  int rc = _find_kekule_form (rings, kta, astart, pi_electron_count);
+  int rc = _find_kekule_form(rings, kta, astart, pi_electron_count);
 
   for (int i = 0; i < _number_elements; i++)
   {
@@ -4148,9 +4560,9 @@ Molecule::_find_kekule_form_ring_system (Kekule_Temporary_Arrays & kta,
 //  If the computed implicit hydrogens are the same as the number specified, no need for the known flag
 
     int ih;
-    a->compute_implicit_hydrogens (ih);
+    a->compute_implicit_hydrogens(ih);
     if (ih == a->implicit_hydrogens())
-      a->set_implicit_hydrogens_known (0);
+      a->set_implicit_hydrogens_known(0);
   }
 
   if (rc)
@@ -4169,7 +4581,7 @@ Molecule::_find_kekule_form_ring_system (Kekule_Temporary_Arrays & kta,
   {
     if (file_scope_display_no_kekule_form_message)
       cerr << "Molecule::_find_kekule_form: no kekule form for " << system_size << " atoms\n";
-    return _maybe_all_atoms_are_permanent_aromatic (kta, rings);
+    return _maybe_all_atoms_are_permanent_aromatic(kta, rings);
   }
 
 /*
@@ -4178,9 +4590,14 @@ Molecule::_find_kekule_form_ring_system (Kekule_Temporary_Arrays & kta,
   If the algorithm starts with the Sulphur containing ring, we fail, because we need
   the double bond to the Nitrogen outside the ring. Therefore, we do an iterative
   process
+
+
+  But since we are not doing an interative process now, we turn off the iterative stuff 
+  for efficiency
 */
 
-  int * ring_already_done = new_int (nr); iw_auto_array<int> free_ring_already_done (ring_already_done);
+#ifdef CODE_FOR_WHEN_WE_DO_PAIRWISE_FINDING
+  int * ring_already_done = new_int(nr); std::unique_ptr<int[]> free_ring_already_done(ring_already_done);
 
   while (1)
   {
@@ -4197,14 +4614,14 @@ Molecule::_find_kekule_form_ring_system (Kekule_Temporary_Arrays & kta,
       cerr << "Doing " << (*ri) << " separately\n";
 #endif
 
-      set_vector (process_these_atoms, _number_elements, 0);
+      set_vector(process_these_atoms, _number_elements, 0);
 
-      ri->set_vector (process_these_atoms, 1);
+      ri->set_vector(process_these_atoms, 1);
 
       resizable_array<const Ring *> tmp;
-      tmp.add (ri);
+      tmp.add(ri);
 
-      if (_find_kekule_form_ring_system (kta, tmp))   // no recursion because only one item in tmp
+      if (_find_kekule_form_ring_system(kta, tmp))   // no recursion because only one item in tmp
       {
         rings_found_aromatic_this_iteration++;
         ring_already_done[i] = 1;
@@ -4215,6 +4632,23 @@ Molecule::_find_kekule_form_ring_system (Kekule_Temporary_Arrays & kta,
     if (0 == rings_found_aromatic_this_iteration)
       break;
   }
+#else
+  for (int i = 0; i < nr; ++i)
+  {
+    const Ring * ri = rings[i];
+    set_vector(process_these_atoms, _number_elements, 0);
+
+    ri->set_vector(process_these_atoms, 1);
+
+    resizable_array<const Ring *> tmp;
+    tmp.add(ri);
+
+    if (_find_kekule_form_ring_system(kta, tmp))   // no recursion because only one item in tmp
+    {
+      rc++;
+    }
+  }
+#endif
 
 #ifdef DEBUG_KEKULE
   cerr << "rc = " << rc << endl;
@@ -4226,7 +4660,7 @@ Molecule::_find_kekule_form_ring_system (Kekule_Temporary_Arrays & kta,
   if (file_scope_display_no_kekule_form_message)
     cerr << "Molecule::_find_kekule_form: no kekule form for " << system_size << " atoms\n";
 
-  return _maybe_all_atoms_are_permanent_aromatic (kta, rings);
+  return _maybe_all_atoms_are_permanent_aromatic(kta, rings);
 }
 
 static void
@@ -4236,7 +4670,7 @@ unset_all_atoms_in_rings (const resizable_array<const Ring *> & rings,
 {
   for (int i = 0; i < rings.number_elements(); i++)
   {
-    rings[i]->set_vector (aromatic_atoms, 0);
+    rings[i]->set_vector(aromatic_atoms, 0);
 
     int rn = rings[i]->ring_number();
 
@@ -4255,7 +4689,7 @@ Molecule::_find_next_ring_or_ring_system (Kekule_Temporary_Arrays & kta,
 {
   int * process_these_atoms = kta.process_these_atoms();
 
-  set_vector (process_these_atoms, _number_elements, 0);
+  set_vector(process_these_atoms, _number_elements, 0);
 
   const int * process_these_rings = kta.process_these_rings();
 
@@ -4263,13 +4697,13 @@ Molecule::_find_next_ring_or_ring_system (Kekule_Temporary_Arrays & kta,
 
 #ifdef DEBUG_FIND_NEXT_RING_OR_RING_SYSTEM
   cerr << "In _find_next_ring_or_ring_system, flag " << flag << endl;
-  iw_write_array (process_these_rings, nr, "process_these_rings", cerr);
+  iw_write_array(process_these_rings, nr, "process_these_rings", cerr);
 #endif
 
   if (rings.number_elements())
-    rings.resize_keep_storage (0);
+    rings.resize_keep_storage(0);
   else
-    rings.resize (nr);
+    rings.resize(nr);
 
   int rc = 0;
   for (int i = 0; i < nr; i++)
@@ -4280,14 +4714,14 @@ Molecule::_find_next_ring_or_ring_system (Kekule_Temporary_Arrays & kta,
     if (flag != process_these_rings[i])
       continue;
 
-    const Ring * ri = ringi (i);
+    const Ring * ri = ringi(i);
 
 #ifdef DEBUG_FIND_NEXT_RING_OR_RING_SYSTEM
     cerr << "Doing ring " << i << " " << (*ri) << endl;
 #endif
 
-    ri->set_vector (process_these_atoms, 1);
-    rings.add (ri);
+    ri->set_vector(process_these_atoms, 1);
+    rings.add(ri);
     rc++;
   }
 
@@ -4297,13 +4731,13 @@ Molecule::_find_next_ring_or_ring_system (Kekule_Temporary_Arrays & kta,
 //#define DEBUG_FIND_KEKULE_FORM_MAIN
 
 int
-Molecule::_find_kekule_form (Kekule_Temporary_Arrays & kta)
+Molecule::_find_kekule_form(Kekule_Temporary_Arrays & kta)
 {
   int failures = 0;
   resizable_array<const Ring *> rings;
 
   int flag = 2;
-  while (_find_next_ring_or_ring_system (kta, flag, rings))
+  while (_find_next_ring_or_ring_system(kta, flag, rings))
   {
     flag++;
 
@@ -4311,8 +4745,8 @@ Molecule::_find_kekule_form (Kekule_Temporary_Arrays & kta)
     cerr << "Ring system contains " << rings.number_elements() << " rings\n";
 #endif
 
-    if (_find_kekule_form_ring_system (kta, rings))
-      unset_all_atoms_in_rings (rings, kta.aromatic_atoms(), kta.process_these_rings());   // mark atoms and rings as done
+    if (_find_kekule_form_ring_system(kta, rings))
+      unset_all_atoms_in_rings(rings, kta.aromatic_atoms(), kta.process_these_rings());   // mark atoms and rings as done
     else
       failures++;
 
@@ -4343,16 +4777,16 @@ my_fetch_or_create_permanent_aromatic_element (const char * s,
   if (NULL != e)
     return;
 
-  e = get_element_from_symbol_no_case_conversion (s);
+  e = get_element_from_symbol_no_case_conversion(s);
   if (NULL == e)
-    e = create_element_with_symbol (s);
+    e = create_element_with_symbol(s);
 
   assert (NULL != e);
 
   if (NULL != copy_element_data_from)
-    const_cast<Element *> (e)->copy_element_data (copy_element_data_from);
+    const_cast<Element *>(e)->copy_element_data(copy_element_data_from);
 
-  const_cast<Element *> (e)->set_permanent_aromatic (1);
+  const_cast<Element *>(e)->set_permanent_aromatic(1);
 
   return;
 }
@@ -4369,7 +4803,7 @@ Molecule::_convert_any_chain_aromatic_atoms_to_permanent_aromatic (const int * p
     if (nrings(i))
       continue;
 
-    _convert_atom_to_permanent_aromatic (i);
+    _convert_atom_to_permanent_aromatic(i);
   }
 
   return 1;
@@ -4378,12 +4812,12 @@ Molecule::_convert_any_chain_aromatic_atoms_to_permanent_aromatic (const int * p
 static void
 create_permanent_aromatic_elements()
 {
-  my_fetch_or_create_permanent_aromatic_element ("c", aromatic_carbon, get_element_from_atomic_number (6));
-  my_fetch_or_create_permanent_aromatic_element ("n", aromatic_nitrogen, get_element_from_atomic_number (7));
-  my_fetch_or_create_permanent_aromatic_element ("o", aromatic_oxygen, get_element_from_atomic_number (8));
-  my_fetch_or_create_permanent_aromatic_element ("p", aromatic_phosphorus, get_element_from_atomic_number (15));
-  my_fetch_or_create_permanent_aromatic_element ("s", aromatic_sulphur, get_element_from_atomic_number (16));
-  my_fetch_or_create_permanent_aromatic_element ("a", aromatic_a, NULL);
+  my_fetch_or_create_permanent_aromatic_element("c", aromatic_carbon, get_element_from_atomic_number(6));
+  my_fetch_or_create_permanent_aromatic_element("n", aromatic_nitrogen, get_element_from_atomic_number(7));
+  my_fetch_or_create_permanent_aromatic_element("o", aromatic_oxygen, get_element_from_atomic_number(8));
+  my_fetch_or_create_permanent_aromatic_element("p", aromatic_phosphorus, get_element_from_atomic_number(15));
+  my_fetch_or_create_permanent_aromatic_element("s", aromatic_sulphur, get_element_from_atomic_number(16));
+  my_fetch_or_create_permanent_aromatic_element("a", aromatic_a, NULL);
 
   return;
 }
@@ -4392,7 +4826,7 @@ int
 Molecule::_convert_atom_to_permanent_aromatic (atom_number_t zatom)
 {
   if (NULL == aromatic_carbon)
-    create_permanent_aromatic_elements ();
+    create_permanent_aromatic_elements();
 
   Atom * a = _things[zatom];
 
@@ -4401,17 +4835,17 @@ Molecule::_convert_atom_to_permanent_aromatic (atom_number_t zatom)
 //  cerr << "Converting atom " << zatom << " to permanent aromatic\n";
 
   if (6 == z)
-    a->set_element (aromatic_carbon);
+    a->set_element(aromatic_carbon);
   else if (7 == z)
-    a->set_element (aromatic_nitrogen);
+    a->set_element(aromatic_nitrogen);
   else if (8 == z)
-    a->set_element (aromatic_oxygen);
+    a->set_element(aromatic_oxygen);
   else if (16 == z)
-    a->set_element (aromatic_sulphur);
+    a->set_element(aromatic_sulphur);
   else if (15 == z)
-    a->set_element (aromatic_phosphorus);
+    a->set_element(aromatic_phosphorus);
   else if ("a" == a->element()->symbol())
-    a->set_element (aromatic_a);
+    a->set_element(aromatic_a);
   else if (a->element()->permanent_aromatic())
     ;
   else
@@ -4430,21 +4864,21 @@ Molecule::_kekule_cannot_be_aromatic (int * process_these_atoms,
                                       int & aromatic_atoms_found,
                                       int & a_atoms_found)
 {
-  int * rm = new int[_number_elements]; iw_auto_array<int> free_rm (rm);  // To avoid recomputing ring membership, keep a copy of the initial ring membmership
+  int * rm = new int[_number_elements]; std::unique_ptr<int[]> free_rm(rm);  // To avoid recomputing ring membership, keep a copy of the initial ring membmership
 
-  ring_membership (rm);     // force SSSR
+  ring_membership(rm);     // force SSSR
 
   if (0 == nrings())
   {
     if (convert_chain_aromatic_bonds())
     {
-      (void) _convert_chain_aromatic_bonds (process_these_atoms, rm);
+      (void) _convert_chain_aromatic_bonds(process_these_atoms, rm);
       return 0;    // we are happy
     }
     else if (aromatic_chain_bonds_are_ok())
     {
-      _convert_any_chain_aromatic_atoms_to_permanent_aromatic (process_these_atoms);
-      set_vector (process_these_atoms, _number_elements, 0);
+      _convert_any_chain_aromatic_atoms_to_permanent_aromatic(process_these_atoms);
+      set_vector(process_these_atoms, _number_elements, 0);
       return 0;      // that's good!
     }
     else
@@ -4486,7 +4920,7 @@ Molecule::_kekule_cannot_be_aromatic (int * process_these_atoms,
       }
 
       if (! called_convert_chain_aromatic_bonds)
-        (void) _convert_chain_aromatic_bonds (process_these_atoms, rm);
+        (void) _convert_chain_aromatic_bonds(process_these_atoms, rm);
 
       called_convert_chain_aromatic_bonds = 1;
     }
@@ -4518,7 +4952,7 @@ Molecule::_kekule_cannot_be_aromatic (int * process_these_atoms,
 
     if (! a->element()->is_in_periodic_table())
       a_atoms_found++;
-    else if (hcount (i) < 2)   // counts explicit and implicit
+    else if (hcount(i) < 2)   // counts explicit and implicit
       ;
     else if (a->implicit_hydrogens() > 1 && a->implicit_hydrogens_known())
     {
@@ -4536,6 +4970,15 @@ Molecule::_kekule_cannot_be_aromatic (int * process_these_atoms,
   if (0 == aromatic_atoms_found)
     return 0;      // no aromatic atoms specified, no further processing
 
+// Apr 2001. Remove this test because of molecules like Cn1on1C which are aromatic
+// in the Daylight world
+
+//if (aromatic_atoms_found < 4)  // no 3 membered aromatic rings
+//{
+//  cerr << "Molecule::_kekule_cannot_be_aromatic: only " << aromatic_atoms_found << " aromatic atoms\n";
+//  return 1;
+//}
+
   return 0;     // this collection of atoms could all be aromatic
 }
 
@@ -4547,12 +4990,12 @@ Molecule::_kekule_cannot_be_aromatic (int * process_these_atoms,
 int
 Molecule::_make_all_unshared_bonds_non_aromatic (const Ring & r)
 {
-  for (Ring_Bond_Iterator i (r); i != r.end(); i++)
+  for (Ring_Bond_Iterator i(r); i != r.end(); i++)
   {
     atom_number_t a1 = i.a1();
     atom_number_t a2 = i.a2();
 
-    Bond * b = const_cast<Bond *> (_things[a1]->bond_to_atom (a2));
+    Bond * b = const_cast<Bond *>(_things[a1]->bond_to_atom(a2));
 
     if (! b->is_permanent_aromatic())
       continue;
@@ -4560,7 +5003,7 @@ Molecule::_make_all_unshared_bonds_non_aromatic (const Ring & r)
     if (b->nrings() > 1)
       continue;
 
-    b->set_permanent_aromatic (0);
+    b->set_permanent_aromatic(0);
   }
 
   return 1;
@@ -4588,7 +5031,7 @@ Molecule::_make_bonds_aromatic (const Ring * zring)
     else
       a2 = r[i - 1];
 
-    Bond * b = const_cast<Bond *> (_things[a1]->bond_to_atom (a2));
+    Bond * b = const_cast<Bond *>(_things[a1]->bond_to_atom(a2));
 
     b->set_aromatic();
   }
@@ -4599,15 +5042,15 @@ Molecule::_make_bonds_aromatic (const Ring * zring)
 int
 Molecule::_make_all_bonds_aromatic (const Ring & r)
 {
-  for (Ring_Bond_Iterator i (r); i != r.end(); i++)
+  for (Ring_Bond_Iterator i(r); i != r.end(); i++)
   {
     atom_number_t a1 = i.a1();
     atom_number_t a2 = i.a2();
 
-    Bond * b = const_cast<Bond *> (_things[a1]->bond_to_atom (a2));
+    Bond * b = const_cast<Bond *>(_things[a1]->bond_to_atom(a2));
 
     if (! b->is_permanent_aromatic())
-      b->set_permanent_aromatic (1);
+      b->set_permanent_aromatic(1);
   }
 
   return 1;
@@ -4625,12 +5068,12 @@ int
 Molecule::_count_aromatic_bonds_in_just_one_ring (const Ring & r)
 {
   int rc = 0;
-  for (Ring_Bond_Iterator i (r); i != r.end(); i++)
+  for (Ring_Bond_Iterator i(r); i != r.end(); i++)
   {
     atom_number_t a1 = i.a1();
     atom_number_t a2 = i.a2();
 
-    const Bond * b = _things[a1]->bond_to_atom (a2);
+    const Bond * b = _things[a1]->bond_to_atom(a2);
 
     if (! b->is_permanent_aromatic())
       continue;
@@ -4645,12 +5088,14 @@ Molecule::_count_aromatic_bonds_in_just_one_ring (const Ring & r)
 int
 Molecule::_all_bonds_aromatic (const Ring & r) const
 {
-  for (Ring_Bond_Iterator i (r); i != r.end(); i++)
+  for (Ring_Bond_Iterator i(r); i != r.end(); i++)
   {
     atom_number_t a1 = i.a1();
     atom_number_t a2 = i.a2();
 
-    const Bond * b = _things[a1]->bond_to_atom (a2);
+    const Bond * b = _things[a1]->bond_to_atom(a2);
+
+//  cerr << "Bond between " << a1 << " and " << a2 << " aromatic? " << b->is_permanent_aromatic() << endl;
 
     if (! b->is_permanent_aromatic())
       return 0;
@@ -4677,22 +5122,22 @@ Molecule::_kekule_check_rings_containing_aliphatic_bonds (Kekule_Temporary_Array
     if (0 == process_these_rings[i])
       continue;
 
-    const Ring * ri = ringi (i);
+    const Ring * ri = ringi(i);
 
-    if (_all_bonds_aromatic (*ri))    // excellent, as it should be
+    if (_all_bonds_aromatic(*ri))    // excellent, as it should be
       continue;
 
     cerr << _molecule_name << " not all bonds aromatic " << (*ri) << endl;
 
     if (all_bonds_in_aromatic_ring_must_be_aromatic)   // cannot make aromatic
     {
-      _make_all_unshared_bonds_non_aromatic (*ri);
+      _make_all_unshared_bonds_non_aromatic(*ri);
 
       process_these_rings[i] = 0;
       continue;
     }
 
-    int abj1r = _count_aromatic_bonds_in_just_one_ring (*ri);  // not shared with another ring
+    int abj1r = _count_aromatic_bonds_in_just_one_ring(*ri);  // not shared with another ring
 
     if (0 == abj1r)
     {
@@ -4702,7 +5147,7 @@ Molecule::_kekule_check_rings_containing_aliphatic_bonds (Kekule_Temporary_Array
 
     cerr << "Ring " << (*ri) << " has " << abj1r << " unshared aromatic bonds\n";
 
-    _make_all_bonds_aromatic (*ri);
+    _make_all_bonds_aromatic(*ri);
   }
 
   return 1;
@@ -4715,7 +5160,7 @@ Molecule::_kekule_check_rings_containing_aliphatic_bonds (Kekule_Temporary_Array
 */
 
 int
-Molecule::_determine_hydrogen_counts (Kekule_Temporary_Arrays & kta)
+Molecule::_determine_hydrogen_counts(Kekule_Temporary_Arrays & kta)
 {
   const int * aromatic_atoms = kta.aromatic_atoms();
 
@@ -4730,9 +5175,9 @@ Molecule::_determine_hydrogen_counts (Kekule_Temporary_Arrays & kta)
 
     int acon = a->ncon();
 
-    atomic_number_t z = a->atomic_number();
+    const atomic_number_t z = a->atomic_number();
 
-    int exph = explicit_hydrogens (i);
+    const int exph = explicit_hydrogens(i);
 
 //  cerr << "Checking aromatic atom " << i << " type " << a->atomic_symbol() << " exph " << exph << " acon " << acon << " Hknown " <<   a->implicit_hydrogens_known() << " ih " << a->implicit_hydrogens() << endl;
 
@@ -4776,6 +5221,10 @@ Molecule::_determine_hydrogen_counts (Kekule_Temporary_Arrays & kta)
     {
       if (NULL == _atom_type)
         implicit_hydrogens_needed[i] = -1;    // cannot say, pyrrole or pyridine
+      else if (ATOM_TYPE_NAR == _atom_type->item(i))   // Tripos aromatic Nitrogen, no hydrogens
+        implicit_hydrogens_needed[i] = 0;
+      else if (ATOM_TYPE_NPL3 == _atom_type->item(i))   // Tripos designation for Pyrrole
+        implicit_hydrogens_needed[i] = 1;
       else
         implicit_hydrogens_needed[i] = -1;    // cannot figure it out
     }
@@ -4834,11 +5283,11 @@ Molecule::_kekule_suppress_non_aromatic_rings (Kekule_Temporary_Arrays & kta)
 
   for (int i = 0; i < nr; i++)
   {
-    const Ring * r = ringi (i);
+    const Ring * r = ringi(i);
     if (! r->is_fused())
       continue;
 
-    if (! r->all_members_set_in_array (aromatic_atoms, 1))
+    if (! r->all_members_set_in_array(aromatic_atoms, 1))
       continue;
 
     int atoms_with_unshared_pi_electrons = 0;
@@ -4865,11 +5314,11 @@ Molecule::_kekule_suppress_non_aromatic_rings (Kekule_Temporary_Arrays & kta)
       int heteroatom_outside_ring = 0;
       for (int l = 0; l < kcon; l++)
       {
-        const Bond * b = ak->item (l);
+        const Bond * b = ak->item(l);
         if (! b->is_double_bond())
           continue;
 
-        atom_number_t m = b->other (k);
+        atom_number_t m = b->other(k);
         if (6 != _things[m]->atomic_number())
         {
           heteroatom_outside_ring = 1;
@@ -4885,7 +5334,7 @@ Molecule::_kekule_suppress_non_aromatic_rings (Kekule_Temporary_Arrays & kta)
     {
       for (int j = 0; j < ring_size; j++)
       {
-        atom_number_t k = r->item (j);
+        atom_number_t k = r->item(j);
         if (aromatic_atoms[k] && 1 == nrings(k))
         {
           aromatic_atoms[k] = 0;
@@ -4929,7 +5378,7 @@ Molecule::_only_process_rings_with_all_aromatic_atoms (Kekule_Temporary_Arrays &
   const int * aromatic_atoms = kta.aromatic_atoms();
 
 #ifdef DEBUG_ONLY_PROCESS_RINGS_WITH_ALL_AROMATIC_ATOMS
-  iw_write_array (aromatic_atoms, _number_elements, "_only_process_rings_with_all_aromatic_atoms:aromatic_atoms", cerr);
+  iw_write_array(aromatic_atoms, _number_elements, "_only_process_rings_with_all_aromatic_atoms:aromatic_atoms", cerr);
 #endif
 
   int nr = _sssr_rings.number_elements();
@@ -4938,7 +5387,7 @@ Molecule::_only_process_rings_with_all_aromatic_atoms (Kekule_Temporary_Arrays &
 
   for (int i = 0; i < nr; i++)
   {
-    const Ring * ri = ringi (i);
+    const Ring * ri = ringi(i);
 
     int n = ri->count_members_set_in_array(aromatic_atoms, 1);
 
@@ -4953,14 +5402,14 @@ Molecule::_only_process_rings_with_all_aromatic_atoms (Kekule_Temporary_Arrays &
       continue;
     }
 
-//  if (ri->all_members_set_in_array (aromatic_atoms, 1))
+//  if (ri->all_members_set_in_array(aromatic_atoms, 1))
 //    continue;
 
 #ifdef DEBUG_ONLY_PROCESS_RINGS_WITH_ALL_AROMATIC_ATOMS
     cerr << "Adding problematic ring " << (*ri) << ", " << n << " of " << ri->number_elements() << " atoms aromatic\n";
 #endif
 
-    problematic_rings.add (i);
+    problematic_rings.add(i);
   }
 
   if (0 == problematic_rings.number_elements())
@@ -5015,7 +5464,7 @@ Molecule::_only_process_rings_with_all_aromatic_atoms (Kekule_Temporary_Arrays &
   {
     const Ring * ri = _non_sssr_rings[i];
 
-    if (! ri->all_members_set_in_array (aromatic_atoms, 1))
+    if (! ri->all_members_set_in_array(aromatic_atoms, 1))
       continue;
 
 //  Can we have RI change places with one of the problematic ones
@@ -5027,14 +5476,14 @@ Molecule::_only_process_rings_with_all_aromatic_atoms (Kekule_Temporary_Arrays &
       const Ring * rk = _sssr_rings[k];
 
 #ifdef DEBUG_ONLY_PROCESS_RINGS_WITH_ALL_AROMATIC_ATOMS
-      cerr << "Can it replace " << (*rk) << " comm " << rk->compute_bonds_shared_with (*ri) << endl;
+      cerr << "Can it replace " << (*rk) << " comm " << rk->compute_bonds_shared_with(*ri) << endl;
 #endif
 
-      if (0 == rk->compute_bonds_shared_with (*ri))
+      if (0 == rk->compute_bonds_shared_with(*ri))
         continue;
 
-      _transfer_from_non_sssr_to_sssr_ring_set (i, k);
-      problematic_rings.remove_item (j);
+      _transfer_from_non_sssr_to_sssr_ring_set(i, k);
+      problematic_rings.remove_item(j);
     }
   }
 
@@ -5061,7 +5510,7 @@ Molecule::_has_aromatic_bonds (const Atom * a) const
 
   for (int i = 0; i < acon; i++)
   {
-    const Bond * b = a->item (i);
+    const Bond * b = a->item(i);
 
     if (b->is_permanent_aromatic())
       return 1;
@@ -5120,7 +5569,7 @@ Molecule::_kekule_identify_non_arom_rings (Kekule_Temporary_Arrays & kta)
 //#define DEBUG_KEKULE_IDENTIFY_NON_AROM_RINGS
 #ifdef DEBUG_KEKULE_IDENTIFY_NON_AROM_RINGS
   cerr << "At start of _kekule_identify_non_arom_rings\n";
-  iw_write_array (process_these_rings, nr, "process_these_rings", cerr);
+  iw_write_array(process_these_rings, nr, "process_these_rings", cerr);
 #endif
 
   for (int i = 0; i < nr; i++)
@@ -5128,14 +5577,14 @@ Molecule::_kekule_identify_non_arom_rings (Kekule_Temporary_Arrays & kta)
     if (0 == process_these_rings[i])
       continue;
 
-    const Ring * r = ringi (i);
+    const Ring * r = ringi(i);
 
 //  cerr << "ring i = " << i << " fused? " << r->is_fused() << " all_set " << r->all_members_set_in_array(aromatic_atoms, 1) << endl;
 
     if (! r->is_fused())       // only fused rings have this problem
       continue;
 
-    if (! r->all_members_set_in_array (aromatic_atoms, 1))
+    if (! r->all_members_set_in_array(aromatic_atoms, 1))
       continue;
 
 #ifdef DEBUG_KEKULE_IDENTIFY_NON_AROM_RINGS
@@ -5147,7 +5596,7 @@ Molecule::_kekule_identify_non_arom_rings (Kekule_Temporary_Arrays & kta)
     int found_atom_in_one_ring_with_pi_electrons = 0;
     for (int j = 0; j < n; j++)
     {
-      atom_number_t k = r->item (j);
+      atom_number_t k = r->item(j);
       if (nrings(k) > 1)      // atom shared with another ring.
         continue;
 
@@ -5181,13 +5630,13 @@ Molecule::_kekule_identify_non_arom_rings (Kekule_Temporary_Arrays & kta)
     if (! process_these_rings[i])
       continue;
 
-    const Ring * ri = ringi (i);
+    const Ring * ri = ringi(i);
 
     int ring_size = ri->number_elements();
 
     for (int j = 0; j < ring_size; j++)
     {
-      atom_number_t k = ri->item (j);
+      atom_number_t k = ri->item(j);
 
       const Atom * ak = _things[k];
 
@@ -5197,7 +5646,7 @@ Molecule::_kekule_identify_non_arom_rings (Kekule_Temporary_Arrays & kta)
       if (ak->nbonds() > ak->ncon())    // possibly aromatic
         continue;
 
-      if (_has_aromatic_bonds (ak))
+      if (_has_aromatic_bonds(ak))
         continue;
 
       process_these_rings[i] = 0;
@@ -5208,7 +5657,7 @@ Molecule::_kekule_identify_non_arom_rings (Kekule_Temporary_Arrays & kta)
 
 #ifdef DEBUG_KEKULE_IDENTIFY_NON_AROM_RINGS
   cerr << "After _kekule_identify_non_arom_rings\n";
-  iw_write_array (process_these_rings, nr, "process_these_rings", cerr);
+  iw_write_array(process_these_rings, nr, "process_these_rings", cerr);
 #endif
 
   return 1;
@@ -5233,7 +5682,7 @@ Molecule::_group_rings_into_groups_to_be_processed_together (Kekule_Temporary_Ar
 
 #ifdef DEBUG_GROUP_RINGS_INTO_GROUPS_TO_BE_PROCESSED_TOGETHER
   cerr << "_group_rings_into_groups_to_be_processed_together\n";
-  iw_write_array (process_these_rings, nr, "process_these_rings", cerr);
+  iw_write_array(process_these_rings, nr, "process_these_rings", cerr);
 #endif
 
   int flag = 2;         // start numbering here because initially rings being processed will have value 1
@@ -5246,19 +5695,19 @@ Molecule::_group_rings_into_groups_to_be_processed_together (Kekule_Temporary_Ar
     if (process_these_rings[i] >= 2)   // already been put into a ring or ring system
       continue;
 
-    const Ring * ri = ringi (i);
+    const Ring * ri = ringi(i);
 
     process_these_rings[i] = flag;
 
     if (ri->is_fused())
-      _grow_fused_system (*ri, flag, process_these_rings);
+      _grow_fused_system(*ri, flag, process_these_rings);
 
     flag++;
   }
 
 #ifdef DEBUG_GROUP_RINGS_INTO_GROUPS_TO_BE_PROCESSED_TOGETHER
   cerr << "After grouping\n";
-  iw_write_array (process_these_rings, nr, "process_these_rings", cerr);
+  iw_write_array(process_these_rings, nr, "process_these_rings", cerr);
 
   for (int i = 2; i < flag; i++)
   {
@@ -5282,7 +5731,7 @@ Molecule::_grow_fused_system (const Ring & r,
 {
   for (int i = 0; i < r.fused_ring_neighbours(); i++)
   {
-    const Ring * rn = r.fused_neighbour (i);
+    const Ring * rn = r.fused_neighbour(i);
 
     int ring_number = rn->ring_number();
 
@@ -5293,7 +5742,7 @@ Molecule::_grow_fused_system (const Ring & r,
       continue;
 
     in_system[ring_number] = flag;
-    _grow_fused_system (*rn, flag, in_system);
+    _grow_fused_system(*rn, flag, in_system);
   }
 
   return 1;
@@ -5318,7 +5767,7 @@ Molecule::_explicit_hydrogen_bonded_to_aromatic_atom (const int * aromatic_atoms
     if (0 == a->ncon())
       continue;
 
-    atom_number_t j = a->other (i, 0);
+    atom_number_t j = a->other(i, 0);
 
     if (aromatic_atoms[j])
       return 1;
@@ -5329,8 +5778,8 @@ Molecule::_explicit_hydrogen_bonded_to_aromatic_atom (const int * aromatic_atoms
 #endif
 
 int
-Molecule::find_kekule_form (int * aromatic_atoms,
-                            const int * aromatic_bonds)
+Molecule::find_kekule_form(int * aromatic_atoms,
+                           const int * aromatic_bonds)
 {
   if (NULL == aromatic_atoms)
     ;
@@ -5353,12 +5802,12 @@ Molecule::find_kekule_form (int * aromatic_atoms,
   (void) ring_membership();    // ensure SSSR computed
 
 #ifdef DEBUG_FIND_KEKULE_FORM_MAIN
-  iw_write_array (aromatic_atoms, _number_elements, "find_kekule_form:aromatic_atoms", cerr);
+  iw_write_array(aromatic_atoms, _number_elements, "find_kekule_form:aromatic_atoms", cerr);
 #endif
 
   int nb = _bond_list.number_elements();
 
-// first assign any aromatic bonds
+// first assign any aromatic bonds. Try to transfer that information to the atom array
 
   bond_type_t single_and_permanent_aromatic = (SINGLE_BOND | PERMANENT_AROMATIC_BOND);
 
@@ -5366,38 +5815,39 @@ Molecule::find_kekule_form (int * aromatic_atoms,
   {
     for (int i = 0; i < nb; i++)
     {
-      if (aromatic_bonds[i])
-      {
-        _bond_list[i]->set_bond_type (single_and_permanent_aromatic);
-      }
+      if (! aromatic_bonds[i])
+        continue;
+
+      const Bond * b = _bond_list[i];
+      if (0 == b->nrings())
+        continue;
+
+      _bond_list[i]->set_bond_type(single_and_permanent_aromatic);     // does not perturb ring membership
+
+      const atom_number_t a1 = b->a1();
+      const atom_number_t a2 = b->a2();
+
+      aromatic_atoms[a1] = 1;          // might already be set
+      aromatic_atoms[a2] = 1;
     }
   }
 
-  int explicit_hydrogens_bonded_to_aromatics = 0;
+  bool explicit_hydrogens_bonded_to_aromatics = false;
 
   for (int i = 0; i < _number_elements; i++)
   {
-//  cerr << "Atom " << i << " aromatic_atoms " << aromatic_atoms[i] << endl;
-    if (0 == aromatic_atoms[i])
+    if (1 != _things[i]->atomic_number())
       continue;
 
-    const Atom * a = _things[i];
+    if (1 != _things[i]->ncon())
+      continue;
 
-    int acon = a->ncon();
+    const atom_number_t c = _things[i]->other(i, 0);
 
-    for (int j = 0; j < acon; j++)
+    if (aromatic_atoms[c])
     {
-      Bond * b = a->item (j);
-
-      if (b->nrings())
-        continue;
-
-      atom_number_t k = b->other (i);
-
-      if (in_same_ring (i, k))
-        b->set_bond_type (single_and_permanent_aromatic);
-      else if (1 == _things[k]->atomic_number())
-        explicit_hydrogens_bonded_to_aromatics++;
+      explicit_hydrogens_bonded_to_aromatics = true;
+      break;
     }
   }
 
@@ -5405,13 +5855,13 @@ Molecule::find_kekule_form (int * aromatic_atoms,
 #ifdef ECHO_ATOMS_FOR_CONSIDERATION
   for (int i = 0; i < _number_elements; i++)
   {
-    cerr << "Atom " << i << " '" << smarts_equivalent_for_atom (i) << "' aromatic? " << aromatic_atoms[i] << endl;
+    cerr << "Atom " << i << " '" << smarts_equivalent_for_atom(i) << "' aromatic? " << aromatic_atoms[i] << endl;
   }
 #endif
 
   int aromatic_atoms_found = 0;
   int a_atoms_found = 0;
-  if (_kekule_cannot_be_aromatic (aromatic_atoms, aromatic_atoms_found, a_atoms_found))
+  if (_kekule_cannot_be_aromatic(aromatic_atoms, aromatic_atoms_found, a_atoms_found))
     return 0;
 
 //cerr << "Any 'a' atoms found " << a_atoms_found << endl;
@@ -5424,13 +5874,16 @@ Molecule::find_kekule_form (int * aromatic_atoms,
   if (0 == nr)   // user must have asked to ignore chain aromatics
     return 1;
 
-  Kekule_Temporary_Arrays kta (_number_elements, nr, aromatic_atoms, aromatic_bonds);
+  Kekule_Temporary_Arrays kta(_number_elements, nr, aromatic_atoms, aromatic_bonds);
 
-  _determine_hydrogen_counts (kta);
+  if (nr > 6)
+    kta.establish_smallest_ring_size(*this);
 
-  kta.set_a_atoms_found (a_atoms_found);
+  _determine_hydrogen_counts(kta);
 
-/*if (! _do_obvious_hcount_adjustments (kta))
+  kta.set_a_atoms_found(a_atoms_found);
+
+/*if (! _do_obvious_hcount_adjustments(kta))
   {
     cerr << "Molecule::find_kekule_form: bad hcount detected\n";
     return 0;
@@ -5446,31 +5899,31 @@ Molecule::find_kekule_form (int * aromatic_atoms,
 
   Temp_Detach_Atoms tda;
 
-//if (_explicit_hydrogen_bonded_to_aromatic_atom (aromatic_atoms))
+//if (_explicit_hydrogen_bonded_to_aromatic_atom(aromatic_atoms))
   if (explicit_hydrogens_bonded_to_aromatics)
   {
-    tda.detach_atoms (*this);
+    tda.detach_atoms(*this);
     ring_membership();
   }
 
 #ifdef DEBUG_FIND_KEKULE_FORM_MAIN
   cerr << "at " << __LINE__ << endl;
-  iw_write_array (kta.process_these_rings(), nr, "process_these_rings", cerr);
+  iw_write_array(kta.process_these_rings(), nr, "process_these_rings", cerr);
 #endif
 
-  _only_process_rings_with_all_aromatic_atoms (kta);
+  _only_process_rings_with_all_aromatic_atoms(kta);
 
 #ifdef DEBUG_FIND_KEKULE_FORM_MAIN
   cerr << "at " << __LINE__ << endl;
-  iw_write_array (kta.process_these_rings(), nr, "process_these_rings", cerr);
+  iw_write_array(kta.process_these_rings(), nr, "process_these_rings", cerr);
 #endif
 
   if (_discard_non_aromatic_kekule_input)
-    _kekule_suppress_non_aromatic_rings (kta);
+    _kekule_suppress_non_aromatic_rings(kta);
 
 #ifdef DEBUG_FIND_KEKULE_FORM_MAIN
   cerr << "at " << __LINE__ << endl;
-  iw_write_array (kta.process_these_rings(), nr, "process_these_rings", cerr);
+  iw_write_array(kta.process_these_rings(), nr, "process_these_rings", cerr);
 #endif
 
 // Jul 2009. The problem is that we have allowed these rings to participate
@@ -5481,43 +5934,43 @@ Molecule::find_kekule_form (int * aromatic_atoms,
 
 #ifdef DEBUG_FIND_KEKULE_FORM_MAIN
   cerr << "at " << __LINE__ << endl;
-  iw_write_array (kta.process_these_rings(), nr, "process_these_rings", cerr);
+  iw_write_array(kta.process_these_rings(), nr, "process_these_rings", cerr);
 #endif
 
   if (NULL != aromatic_bonds)
-    _kekule_check_rings_containing_aliphatic_bonds (kta);
+    _kekule_check_rings_containing_aliphatic_bonds(kta);
 
 #ifdef DEBUG_FIND_KEKULE_FORM_MAIN
   cerr << "at " << __LINE__ << endl;
-  iw_write_array (kta.process_these_rings(), nr, "process_these_rings", cerr);
+  iw_write_array(kta.process_these_rings(), nr, "process_these_rings", cerr);
 #endif
 
-  _group_rings_into_groups_to_be_processed_together (kta);
+  _group_rings_into_groups_to_be_processed_together(kta);
 
 #ifdef DEBUG_FIND_KEKULE_FORM_MAIN
   cerr << "at " << __LINE__ << endl;
-  iw_write_array (kta.process_these_rings(), nr, "process_these_rings", cerr);
+  iw_write_array(kta.process_these_rings(), nr, "process_these_rings", cerr);
 #endif
 
 // If we are going to re-try with positive nitrogen or whatever,
 // we need to make a copy of the aromatic_atoms array
 
-  int rc = _find_kekule_form (kta);
+  int rc = _find_kekule_form(kta);
 
 #ifdef DEBUG_FIND_KEKULE_FORM_MAIN
   cerr << "at " << __LINE__ << ", rc = " << rc << endl;
-  iw_write_array (kta.process_these_rings(), nr, "process_these_rings", cerr);
+  iw_write_array(kta.process_these_rings(), nr, "process_these_rings", cerr);
 #endif
 
   if (rc)
     ;
   else if (kekule_try_positive_nitrogen || kekule_try_positive_oxygen)
   {
-    rc = _find_kekule_form_positive_nitrogen (kta);
+    rc = _find_kekule_form_positive_nitrogen(kta);
   }
 
   if (tda.natoms())
-    tda.reattach_atoms (*this);
+    tda.reattach_atoms(*this);
 
   _set_modified();
 
@@ -5533,7 +5986,7 @@ Molecule::find_kekule_form (int * aromatic_atoms,
       continue;
 
     if (b->is_single_bond() || b->is_double_bond())   // great, kekule form found
-      b->set_permanent_aromatic (0);
+      b->set_permanent_aromatic(0);
   }
 
   return rc;
@@ -5610,11 +6063,11 @@ Molecule::_find_kekule_form_positive_nitrogen (Kekule_Temporary_Arrays & tka)
 //  Make sure we first process those N atoms in multiple rings.
 
     if (0 == possible_nplus.number_elements())
-      possible_nplus.add (i);
+      possible_nplus.add(i);
     else if (1 == nrings(i))
-      possible_nplus.add (i);
+      possible_nplus.add(i);
     else
-      possible_nplus.insert_before (0, i);
+      possible_nplus.insert_before(0, i);
 
     vary_bonds[i] = 1;
 
@@ -5648,11 +6101,11 @@ Molecule::_find_kekule_form_positive_nitrogen (Kekule_Temporary_Arrays & tka)
 //  Make sure we first process those N atoms in multiple rings.
 
     if (0 == possible_nplus.number_elements())
-      possible_nplus.add (i);
+      possible_nplus.add(i);
     else if (1 == nrings(i))
-      possible_nplus.add (i);
+      possible_nplus.add(i);
     else
-      possible_nplus.insert_before (0, i);
+      possible_nplus.insert_before(0, i);
 
 #ifdef DEBUG_VARY_NPLUS
     cerr << "Atom " << i << " is a possible positively charged Oxygen\n";
@@ -5662,7 +6115,7 @@ Molecule::_find_kekule_form_positive_nitrogen (Kekule_Temporary_Arrays & tka)
   if (0 == possible_nplus.number_elements())
     return 0;
 
-  return _find_kekule_form_positive_nitrogen (possible_nplus, tka);
+  return _find_kekule_form_positive_nitrogen(possible_nplus, tka);
 }
 
 void
@@ -5682,17 +6135,17 @@ Molecule::_set_all_bonds_in_system_to_single (const int * process_these_atoms)
 
     for (int j = 0; j < acon; j++)
     {
-      Bond * b = a->item (j);
+      Bond * b = a->item(j);
 
       if (b->is_single_bond())
         continue;
 
-      atom_number_t k = b->other (i);
+      atom_number_t k = b->other(i);
 
       if (0 == process_these_atoms[k])
         continue;
 
-      b->set_bond_type (SINGLE_BOND);
+      b->set_bond_type(SINGLE_BOND);
     }
   }
 
@@ -5727,7 +6180,7 @@ Molecule::_find_kekule_form_positive_nitrogen (Set_of_Atoms & possible_nplus,
 
 // There may have been some partial results previously, so we save the existing bonds in case of failure
 
-  bond_type_t * bsave = new bond_type_t[_bond_list.number_elements()]; iw_auto_array<bond_type_t> free_bsave (bsave);
+  bond_type_t * bsave = new bond_type_t[_bond_list.number_elements()]; std::unique_ptr<bond_type_t[]> free_bsave(bsave);
 
   int nr = _sssr_rings.number_elements();
 
@@ -5738,11 +6191,11 @@ Molecule::_find_kekule_form_positive_nitrogen (Set_of_Atoms & possible_nplus,
 
     int flag = process_these_rings[i];
 
-    _find_next_ring_or_ring_system (kta, flag, rings);
+    _find_next_ring_or_ring_system(kta, flag, rings);
 
-    _bond_list.copy_bond_types (bsave);
+    _bond_list.copy_bond_types(bsave);
 
-    _set_all_bonds_in_system_to_single (kta.process_these_atoms());
+    _set_all_bonds_in_system_to_single(kta.process_these_atoms());
 
 #ifdef DEBUG_VARY_NPLUS
     cerr << "Processing ring system with " << rings.number_elements() << " rings\n";
@@ -5750,13 +6203,13 @@ Molecule::_find_kekule_form_positive_nitrogen (Set_of_Atoms & possible_nplus,
 
     Set_of_Atoms possible_nplus_in_system;
 
-    _identify_possible_nplus_in_system (possible_nplus, possible_nplus_in_system, kta.process_these_atoms());
+    _identify_possible_nplus_in_system(possible_nplus, possible_nplus_in_system, kta.process_these_atoms());
 
-    if (_find_kekule_form_positive_nitrogen_ring_system (kta, rings, possible_nplus_in_system))
-      unset_all_atoms_in_rings (rings, kta.aromatic_atoms(), process_these_rings);   // mark atoms and rings as done
+    if (_find_kekule_form_positive_nitrogen_ring_system(kta, rings, possible_nplus_in_system))
+      unset_all_atoms_in_rings(rings, kta.aromatic_atoms(), process_these_rings);   // mark atoms and rings as done
     else
     {
-      _restore_existing_bond_types (bsave);
+      _restore_existing_bond_types(bsave);
       rc = 0;
     }
 
@@ -5791,7 +6244,7 @@ Molecule::_find_kekule_form_positive_nitrogen_ring_system (Kekule_Temporary_Arra
   {
     Set_of_Atoms tmp;
 
-    if (_find_kekule_form_positive_nitrogen_ring_system (kta, rings, possible_nplus_in_system, tmp, i))
+    if (_find_kekule_form_positive_nitrogen_ring_system(kta, rings, possible_nplus_in_system, tmp, i))
       return 1;
   }
 
@@ -5811,17 +6264,17 @@ Molecule::_find_kekule_form_positive_nitrogen_ring_system (Kekule_Temporary_Arra
   {
     atom_number_t n = possible_nplus_in_system[i];
 
-    if (s.contains (n))
+    if (s.contains(n))
       continue;
 
-    s.add (n);
+    s.add(n);
 
-    if (_find_kekule_form_positive_nitrogen_ring_system_place_charges (kta, rings, s))
+    if (_find_kekule_form_positive_nitrogen_ring_system_place_charges(kta, rings, s))
       return 1;
 
     if (s.number_elements() == maxdepth)   // at max depth, cannot continue
       ;
-    else if (_find_kekule_form_positive_nitrogen_ring_system (kta, rings, possible_nplus_in_system, s, maxdepth))
+    else if (_find_kekule_form_positive_nitrogen_ring_system(kta, rings, possible_nplus_in_system, s, maxdepth))
       return 1;
 
     s.chop();
@@ -5846,8 +6299,8 @@ Molecule::_find_kekule_form_positive_nitrogen_ring_system_place_charges (Kekule_
   {
     atom_number_t n = possible_nplus_in_system[i];
 
-    _things[n]->set_formal_charge (1);
-    _things[n]->set_implicit_hydrogens (0);
+    _things[n]->set_formal_charge(1);
+    _things[n]->set_implicit_hydrogens(0);
     vary_bonds[n] = 1;            // maybe we should save the original value and restore it later
 
 #ifdef DEBUG_VARY_NPLUS
@@ -5857,7 +6310,7 @@ Molecule::_find_kekule_form_positive_nitrogen_ring_system_place_charges (Kekule_
 
   int pi_electron_count = 0;
 
-  int rc = _find_kekule_form (rings, kta, possible_nplus_in_system[0], pi_electron_count);
+  int rc = _find_kekule_form(rings, kta, possible_nplus_in_system[0], pi_electron_count);
 
 #ifdef DEBUG_VARY_NPLUS
   cerr << "Result from _find_kekule_form " << rc << endl;
@@ -5869,7 +6322,7 @@ Molecule::_find_kekule_form_positive_nitrogen_ring_system_place_charges (Kekule_
     {
       const Ring * ri = rings[i];
 
-      ri->set_vector (kta.aromatic_atoms(), 0);
+      ri->set_vector(kta.aromatic_atoms(), 0);
     }
   }
   else
@@ -5878,7 +6331,7 @@ Molecule::_find_kekule_form_positive_nitrogen_ring_system_place_charges (Kekule_
     {
       atom_number_t n = possible_nplus_in_system[i];
 
-      _things[n]->set_formal_charge (0);
+      _things[n]->set_formal_charge(0);
       _things[n]->set_modified();
       vary_bonds[n] = 0;
 
@@ -5899,7 +6352,7 @@ Molecule::_find_kekule_form_positive_nitrogen_ring_system_place_charges (Kekule_
 */
 
 int
-Molecule::_convert_chain_aromatic_bonds (const int * aromatic_atoms,
+Molecule::_convert_chain_aromatic_bonds (int * aromatic_atoms,
                                          const int * rm)
 {
   for (int i = 0; i < _number_elements; i++)
@@ -5917,10 +6370,10 @@ Molecule::_convert_chain_aromatic_bonds (const int * aromatic_atoms,
 
     for (int j = 0; j < icon; j++)
     {
-      atom_number_t k = a->other (i, j);
+      atom_number_t k = a->other(i, j);
 
       if (aromatic_atoms[k])
-        aromatic_atoms_found.add (k);
+        aromatic_atoms_found.add(k);
     }
 
     int na = aromatic_atoms_found.number_elements();
@@ -5935,15 +6388,15 @@ Molecule::_convert_chain_aromatic_bonds (const int * aromatic_atoms,
         continue;
 
       if (_things[i]->implicit_hydrogens() && _things[j]->implicit_hydrogens())
-        set_bond_type_between_atoms (i, j, DOUBLE_BOND);
+        set_bond_type_between_atoms(i, j, DOUBLE_BOND);
       else
-        set_bond_type_between_atoms (i, j, SINGLE_BOND);   // that should already be what it is
-      cerr << "Molecule::_convert_chain_aromatic_bonds: chain atoms " << i << " and " << j << " were aromatic\n";
+        set_bond_type_between_atoms(i, j, SINGLE_BOND);   // that should already be what it is
+//      cerr << "Molecule::_convert_chain_aromatic_bonds: chain atoms " << i << " and " << j << " were aromatic\n";
+      aromatic_atoms[i] = aromatic_atoms[j] = 0;
     }
     else
     {
-      cerr << "Molecule::_convert_chain_aromatic_bonds: Chain atoms aromatic\n";
-      cerr << aromatic_atoms_found << endl;
+      cerr << "Molecule::_convert_chain_aromatic_bonds:found " << aromatic_atoms_found << " aromatic atoms attached\n";
     }
   }
 
@@ -5969,9 +6422,9 @@ Molecule::_single_active_ring_containing_atom (atom_number_t n,
     if (! process_these_rings[i])
       continue;
 
-    const Ring * ri = ringi (i);
+    const Ring * ri = ringi(i);
 
-    if (! ri->contains (n))
+    if (! ri->contains(n))
       continue;
 
     if (NULL != rc)
@@ -5992,7 +6445,7 @@ Molecule::_identify_possible_nplus_in_system (Set_of_Atoms & possible_nplus,
                                               Set_of_Atoms & possible_nplus_in_system,
                                               const int * process_these_atoms) const
 {
-  possible_nplus_in_system.resize_keep_storage (0);
+  possible_nplus_in_system.resize_keep_storage(0);
 
   int nn = possible_nplus.number_elements();
 
@@ -6002,8 +6455,8 @@ Molecule::_identify_possible_nplus_in_system (Set_of_Atoms & possible_nplus,
 
     if (process_these_atoms[n])
     {
-      possible_nplus.remove_item (i);
-      possible_nplus_in_system.add (n);
+      possible_nplus.remove_item(i);
+      possible_nplus_in_system.add(n);
     }
   }
 
@@ -6019,10 +6472,10 @@ Molecule::_restore_existing_bond_types (const bond_type_t * bsave)
   {
     Bond * b = _bond_list[i];
 
-    if (BOND_TYPE_ONLY (b->btype()) == bsave[i])
+    if (BOND_TYPE_ONLY(b->btype()) == bsave[i])
       continue;
 
-    b->set_bond_type (bsave[i]);
+    b->set_bond_type(bsave[i]);
     _things[b->a1()]->recompute_nbonds();
     _things[b->a2()]->recompute_nbonds();
   }
@@ -6051,7 +6504,7 @@ Molecule::_maybe_all_atoms_are_permanent_aromatic (Kekule_Temporary_Arrays & kta
 
     for (int j = 0; j < ring_size; j++)
     {
-      atom_number_t k = ri->item (j);
+      atom_number_t k = ri->item(j);
 
       if (_things[k]->element()->permanent_aromatic())
         continue;
@@ -6065,10 +6518,10 @@ Molecule::_maybe_all_atoms_are_permanent_aromatic (Kekule_Temporary_Arrays & kta
   }
 
   if (all_aromatic)
-    return _kekule_all_atoms_and_bonds_in_system_aromatic (kta, rings);
+    return _kekule_all_atoms_and_bonds_in_system_aromatic(kta, rings);
 
   if (non_kekule_systems_ok_to_be_aromatic())
-    return _kekule_all_atoms_and_bonds_in_system_aromatic (kta, rings);
+    return _kekule_all_atoms_and_bonds_in_system_aromatic(kta, rings);
 
   return 0;
 }
@@ -6080,7 +6533,7 @@ Molecule::unset_all_permanent_aromatic_atoms()
 
   for (int i = 0; i < _number_elements; i++)
   {
-    _things[i]->set_permanent_aromatic (0);
+    _things[i]->set_permanent_aromatic(0);
   }
 
   return 1;
@@ -6159,7 +6612,46 @@ Molecule::_process_without_kekule_perception (const int * aromatic_atoms,
   return 1;
 }
 
+/*int
+Molecule::change_ring_bonds_between_permanent_aromatic_to_aromatic (int call_set_modified)
+{
+  if (0 == nrings())
+    return 0;
 
+  int rc = 0;
+
+  ring_membership();
+
+  int nb = _bond_list.number_elements();
+
+  Bond ** b = const_cast<Bond **>(_bond_list.rawdata());
+
+  for (int i = 0; i < nb; i++)
+  {
+    Bond * bi = b[i];
+
+    if ( 0 == bi->nrings())
+      continue;
+
+    if ( !_things[bi->a1()]->permanent_aromatic() )
+      continue;
+
+    if (! _things[bi->a2()]->permanent_aromatic())
+      continue;
+
+    bond_type_t bnd_type= bi->btype();
+    bi->set_bond_type( bnd_type | AROMATIC_BOND | PERMANENT_AROMATIC_BOND );
+    bi->set_permanent_aromatic(1);
+    rc++;
+  }
+
+  if (0 == rc)
+    ;
+  else if (call_set_modified)
+    _set_modified();
+
+  return rc;
+}*/
 
 /*
   helper function for change_ring_bonds_between_permanent_aromatic_to_aromatic
@@ -6182,7 +6674,7 @@ Molecule::_bond_in_ring_with_all_members_permanent_aromatic (atom_number_t a1,
 //  if (ri->number_elements() <= 4)    uncomment for no 4 membered aromatics, but beware O=C1C(=O)C=C1 ???
 //    continue;
 
-    if (! ri->contains_bond (a1, a2))
+    if (! ri->contains_bond(a1, a2))
       continue;
 
     if (ri->all_members_non_zero_in_array(is_permanent_aromatic))
@@ -6200,7 +6692,7 @@ Molecule::change_ring_bonds_between_permanent_aromatic_to_aromatic (int call_set
 
   ring_membership();    // force sssr
 
-  int * is_permanent_aromatic = new int[_number_elements]; iw_auto_array<int> free_is_permanent_aromatic(is_permanent_aromatic);
+  int * is_permanent_aromatic = new int[_number_elements]; std::unique_ptr<int[]> free_is_permanent_aromatic(is_permanent_aromatic);
 
   int permanent_aromatic_count = 0;
 
@@ -6242,7 +6734,7 @@ Molecule::change_ring_bonds_between_permanent_aromatic_to_aromatic (int call_set
 
     if (bi->is_aromatic())
       ;
-    else if (_bond_in_ring_with_all_members_permanent_aromatic (bi->a1(), bi->a2(), is_permanent_aromatic))
+    else if (_bond_in_ring_with_all_members_permanent_aromatic(bi->a1(), bi->a2(), is_permanent_aromatic))
       continue;
 
     bond_type_t bnd_type= bi->btype();
@@ -6287,7 +6779,7 @@ Molecule::set_bond_types_for_isis_aromaticity_matching ()
 
   int rc = 0;
 
-  int * keep_as_is = new_int(_number_elements * _number_elements); iw_auto_array<int> free_keep_as_is(keep_as_is);
+  int * keep_as_is = new_int(_number_elements * _number_elements); std::unique_ptr<int[]> free_keep_as_is(keep_as_is);
 
 // First mark bonds in the fixed kekule form rings as unchanging
 
@@ -6300,13 +6792,13 @@ Molecule::set_bond_types_for_isis_aromaticity_matching ()
     if (! ri->is_aromatic())
       continue;
 
-    if (! is_fixed_kekule_form (*this, *ri))
+    if (! is_fixed_kekule_form(*this, *ri))
     {
       alternating_kekule_form_rings_present++;
       continue;
     }
 
-    for (Ring_Bond_Iterator j (*ri); j != ri->end(); j++)
+    for (Ring_Bond_Iterator j(*ri); j != ri->end(); j++)
     {
       atom_number_t a1 = j.a1();
       atom_number_t a2 = j.a2();
@@ -6335,7 +6827,7 @@ Molecule::set_bond_types_for_isis_aromaticity_matching ()
     cerr << "Ring " << (*ri) << " is alternating aromatic\n";
 #endif
 
-    for (Ring_Bond_Iterator j (*ri); j != ri->end(); j++)
+    for (Ring_Bond_Iterator j(*ri); j != ri->end(); j++)
     {
       atom_number_t a1 = j.a1();
       atom_number_t a2 = j.a2();
@@ -6394,3 +6886,151 @@ reset_aromatic_file_scope_variables ()
   return;
 }
 
+
+static int
+identify_nitrogen_and_adjacent (const Molecule & m,
+                                const Set_of_Atoms & r,
+                                atom_number_t & n,
+                                atom_number_t & adjacent,
+                                bond_type_t & bt)
+{
+  const int ring_size = r.size();
+
+  for (int i = 0; i < ring_size; ++i)
+  {
+    const auto j = r[i];
+
+    if (7 != m.atomic_number(j))
+      continue;
+
+    n = j;
+    adjacent = r.next_after_wrap(i);
+
+    bt = m.btype_between_atoms(j, adjacent);
+    return 1;
+  }
+
+  return 0;
+}
+
+/*
+  We do not attempt to generate all switched forms. We just cycle through
+  the rings and process them one at a time. Obviously more combinations
+  could be possible by making this recursive...
+*/
+
+int
+Molecule::generate_switched_kekule_forms (resizable_array_p<Molecule> & variant)
+{
+  const auto nr = nrings();
+
+  if (0 == nr)
+    return 0;
+
+  IW_STL_Hash_Set already_done;
+
+  compute_aromaticity_if_needed();
+
+  already_done.insert(smiles());    // note we do not use the unique smiles
+
+  for (auto i = 0; i < nr; ++i)
+  {
+    const auto ri = ringi(i);
+
+    if (! ri->is_aromatic())
+      continue;
+
+    atom_number_t n, adjacent;
+    bond_type_t bt;
+    if (! identify_nitrogen_and_adjacent(*this, *ri, n, adjacent, bt))
+      continue;
+
+    Toggle_Kekule_Form tkf;
+    tkf.set_display_error_messages(0);
+
+    if (IS_SINGLE_BOND(bt))
+      tkf.add_bond(0, 1, DOUBLE_BOND);
+    else
+      tkf.add_bond(0, 1, SINGLE_BOND);
+
+    Set_of_Atoms s;
+    s.add(n);
+    s.add(adjacent);
+
+    Molecule * mcopy = new Molecule(*this);
+    int changed = 0;
+    if (! tkf.process(*mcopy, s, changed) || ! changed || already_done.contains(mcopy->smiles()))
+    {
+      delete mcopy;
+      continue;
+    }
+
+    already_done.insert(mcopy->smiles());
+
+    variant.add(mcopy);
+  }
+
+  return variant.number_elements();
+}
+
+/*
+  We need to know if an atom is in rings that are likely to have alternating forms.
+  Note that this is not a robust check,
+*/
+
+int
+Molecule::all_rings_containing_atom_are_kekule(const atom_number_t zatom)
+{
+  compute_aromaticity_if_needed();
+
+  const int nr = nrings();
+
+  int found_in_ring = 0;
+
+//cerr << "Molecule contains " << nr << " rings\n";
+
+  for (int i = 0; i < nr; ++i)
+  {
+    const Ring * ri = ringi(i);
+
+    if (! ri->is_aromatic())
+      continue;
+
+    if (! ri->contains(zatom))
+      continue;
+
+    found_in_ring++;
+
+    if (! _has_kekule_forms(*ri))
+      return 0;
+  }
+ 
+  if (0 == found_in_ring)    // should complain
+    return 0;
+
+  return 1;
+}
+
+int
+Molecule::_has_kekule_forms(const Set_of_Atoms & r) const
+{
+  for (auto i : r)
+  {
+//  cerr << "Checking atom " << i << ' ' << smarts_equivalent_for_atom(i) << endl;
+
+    const Atom * a = _things[i];
+
+    const auto z = a->atomic_number();
+
+    if (8 == z || 16 == z)
+      return 0;
+
+    if (7 == z && 3 == a->ncon() && 0 == a->formal_charge())
+      return 0;
+
+    if (_doubly_bonded_to_something_outside_ring(i))
+      return 0;
+  }
+
+  return 1;
+}

@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
 
 #include "iw_tdt.h"
@@ -201,7 +183,7 @@ IW_TDT::next_dataitem_value (const_IWSubstring & ztag,
 }
 
 int
-IW_TDT::do_write (ostream & output) const
+IW_TDT::do_write (std::ostream & output) const
 {
   assert (ok());
 
@@ -239,11 +221,11 @@ IW_TDT::_common_write_all_except_vbar(S & output) const
 }
 
 
-template int IW_TDT::_common_write_all_except_vbar(ostream & output) const;
+template int IW_TDT::_common_write_all_except_vbar(std::ostream & output) const;
 template int IW_TDT::_common_write_all_except_vbar(IWString_and_File_Descriptor & output) const;
 
 int
-IW_TDT::write_all_except_vbar (ostream & output) const
+IW_TDT::write_all_except_vbar (std::ostream & output) const
 {
   return _common_write_all_except_vbar (output);
 }
@@ -299,8 +281,8 @@ IW_TDT::_find_index_in_end_array (const char * dkey,
   return -1;
 }
 
-ostream &
-operator << (ostream & os, const IW_TDT & tdt)
+std::ostream &
+operator << (std::ostream & os, const IW_TDT & tdt)
 {
   assert (tdt.ok());
 
@@ -633,7 +615,7 @@ IW_TDT::echo_dataitem (const char * tag,
 }
 
 template int IW_TDT::echo_dataitem(const char * tag, int len_tag, int which_one, IWString_and_File_Descriptor & output) const;
-template int IW_TDT::echo_dataitem(const char * tag, int len_tag, int which_one, ostream & output) const;
+template int IW_TDT::echo_dataitem(const char * tag, int len_tag, int which_one, std::ostream & output) const;
 
 int
 IW_TDT::count_dataitems (const char * tag,
@@ -667,4 +649,22 @@ IW_TDT::count_dataitems(IW_Regular_Expression & rx) const
   }
 
   return rc;
+}
+
+bool
+IW_TDT::operator == (const IW_TDT & rhs) const
+{
+  if (_zdata != rhs._zdata)
+    return false;
+
+#ifdef DEBUG_TDT_EQUALS
+  cerr << "Operator == content matches " << _end.number_elements() << " vs " << rhs._end.number_elements() << endl;
+
+  for (int i = 0; i < _end.number_elements(); i++)
+  {
+    cerr << _end[i] << " vs " << rhs._end[i] << endl;
+  }
+#endif
+
+  return _end == rhs._end;
 }

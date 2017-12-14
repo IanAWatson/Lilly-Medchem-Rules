@@ -1,4 +1,3 @@
-
 #ifndef IW_AUTO_ARRAY_H
 #define IW_AUTO_ARRAY_H
 

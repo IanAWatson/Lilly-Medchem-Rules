@@ -1,25 +1,7 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
-#include <stdlib.h>
 #include <iostream>
-
-using namespace std;
+#include <memory>
+using std::cerr;
+using std::endl;
 
 #include "misc.h"
 
@@ -38,6 +20,14 @@ set_max_iterations (int m)
   max_iterations = m;
 }
 
+static int allow_unsaturated_atoms_to_be_chiral = 0;
+
+void
+set_allow_unsaturated_atoms_to_be_chiral (int s)
+{
+  allow_unsaturated_atoms_to_be_chiral = s;
+}
+
 /*
   To determine if an atom is chiral or not, we need to perform path tracing
   from that atom.
@@ -52,29 +42,42 @@ is_actually_chiral (Molecule & m,
 {
   const Atom * a = atom[zatom];
 
-  int acon = a->ncon ();
+  int acon = a->ncon();
 
-  if (ps.number_elements ())
-    ps.resize_keep_storage (0);
+  if (ps.number_elements())
+    ps.resize_keep_storage(0);
 
-  ps.resize (acon);
+  ps.resize(acon);
 
   for (int i = 0; i < acon; i++)
   {
-    atom_number_t j = a->other (zatom, i);
+    const Bond * b = a->item(i);
+
+    atom_number_t j = b->other(zatom);
 
     Path_Scoring * p = new Path_Scoring;
 
     const Atom * aj = atom[j];
-    p->initialise (j, aj);
+
+    p->initialise(j, aj);
+
+    if (b->is_single_bond())
+      p->set_first_bond(1);
+    else if (! allow_unsaturated_atoms_to_be_chiral || a->atomic_number() < 14)
+    {
+      delete p;
+      return 0;
+    }
+    else if (b->is_double_bond())    // tetrahedral Sulphur types
+      p->set_first_bond(2);
 
     claimed[j] = 1;
 
-    ps.add (p);
+    ps.add(p);
   }
 
   int stopped;
-  if (resolved (ps, stopped))
+  if (resolved(ps, stopped))
     return 1;
 
   int iterations = 0;
@@ -83,12 +86,12 @@ is_actually_chiral (Molecule & m,
   {
     for (int i = 0; i < acon; i++)
     {
-      if (ps[i]->active ())
-        ps[i]->advance (atom, claimed);
+      if (ps[i]->active())
+        ps[i]->advance(atom, claimed);
     }
 
     int stopped;
-    if (resolved (ps, stopped))
+    if (resolved(ps, stopped))
       return 1;
 
     if (stopped)      // not resolved, but cannot go any further
@@ -97,10 +100,10 @@ is_actually_chiral (Molecule & m,
     int number_active = 0;
     for (int i = 0; i < acon; i++)
     {
-      if (! ps[i]->active ())
+      if (! ps[i]->active())
         continue;
 
-      ps[i]->update_claimed (claimed);
+      ps[i]->update_claimed(claimed);
       number_active++;
     }
 
@@ -135,7 +138,7 @@ is_actually_chiral (Molecule & m,
 {
   resizable_array_p<Path_Scoring> ps;
 
-  return is_actually_chiral (m, zatom, ps);
+  return is_actually_chiral(m, zatom, ps);
 }
 
 int
@@ -143,43 +146,52 @@ is_actually_chiral (Molecule & m,
                     atom_number_t zatom,
                     resizable_array_p<Path_Scoring> & ps)
 {
-  if (1 == m.ncon (zatom))
+  const Atom * a = m.atomi(zatom);
+
+  const int acon = a->ncon();
+
+  if (acon < 2 || acon > 4)
     return 0;
 
-  if (m.ncon (zatom) > 4)
-    return 0;
+  const int hcount = m.hcount(zatom);
 
-  if (m.hcount (zatom) > 1)    // what if isotopic Hydrogen???
+  if (hcount > 1)    // what if isotopic Hydrogen???
     return 0;
 
   int lp;
-  if (m.lone_pair_count (zatom, lp) && lp > 1)
+  if (m.lone_pair_count(zatom, lp) && lp > 1)
     return 0;
 
-  m.compute_aromaticity_if_needed ();    // so bonds get aromatic character
+  if (1 == hcount && 1 == lp && 7 == a->atomic_number())    // never
+    return 0;
 
-  int matoms = m.natoms ();
+  if (acon < a->nbonds() && ! allow_unsaturated_atoms_to_be_chiral)
+    return 0;
 
-  int * claimed = new_int (matoms);
+  m.compute_aromaticity_if_needed();    // so bonds get aromatic character
+
+  if (m.is_aromatic(zatom))
+    return 0;
+
+  const int matoms = m.natoms();
+
+  int * claimed = new_int(matoms); std::unique_ptr<int[]> free_claimed(claimed);
 
   claimed[zatom] = 1;
 
-  Atom * const * atoms = new Atom *[matoms];
+  Atom * const * atoms = new Atom *[matoms]; std::unique_ptr<Atom * const []> free_atoms(atoms);
 
-  m.atoms ( (const Atom **) atoms);
+  m.atoms( (const Atom **) atoms);
 
-  int rc = is_actually_chiral (m, zatom, ps, claimed, atoms);
+//cerr << "Detailed calculation on " << m.smarts_equivalent_for_atom(zatom) << endl;
 
-  delete claimed;
-  delete atoms;
-
-  return rc;
+  return is_actually_chiral(m, zatom, ps, claimed, atoms);
 }
 
 int
 do_remove_invalid_chiral_centres (Molecule & m)
 {
-  int nc = m.chiral_centres ();
+  int nc = m.chiral_centres();
   if (0 == nc)
     return 0;
 
@@ -190,19 +202,19 @@ do_remove_invalid_chiral_centres (Molecule & m)
 
   for (int i = 0; i < nc; i++)
   {
-    Chiral_Centre * c = m.chiral_centre_in_molecule_not_indexed_by_atom_number (i);
+    Chiral_Centre * c = m.chiral_centre_in_molecule_not_indexed_by_atom_number(i);
 
-    atom_number_t a = c->a ();
+    atom_number_t a = c->a();
 
-    if (! is_actually_chiral (m, a))
-      centres_to_be_removed.add (a);
+    if (! is_actually_chiral(m, a))
+      centres_to_be_removed.add(a);
   }
 
-  if (centres_to_be_removed.number_elements ())
+  if (centres_to_be_removed.number_elements())
   {
-    for (int i = 0; i < centres_to_be_removed.number_elements (); i++)
+    for (int i = 0; i < centres_to_be_removed.number_elements(); i++)
     {
-      m.remove_chiral_centre_at_atom (centres_to_be_removed[i]);
+      m.remove_chiral_centre_at_atom(centres_to_be_removed[i]);
     }
   }
 

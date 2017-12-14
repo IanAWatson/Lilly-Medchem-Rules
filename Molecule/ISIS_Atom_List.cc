@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
 #include <iomanip>
 using namespace std;
@@ -125,7 +107,7 @@ ISIS_Atom_List::create_from_ALS_record (const IWString & buffer)
       return 0;
     }
 
-    const Element * e = get_element_from_symbol_no_case_conversion (token);
+    const Element * e = get_element_from_symbol_no_case_conversion(token);
 
     if (NULL == e)   // should not happen
     {
@@ -206,6 +188,27 @@ ISIS_Atom_List::initialise_from_mdl_A_symbol ()
   return 1;
 }
 
+/*
+  Marvin adds AH, which is any atom, including Hydrogen
+*/
+
+int
+ISIS_Atom_List::initialise_from_mdl_AH_symbol ()
+{
+  _normal_list = 1;
+
+  initialise_from_mdl_Q_symbol();
+
+  _element.add(get_element_from_atomic_number(6));    // C
+  _element.add(get_element_from_atomic_number(1));    // H
+
+  return 1;
+}
+
+/*
+  Really don't like this, I should do something better with the Q symbol. Fix sometime...
+*/
+
 int
 ISIS_Atom_List::initialise_from_mdl_Q_symbol ()
 {
@@ -221,6 +224,16 @@ ISIS_Atom_List::initialise_from_mdl_Q_symbol ()
   _element.add(get_element_from_atomic_number(53));   // I
 
 //cerr << "Initialised atom list, contains " << _element.number_elements() << " elements\n";
+
+  return 1;
+}
+
+int
+ISIS_Atom_List::initialise_from_mdl_QH_symbol ()
+{
+  initialise_from_mdl_Q_symbol();
+
+  _element.add(get_element_from_atomic_number(1));
 
   return 1;
 }
@@ -308,8 +321,7 @@ ISIS_Atom_List::initialise_atom_list_from_symbol (const const_IWSubstring & s)
   const_IWSubstring token;
   while (mys.nextword(token, i, ','))
   {
-    int notused;
-    const Element * e = get_element_from_symbol(token, notused);
+    const Element * e = get_element_from_symbol_no_case_conversion(token);
     if (NULL == e)
     {
       cerr << "ISIS_Atom_List::initialise_atom_list_from_symbol:unrecognised element '" << token << "'\n";

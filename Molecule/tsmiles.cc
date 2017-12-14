@@ -1,28 +1,11 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
-#include <stdlib.h>
+#include <iostream>
 #include <memory>
-using namespace std;
-//#include "assert.h"
+#include <random>
+using std::cerr;
+using std::endl;
 
 #include "cmdline.h"
-#include "iw_auto_array.h"
+#include "report_progress.h"
 
 #include "molecule.h"
 #include "path.h"
@@ -43,6 +26,7 @@ static int molecules_with_errors = 0;
 static int total_error_count = 0;
 
 static int smiles_interpretation_errors = 0;
+static int aromatic_smiles_interpretation_errors = 0;
 static int amw_errors = 0;
 static int unique_smiles_errors = 0;
 
@@ -54,6 +38,8 @@ static int permutations_performed = 0;
 
 static int remove_non_chiral_chiral_centres = 0;
 
+static int unset_unnecessary_implicit_hydrogens_known_values = 0;
+
 static int write_sssr_upon_failure = 0;
 
 static int test_build_from_aromatic_form = 0;
@@ -64,11 +50,21 @@ static int test_same_ring_stuff = 0;
 
 static int chiral_smiles_failures = 0;
 
-static int report_every = 0;
+static Report_Progress report_progress;
 
 static int molecules_with_too_many_rings = 0;
 
 static IWString_and_File_Descriptor stream_for_failed_molecules;
+
+static int max_rings = 99;
+
+static int destroy_aromaticity = 0;
+
+static int molecules_ok_without_aromaticity = 0;
+
+static int remove_all_chiral_centres = 0;
+
+static std::random_device rd;
 
 void
 usage (int rc)
@@ -87,21 +83,22 @@ usage (int rc)
   cerr << "  -x             terminate all processing on any error\n";
   cerr << "  -j             stop processing any molecule once it has an error\n";
   cerr << "  -u             remove marked chiral centres that aren't chiral\n";
+  cerr << "  -y             remove any un-necessary square brackets (will get radicals wrong)\n";
   cerr << "  -q             test in_same_ring and in_same_ring_system functions\n";
   cerr << "  -R             write SSSR upon failure\n";
+  cerr << "  -f             upon failure, destroy aromaticity and see if a non aromatic form would work\n";
   cerr << "  -r <number>    report progress every <n> molecules\n";
+  cerr << "  -W             remove all chirality as the molecule is read\n";
   cerr << "  -s <number>    random number seed\n";
   cerr << "  -F <fname>     write smiles for failing molecules to <fname>\n";
   cerr << "  -i <type>      specify input type\n";
   cerr << "  -E <symbol>    create an element with symbol <symbol>\n";
-  (void) display_standard_aromaticity_options (cerr);
-  (void) display_standard_smiles_options (cerr);
-#ifdef USE_IWMALLOC
-  cerr << "  -d <block>     die when allocating block number <block>\n";
-#endif
+  cerr << "  -k <nrings>    discard molecules with <nrings> or more (def 99)\n";
+  (void) display_standard_aromaticity_options(cerr);
+  (void) display_standard_smiles_options(cerr);
   cerr << "  -v             verbose output\n";
 
-  exit (rc);
+  exit(rc);
 }
 
 static int molecules_read = 0;
@@ -109,6 +106,41 @@ static int molecules_read = 0;
 static int verbose = 0;
 
 static int test_assignment = 0;
+
+static int
+do_destroy_aromaticity (Molecule & m)
+{
+  Set_of_Atoms double_bonds_to_be_removed;
+
+  m.compute_aromaticity_if_needed();
+
+  const int nb = m.nedges();
+
+  for (int i = 0; i < nb; ++i)
+  {
+    const Bond * b = m.bondi(i);
+
+    if (! b->is_aromatic())
+      continue;
+
+    double_bonds_to_be_removed.add(b->a1());
+    double_bonds_to_be_removed.add(b->a2());
+  }
+
+  const int n = double_bonds_to_be_removed.size();
+
+  if (0 == n)
+    return 0;
+
+  for (auto i = 0; i < n; i += 2)
+  {
+    m.set_bond_type_between_atoms(double_bonds_to_be_removed[i], double_bonds_to_be_removed[i+1], SINGLE_BOND);
+  }
+
+  m.append_to_name(" XAROM");
+
+  return 1;
+}
 
 static void
 do_remove_non_chiral_chiral_centres (Molecule & m)
@@ -126,12 +158,12 @@ do_remove_non_chiral_chiral_centres (Molecule & m)
 
   for (int i = 0; i < matoms; i++)
   {
-    if (NULL == m.chiral_centre_at_atom (i))
+    if (NULL == m.chiral_centre_at_atom(i))
       continue;
 
-    if (! is_actually_chiral (m, i))
+    if (! is_actually_chiral(m, i))
     {
-      m.remove_chiral_centre_at_atom (i);
+      m.remove_chiral_centre_at_atom(i);
       rc++;
     }
 
@@ -162,12 +194,12 @@ either_side (const Atom ** atom,
   int acon = a->ncon();
   for (int i = 0; i < acon; i++)
   {
-    atom_number_t j = a->other (a1, i);
+    atom_number_t j = a->other(a1, i);
     if (n1 == wside[j])     // closing a ring or turning back on ourselves within our subset
       continue;
 
     wside[j] = n1;
-    if (! either_side (atom, j, n1, wside))
+    if (! either_side(atom, j, n1, wside))
       return 0;
   }
 
@@ -191,13 +223,13 @@ either_side (const Atom ** atom,
   wside[a1] = n1;
   wside[a2] = n1;     // temporarily
 
-  if (! either_side (atom, a1, n1, wside))
+  if (! either_side(atom, a1, n1, wside))
     return 0;
 
   wside[a1] = n2;     // temporarily
   wside[a2] = n2;
 
-  if (! either_side (atom, a2, n2, wside))
+  if (! either_side(atom, a2, n2, wside))
     return 0;
 
   wside[a1] = n1;
@@ -222,7 +254,7 @@ do_test_subset_unique_smiles (Molecule & m,
 
   for (int i = 0; i < nb; i++)
   {
-    const Bond * b = m.bondi (i);
+    const Bond * b = m.bondi(i);
 
     if (b->nrings())
       continue;
@@ -232,10 +264,10 @@ do_test_subset_unique_smiles (Molecule & m,
 
 //  Divide the molecule across the bond
 
-    (void) either_side (atom, b->a1(), 0, b->a2(), 1, subset);
+    (void) either_side(atom, b->a1(), 0, b->a2(), 1, subset);
 
     Smiles_Information smi_info;
-    IWString usmi11 = m.unique_smiles (smi_info, subset);
+    IWString usmi11 = m.unique_smiles(smi_info, subset);
     for (int i = 0; i < matoms; i++)
     {
       if (0 == subset[i])
@@ -248,18 +280,18 @@ do_test_subset_unique_smiles (Molecule & m,
 
     smi_info.invalidate();
 
-    IWString usmi12 = m.unique_smiles (smi_info, subset);
+    IWString usmi12 = m.unique_smiles(smi_info, subset);
 
     Molecule tmp = m;
 
-    tmp.remove_bond_between_atoms (b->a1(), b->a2());
+    tmp.remove_bond_between_atoms(b->a1(), b->a2());
 
     assert (tmp.number_fragments() > 1);
 
 //  cerr << "Creating components\n";
 
     resizable_array_p<Molecule> components;
-    (void) tmp.create_components (components);
+    (void) tmp.create_components(components);
 
 //  cerr << "Created " << components.number_elements() << " components with " << components[0]->natoms() << " and " << components[1]->natoms() << " atoms\n";
 
@@ -275,13 +307,13 @@ do_test_subset_unique_smiles (Molecule & m,
 static int
 do_test_subset_unique_smiles (Molecule & m)
 {
-  const Atom ** atoms = new const Atom *[m.natoms()]; auto_ptr<const Atom *> free_atoms(atoms);
+  const Atom ** atoms = new const Atom *[m.natoms()]; std::unique_ptr<const Atom *[]> free_atoms(atoms);
   
-  m.atoms (atoms);
+  m.atoms(atoms);
 
-  int * tmp = new int[m.natoms()]; iw_auto_array<int> free_tmp (tmp);
+  int * tmp = new int[m.natoms()]; std::unique_ptr<int[]> free_tmp(tmp);
 
-  int rc = do_test_subset_unique_smiles (m, atoms, tmp);
+  int rc = do_test_subset_unique_smiles(m, atoms, tmp);
 
 //delete atoms;
 
@@ -312,7 +344,7 @@ do_test_assignment (Molecule & m, const IWString & usmi)
   {
     molecular_weight_t tmpamw = tmp.molecular_weight_ignore_isotopes();
 
-    if (fabs (tmpamw - mamw) > 0.1)
+    if (fabs(tmpamw - mamw) > 0.1)
     {
       cerr << "Molecular weight mismatch on constructor assignment, " << mamw << " vs " << tmpamw << endl;
       return 0;
@@ -332,15 +364,15 @@ do_test_assignment (Molecule & m, const IWString & usmi)
 }
 
 static int
-report_canonical_ranking (ostream & os,
+report_canonical_ranking (std::ostream & os,
                           Molecule & m)
 {
   os << "Canonical ordering:\n";
   int matoms = m.natoms();
   for (int i = 0; i < matoms; i++)
   {
-    os << "Atom " << i << " (" << m.atomic_symbol (i) << ") canonical number " << 
-          m.canonical_rank (i) << " symmetry class " << m.symmetry_class (i) << " bonds";
+    os << "Atom " << i << " (" << m.atomic_symbol(i) << ") canonical number " << 
+          m.canonical_rank(i) << " symmetry class " << m.symmetry_class(i) << " bonds";
     int acon = m.ncon(i);
     for (int j = 0; j < acon; j++)
     {
@@ -356,12 +388,12 @@ report_canonical_ranking (ostream & os,
 
     for (int i = 0; i < nr; i++)
     {
-      const Ring * ri = m.ringi (i);
+      const Ring * ri = m.ringi(i);
       os << " ring " << i << ':';
       for (int j = 0; j < ri->number_elements(); j++)
       {
-        atom_number_t k = ri->item (j);
-        os << ' ' << k << " (" << m.atomic_symbol (k) << ')';
+        atom_number_t k = ri->item(j);
+        os << ' ' << k << " (" << m.atomic_symbol(k) << ')';
       }
       os << endl;
     }
@@ -373,7 +405,7 @@ report_canonical_ranking (ostream & os,
 static int
 report_aromatic_atom_count_if_different (Molecule & m1,
                                          Molecule & m2,
-                                         ostream & os)
+                                         std::ostream & os)
 {
   int matoms = m1.natoms();
 
@@ -460,7 +492,7 @@ test_same_ring_and_same_ring_system (Molecule & m)
   {
     const Ring * ri = m.ringi(i);
 
-    if (! test_same_ring (m, *ri))
+    if (! test_same_ring(m, *ri))
       return 0;
 
     if (! ri->is_fused())
@@ -483,7 +515,7 @@ test_same_ring_and_same_ring_system (Molecule & m)
 
 
 static int
-test_include_chirality_in_smiles (Molecule & m)
+test_include_chirality_in_smiles(Molecule & m)
 {
   if (0 == m.chiral_centres())
     return 1;
@@ -507,8 +539,8 @@ test_include_chirality_in_smiles (Molecule & m)
     return 1;
 
   cerr << "set_include_chirality_in_smiles failure, " << m.name() << "\n";
-  cerr << "smiles w/o chirality '" << usmi << "'\n";
-  cerr << "smiles from achiral  '" << s2 << "'\n";
+  cerr << "smiles w/o chirality " << usmi << "\n";
+  cerr << "smiles from achiral  " << s2 << "\n";
 
   chiral_smiles_failures++;
 
@@ -521,11 +553,13 @@ choose_two_atom_numbers(int matoms,
 {
   assert(matoms > 1);
 
-  a1 = intbtwij(0, matoms - 1);
+  std::uniform_int_distribution<int> um(0, matoms - 1);
+
+  a1 = um(rd);
 
   do
   {
-    a2 = intbtwij(0, matoms - 1);
+    a2 = um(rd);
   }
   while(a2 == a1);
 
@@ -548,6 +582,65 @@ report_pi_electrons (Molecule & m)
   return;
 }
 
+#ifdef MAYBE_IMPLEMENT_THIS_SOMETIME
+class Counters_This_Molecle
+{
+  public:
+    const IWString & _usmi;
+    const molecular_weight_t _amw;
+
+    int _smiles_interpretation_errors;
+    int _aromatic_smiles_interpretation_errors;
+
+  public:
+    Counters_This_Molecle(const IWString & s, const molecular_weight_t & mw);
+
+    void smiles_interpretation_error() { _smiles_interpretation_errors++;}
+    void aromatic_smiles_interpretation_error() { _aromatic_smiles_interpretation_errors++;}
+};
+
+Counters_This_Molecle::Counters_This_Molecle(const IWString & s,
+                                const molecular_weight_t & mw) : _usmi(s), _amw(mw)
+{
+  _smiles_interpretation_errors = 0;
+  _aromatic_smiles_interpretation_errors = 0;
+}
+
+static int
+tsmiles(Molecule & m,
+        Counters_This_Molecle & c,
+        const IWString & rsmi)
+{
+  Molecule x;
+  if (! x.build_from_smiles(rsmi))
+  {
+    c.smiles_interpretation_error();
+  }
+}
+
+static int
+tsmiles(Molecule & m,
+        const molecular_weight_t amw)
+{
+  const IWString & usmi = m.unique_smiles();
+
+  Counters_This_Molecle c(m.unique_smiles(), amw);
+
+  for (int i = 0; i < permutations_per_molecule; ++i)
+  {
+    permutations_performed++;
+
+    IWString rsmi = m.random_smiles();
+ 
+    if (verbose > 2)
+      cerr << "Permutation " << i << " " << rsmi << "\n";
+
+    if (tsmiles(m, c, rsmi))
+      continue;
+  }
+}
+#endif
+
 /*
   We return the number of errors we encounter
 */
@@ -555,7 +648,7 @@ report_pi_electrons (Molecule & m)
 static int
 tsmiles (Molecule & m,
          const IWString & usmiles,
-         molecular_weight_t amw)
+         const molecular_weight_t amw)
 {
   int errors_this_molecule = 0;
 
@@ -573,13 +666,13 @@ tsmiles (Molecule & m,
     IWString rsmi = m.random_smiles();
  
     if (verbose > 2)
-      cerr << "Permutation " << i << " '" << rsmi << "'\n";
+      cerr << "Permutation " << i << " " << rsmi << "\n";
 
     Molecule x;
-    if (! x.build_from_smiles (rsmi.chars()))
+    if (! x.build_from_smiles(rsmi.chars()))      // this should never happen
     {
       cerr << "Error: molecule " << molecules_read << " '" << m.molecule_name() << "'\n";
-      cerr << "Permutation " << i << " rsmiles '" << rsmi << "'\n";
+      cerr << "Permutation " << i << " rsmiles " << rsmi << "\n";
       cerr << "Cannot interpret smiles\n";
       smiles_interpretation_errors++;
       errors_this_molecule++;
@@ -593,32 +686,33 @@ tsmiles (Molecule & m,
     if (usmiles != xusmi)
     {
       cerr << "Error: molecule " << molecules_read << " '" << m.molecule_name() << "'\n";
-      cerr << "Permutation " << i << " rsmiles '" << rsmi << "'\n";
+      cerr << "Permutation " << i << " rsmiles " << rsmi << "\n";
       cerr << "Unique smiles mis-match\n";
-      cerr << "Original '" << usmiles << "'\n";
-      cerr << "Now      '" << xusmi << "'\n";
+      cerr << "Original " << usmiles << "\n";
+      cerr << "Now      " << xusmi << "\n";
       report_aromatic_atom_count_if_different(m, x, cerr);
       if (verbose <= 1)
       {
         cerr << "Original molecule\n";
-        report_canonical_ranking (cerr, m);
+        report_canonical_ranking(cerr, m);
       }
       cerr << "Random variant\n";
-      report_canonical_ranking (cerr, x);
+      report_canonical_ranking(cerr, x);
 
       unique_smiles_errors++;
       errors_this_molecule++;
       reason_for_failure << " unique smiles mismatch";
+
       continue;
     }
 
     if (amw > 0.0)
     {
       molecular_weight_t xamw = x.molecular_weight_ignore_isotopes();
-      if (fabs (amw - xamw) > 0.1)
+      if (fabs(amw - xamw) > 0.1)
       {
         cerr << "Error: molecule " << molecules_read << " '" << m.molecule_name() << "'\n";
-        cerr << "Permutation " << i << " rsmiles '" << rsmi << "'\n";
+        cerr << "Permutation " << i << " rsmiles " << rsmi << "\n";
         cerr << "AMW mismatch, originally " << amw << " now " << xamw << endl;
         amw_errors++;
         errors_this_molecule++;
@@ -633,16 +727,18 @@ tsmiles (Molecule & m,
     for (int i = 0; i < test_build_from_aromatic_form; i++)
     {
       m.compute_aromaticity_if_needed();
-      set_include_aromaticity_in_smiles (1);
+      set_include_aromaticity_in_smiles(1);
       IWString random_smiles = m.random_smiles();
-      set_include_aromaticity_in_smiles (0);
+      set_include_aromaticity_in_smiles(0);
+
+//    cerr << "Random aromatic form " << i << ' ' << random_smiles << endl;
 
       Molecule mtmp;
-      if (! mtmp.build_from_smiles (random_smiles))
+      if (! mtmp.build_from_smiles(random_smiles))
       {
-        cerr << "Cannot parse smiles '" << random_smiles << "', '" << m.name() << "'\n";
+        cerr << "Cannot parse aromatic smiles " << random_smiles << " '" << m.name() << "'\n";
         errors_this_molecule++;
-        smiles_interpretation_errors++;
+        aromatic_smiles_interpretation_errors++;
         reason_for_failure << " aromatic smiles";
         if (stop_processing_molecule_on_first_error)
           break;
@@ -653,11 +749,11 @@ tsmiles (Molecule & m,
       if (usmiles != xusmi)
       {
         cerr << "Error: molecule " << molecules_read << " '" << m.molecule_name() << "'\n";
-        cerr << "Permutation " << i << " rsmiles '" << random_smiles << "'\n";
+        cerr << "Permutation " << i << " rsmiles " << random_smiles << "\n";
         cerr << "Unique smiles mis-match (from aromatic)\n";
-        cerr << "Original '" << usmiles << "'\n";
-        cerr << "Random   '" << random_smiles << "'\n";
-        cerr << "Now      '" << xusmi << "'\n";
+        cerr << "Original " << usmiles << "\n";
+        cerr << "Random   " << random_smiles << "\n";
+        cerr << "Now      " << xusmi << "\n";
         report_aromatic_atom_count_if_different(m, mtmp, cerr);
 
         unique_smiles_errors++;
@@ -669,7 +765,7 @@ tsmiles (Molecule & m,
     }
   }
 
-  int matoms = m.natoms();
+  const int matoms = m.natoms();
 
   if (test_swap_atoms && matoms > 2)
   {
@@ -678,6 +774,8 @@ tsmiles (Molecule & m,
 
     for (int i = 0; i < test_swap_atoms; i++)
     {
+//    cerr << "Testing atom swap " << i << endl;
+
       choose_two_atom_numbers(matoms, a1, a2);
       x.swap_atoms(a1, a2);
 
@@ -686,8 +784,8 @@ tsmiles (Molecule & m,
       if (xusmi != usmiles)
       {
         cerr << "Atom swap failure '" << m.name() << "'\n";
-        cerr << "Parent unique smiles '" << usmiles << "'\n";
-        cerr << "Atom swapped variant '" << xusmi << "'\n";
+        cerr << "Parent unique smiles " << usmiles << "\n";
+        cerr << "Atom swapped variant " << xusmi << "\n";
         atom_swap_errors++;
         errors_this_molecule++;
         reason_for_failure << " swap error";
@@ -732,7 +830,7 @@ tsmiles (Molecule & m,
 }
 
 static int
-tsmiles (Molecule & m)
+tsmiles(Molecule & m)
 {
   assert (m.ok());
 
@@ -742,15 +840,21 @@ tsmiles (Molecule & m)
     cerr << "Testing molecule " << molecules_read << " '" << m.name() << "' with " <<
             matoms << " atoms, " << m.nrings() << " rings\n";
 
-  if (m.nrings() > 99)
+  if (m.nrings() > max_rings)
   {
-    cerr << "Too many rings, many potential problems, skipping '" << m.name() << "'\n";
+    cerr << "Too many rings " << m.nrings() << ", many potential problems, skipping '" << m.name() << "'\n";
     molecules_with_too_many_rings++;
-    return 1;
+    return 0;
   }
 
   if (remove_non_chiral_chiral_centres)
-    do_remove_non_chiral_chiral_centres (m);
+    do_remove_non_chiral_chiral_centres(m);
+
+  if (unset_unnecessary_implicit_hydrogens_known_values)
+    m.unset_unnecessary_implicit_hydrogens_known_values();
+
+  if (remove_all_chiral_centres)
+    m.remove_all_chiral_centres();
 
   const IWString usmiles = m.unique_smiles();
 
@@ -761,29 +865,56 @@ tsmiles (Molecule & m)
     amw = 0.0;
 
   if (verbose > 1)
-    cerr << "Unique smiles '" << usmiles << "' amw = " << amw << endl;
+    cerr << "Unique smiles " << usmiles << " amw = " << amw << endl;
 
   if (verbose > 2)
-    report_canonical_ranking (cerr, m);
+    report_canonical_ranking(cerr, m);
 
   const resizable_array<atom_number_t> & atom_order_in_smiles = m.atom_order_in_smiles();
 
   assert (matoms == atom_order_in_smiles.number_elements());
 
   if (test_assignment)
-    do_test_assignment (m, usmiles);
+    do_test_assignment(m, usmiles);
 
   if (test_subset_unique_smiles)
-    do_test_subset_unique_smiles (m);
+    do_test_subset_unique_smiles(m);
 
-  return tsmiles (m, usmiles, amw);
+  int rc  = tsmiles(m, usmiles, amw);
+
+  if (0 == rc)   // no failures
+    return 0;
+
+  if (! destroy_aromaticity)
+    return rc;
+
+  if (! m.contains_aromatic_atoms())
+    return rc;
+
+  if (! do_destroy_aromaticity(m))
+    return rc;
+
+  const IWString xusmi = m.unique_smiles();
+
+  amw = m.molecular_weight_ignore_isotopes();
+
+  rc = tsmiles(m, xusmi, amw);
+
+  if (0 == rc)
+  {
+    molecules_ok_without_aromaticity++;
+    if (verbose > 1)
+      cerr << m.name() << " ok after aromaticity removal\n";
+  }
+
+  return rc;
 }
 
 /*
 */
 
 static int
-tsmiles (data_source_and_type<Molecule> & input)
+tsmiles(data_source_and_type<Molecule> & input)
 {
   assert (input.good());
 
@@ -791,7 +922,7 @@ tsmiles (data_source_and_type<Molecule> & input)
   Molecule * m;
   while (NULL != (m = input.next_molecule()))
   {
-    auto_ptr<Molecule> free_m (m);
+    std::unique_ptr<Molecule> free_m(m);
 
     if (verbose > 1)
       cerr << "Read " << input.molecules_read() << ", '" << m->name() << "'\n";
@@ -804,12 +935,12 @@ tsmiles (data_source_and_type<Molecule> & input)
       continue;
     }
 
-    failures += tsmiles (*m);
+    failures += tsmiles(*m);
 
     if (failures && abort_on_error)
       break;
 
-    if (report_every > 0 && 0 == molecules_read % report_every)
+    if (report_progress())
       cerr << "Read " << molecules_read << " molecules, " << failures << " failures\n";
   }
 
@@ -817,15 +948,15 @@ tsmiles (data_source_and_type<Molecule> & input)
 }
 
 static int
-tsmiles (const char * fname, int input_type)
+tsmiles(const char * fname, int input_type)
 {
   if (0 == input_type)
   {
-    input_type = discern_file_type_from_name (fname);
+    input_type = discern_file_type_from_name(fname);
     assert (0 != input_type);
   }
 
-  data_source_and_type<Molecule> input (input_type, fname);
+  data_source_and_type<Molecule> input(input_type, fname);
   if (! input.good())
   {
     cerr << "Cannot open '" << fname << "'\n";
@@ -835,7 +966,7 @@ tsmiles (const char * fname, int input_type)
   if (verbose)
     cerr << "Processing '" << fname << "'\n";
 
-  int failures = tsmiles (input);
+  int failures = tsmiles(input);
 
   if (verbose)
     cerr << "Read " << input.molecules_read() << " molecules\n";
@@ -844,89 +975,109 @@ tsmiles (const char * fname, int input_type)
 }
 
 static int
-tsmiles (int argc, char **argv)
+tsmiles(int argc, char **argv)
 {
-  Command_Line cl (argc, argv, "jK:xp:s:A:vi:E:ac:t:bur:Rm:w:hqF:");
+  Command_Line cl(argc, argv, "jK:xp:s:A:vi:E:ac:t:bur:Rm:w:hqF:k:fWy");
 
   if (cl.unrecognised_options_encountered())
   {
     cerr << "Unrecognised options encountered\n";
-    usage (17);
+    usage(17);
   }
 
-  verbose = cl.option_count ('v');
+  verbose = cl.option_count('v');
 
-  if (! process_elements (cl))
-    usage (1);
+  if (! process_elements(cl))
+    usage(1);
 
-  if (! process_standard_smiles_options (cl, verbose, 'K'))
-    usage (2);
+  if (! process_standard_smiles_options(cl, verbose, 'K'))
+    usage(2);
 
   int input_type = 0;
-  if (! cl.option_present ('i'))
+  if (! cl.option_present('i'))
   {
-    if (! all_files_recognised_by_suffix (cl))
+    if (! all_files_recognised_by_suffix(cl))
     {
       cerr << "Cannot recognise file types by suffix(es)\n";
       return 3;
     }
   }
-  else if (! process_input_type (cl, input_type))
-    usage (2);
+  else if (! process_input_type(cl, input_type))
+    usage(2);
 
-  if (cl.option_present ('A'))
+  if (cl.option_present('A'))
   {
-    if (! process_standard_aromaticity_options (cl, verbose))
+    if (! process_standard_aromaticity_options(cl, verbose))
     {
       cerr << "cannot process aromaticit options\n";
-      usage (3);
+      usage(3);
     }
   }
-
-  if (cl.option_present ('p'))
+  else
   {
-    if (! cl.value ('p', permutations_per_molecule) || permutations_per_molecule <= 0)
+    cerr << "Warning, does not work well without Daylight aromaticity\n";
+  }
+
+  if (cl.option_present('p'))
+  {
+    if (! cl.value('p', permutations_per_molecule) || permutations_per_molecule <= 0)
     {
       cerr << "The -p option must be followed by a whole positive number\n";
-      usage (4);
+      usage(4);
     }
   }
   else if (verbose)
     cerr << "Performing " << permutations_per_molecule << " by default\n";
 
-  if (cl.option_present ('x'))
+  if (cl.option_present('x'))
   {
     abort_on_error = 1;
     if (verbose)
       cerr << "Programme will stop on encountering an error\n";
   }
 
-  if (cl.option_present ('b'))
+  if (cl.option_present('y'))
+  {
+    unset_unnecessary_implicit_hydrogens_known_values = 1;
+
+    if (verbose)
+      cerr << "Will remove unnecessary square brackets\n";
+  }
+
+  if (cl.option_present('b'))
   {
     test_subset_unique_smiles = 1;
     if (verbose)
       cerr << "Will test unique smiles on subsets\n";
   }
 
-  if (cl.option_present ('j'))
+  if (cl.option_present('j'))
   {
     stop_processing_molecule_on_first_error = 1;
     if (verbose)
       cerr << "No further permutations done a molecule for which an error has occurred\n";
   }
 
-  if (cl.option_present ('a'))
+  if (cl.option_present('a'))
   {
     test_assignment = 1;
     if (verbose)
       cerr << "will test the assignment operator\n";
   }
 
-  if (cl.option_present ('c'))
+  if (cl.option_present('f'))
+  {
+    destroy_aromaticity = 1;
+
+    if (verbose)
+      cerr << "Upon failure, will destroy aromaticity and see if molecule works without aromatic bonds\n";
+  }
+
+  if (cl.option_present('c'))
   {
     int include_chiral_info = 1;
 
-    if (! cl.value ('c', include_chiral_info))
+    if (! cl.value('c', include_chiral_info))
     {
       cerr << "the -c option must be followed by a whole number\n";
       usage (7);
@@ -934,7 +1085,15 @@ tsmiles (int argc, char **argv)
     if (verbose)
       cerr << "Include chiral info set to " << include_chiral_info << endl;
 
-    set_include_chiral_info_in_smiles (include_chiral_info);
+    set_include_chiral_info_in_smiles(include_chiral_info);
+  }
+
+  if (cl.option_present('W'))
+  {
+    remove_all_chiral_centres = 1;
+
+    if (verbose)
+      cerr << "Will remove all chiral centres before testing\n";
   }
 
   if (cl.option_present('h'))
@@ -950,6 +1109,18 @@ tsmiles (int argc, char **argv)
 
     if (verbose)
      cerr << "Will test in_same_ring and in_same_ring_system member functions\n";
+  }
+
+  if (cl.option_present('k'))
+  {
+    if (! cl.value('k', max_rings) || max_rings < 0)
+    {
+      cerr << "The maximum number of rings to process option (-k) must be a whole +ve number\n";
+      usage(2);
+    }
+
+    if (verbose)
+      cerr << "Will not test molecules having more than " << max_rings << " rings\n";
   }
 
   if (cl.option_present('t'))
@@ -969,7 +1140,7 @@ tsmiles (int argc, char **argv)
 
   }
 
-  if (cl.option_present ('u'))
+  if (cl.option_present('u'))
   {
     remove_non_chiral_chiral_centres = 1;
 
@@ -979,17 +1150,14 @@ tsmiles (int argc, char **argv)
 
   if (cl.option_present('r'))
   {
-    if (! cl.value('r', report_every) || report_every < 0)
+    if (! report_progress.initialise(cl, 'r', verbose))
     {
-      cerr << "The report every option (-r) must be a whole +ve number\n";
-      usage(4);
+      cerr << "Cannot initialise progress reporting\n";
+      return 1;
     }
-
-    if (verbose)
-      cerr << "Will report status every " << report_every << " molecules\n";
   }
 
-  if (cl.option_present ('R'))
+  if (cl.option_present('R'))
   {
     write_sssr_upon_failure = 1;
 
@@ -997,15 +1165,15 @@ tsmiles (int argc, char **argv)
       cerr << "Will write the SSSR upon failure\n";
   }
 
-  if (cl.option_present ('m'))
+  if (cl.option_present('m'))
   {
-    if (! cl.value ('m', test_build_from_aromatic_form) || test_build_from_aromatic_form < 1)
+    if (! cl.value('m', test_build_from_aromatic_form) || test_build_from_aromatic_form < 1)
     {
       cerr << "The number of steps for testing build from aromatic form (-m) must be +ve\n";
-      usage (11);
+      usage(11);
     }
 
-    set_input_aromatic_structures (1);
+    set_input_aromatic_structures(1);
 
     if (verbose)
       cerr << "Will do " << test_build_from_aromatic_form << " tests of building from aromatic form\n";
@@ -1023,16 +1191,16 @@ tsmiles (int argc, char **argv)
       cerr << "Will swap " << test_swap_atoms << " atoms for each input molecule\n";
   }
 
-  if (cl.option_present ('s'))
+  if (cl.option_present('s'))
   {
     random_number_seed_t s;
-    if (! cl.value ('s', s))
+    if (! cl.value('s', s))
     {
       cerr << "Random number seeds (-s option) must be whole numbers\n";
       return 6;
     }
 
-    set_smiles_random_number_seed (s);
+    set_smiles_random_number_seed(s);
 
     if (verbose)
       cerr << "Using random number seed " << s << endl;
@@ -1041,7 +1209,7 @@ tsmiles (int argc, char **argv)
   if (0 == cl.number_elements())
   {
     cerr << "Insufficient arguments " << argc << "\n";
-    usage (1);
+    usage(1);
   }
 
   if (cl.option_present('F'))
@@ -1064,7 +1232,7 @@ tsmiles (int argc, char **argv)
   int failures = 0;
 
   for (int i = 0; i < cl.number_elements(); i++)
-    failures += tsmiles (cl[i], input_type);
+    failures += tsmiles(cl[i], input_type);
 
   cerr << "After processing, " << failures << " failures\n";
   if (verbose || failures)
@@ -1077,17 +1245,18 @@ tsmiles (int argc, char **argv)
     {
       cerr << total_error_count << " errors in " << molecules_with_errors << " molecules\n";
       cerr << smiles_interpretation_errors << " smiles interpretation errors\n";
+      cerr << aromatic_smiles_interpretation_errors << " aromatic smiles interpretation errors\n";
       cerr << amw_errors << " molecular weight errors\n";
       cerr << unique_smiles_errors << " unique smiles errors\n";
       cerr << atom_swap_errors << " atom swap errors\n";
+
+      if (destroy_aromaticity)
+        cerr << molecules_ok_without_aromaticity << " molecules that failed were OK once aromaticity was removed\n";
     }
     else
       cerr << "All tests successful\n";
   }
 
-#ifdef USE_IWMALLOC
-  check_all_malloced (stderr);
-#endif
 
   return (failures != 0);
 }
@@ -1097,11 +1266,7 @@ main (int argc, char ** argv)
 {
   prog_name = argv[0];
 
-  int rc = tsmiles (argc, argv);
-
-#ifdef USE_IWMALLOC
-  terse_malloc_status (stderr);
-#endif
+  int rc = tsmiles(argc, argv);
 
   return rc;
 }

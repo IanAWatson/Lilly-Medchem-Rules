@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
 
 #include "substructure.h"
@@ -167,7 +149,7 @@ ISIS_Link_Atom::adjust_atom_numbers(int const * xref)
 }
 
 int
-ISIS_Link_Atom::debug_print (ostream & os) const
+ISIS_Link_Atom::debug_print (std::ostream & os) const
 {
   os << "ISIS_Link_Atom between " << _a1 << " through " << _a << " to " << _a2 << " range " << 
 
@@ -176,15 +158,15 @@ ISIS_Link_Atom::debug_print (ostream & os) const
   return os.good ();
 }
 
-ostream &
-operator<< (ostream & os, const ISIS_Link_Atom & l)
+std::ostream &
+operator<< (std::ostream & os, const ISIS_Link_Atom & l)
 {
   l.debug_print (os);
   return os;
 }
 
 int
-ISIS_Link_Atom::write_M_LIN (ostream & output) const
+ISIS_Link_Atom::write_M_LIN (std::ostream & output) const
 {
   output << "M  LIN";
 

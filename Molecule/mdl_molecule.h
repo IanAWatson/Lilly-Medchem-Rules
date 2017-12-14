@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef MDL_MOLECULE_H
 #define MDL_MOLECULE_H
 
@@ -31,8 +13,6 @@
 #include "ematch.h"
 #include "atom_alias.h"
 
-class ISIS_Link_Atom;
-
 class MDL_Molecule : public Molecule, public MDL_File_Data
 {
   private:
@@ -46,7 +26,7 @@ class MDL_Molecule : public Molecule, public MDL_File_Data
 
 //  private functions
 
-    int _parse_link_record (const IWString & buffer, resizable_array_p<ISIS_Link_Atom> & ltmp);
+    int _parse_link_record (const IWString & buffer, ::resizable_array_p<ISIS_Link_Atom> & ltmp);
 
     int _parse_M_record (iwstring_data_source & input,
                          const const_IWSubstring & buffer,
@@ -91,10 +71,14 @@ class MDL_Molecule : public Molecule, public MDL_File_Data
 
     int remove_explicit_hydrogens(atomic_number_t = 1);
     
-    int change_R_groups_to_substitutions (Element_Matcher & rgroup);
+    int change_R_groups_to_substitutions (Element_Matcher & rgroup, int enable_hydrogen_substituent);
+    int change_R_groups_to_match_any_atom (Element_Matcher & rgroup, int only_substituents_at_matched_atoms);
 
     int only_allow_substitutions_at_isotopic_atoms(const Molecule_to_Query_Specifications & mqs);
     int only_allow_substitutions_at_non_isotopic_atoms();
+
+    void set_substitution(const atom_number_t a, const int s);
+    void set_ring_bond(const atom_number_t a, const int s);
 
     int determine_attachment_points_by_query(Molecule_to_Query_Specifications & mqs);
     
@@ -123,8 +107,9 @@ class MDL_Molecule : public Molecule, public MDL_File_Data
   the organic subset. This is for Valhalla
 */
 
-extern void set_convert_a_and_q_atoms_to_atom_lists (int);
-extern void set_convert_not_atom_lists_to_organic_lists (int);
+extern void set_convert_a_and_q_atoms_to_atom_lists(int);
+extern void set_convert_not_atom_lists_to_organic_lists(int);
 void reset_mdl_molecule_file_scope_variables();
+extern void set_mdl_molecule_discard_chirality(const int s);
 
 #endif

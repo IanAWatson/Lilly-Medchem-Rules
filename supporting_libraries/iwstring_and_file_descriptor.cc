@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
 #include "iwconfig.h"
 #ifdef _WIN32
@@ -56,6 +38,11 @@ IWString_and_File_Descriptor::~IWString_and_File_Descriptor()
   }
   else if (_fd < 0)
     ;
+  else if (_fd ==1)
+  {
+	IWString::write(_fd);
+    return;
+  }
   else if (0 == IWString::length())
   {
     IW_FD_CLOSE(_fd);
@@ -235,7 +222,7 @@ IWString_and_File_Descriptor::_compress_and_write()
   return 0;
 }
 ssize_t
-IWString_and_File_Descriptor::write (const char * s, int nchars)
+IWString_and_File_Descriptor::write (const char * s, size_t nchars)
 {
   if (nchars + _number_elements < 32768)
     return IWString::strncat(s, nchars);

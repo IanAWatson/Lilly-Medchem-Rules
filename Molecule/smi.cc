@@ -1,23 +1,6 @@
-/**************************************************************************
-
-    Copyright (C) 2012  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
 #include <iostream>
+#include <memory>
 #include <ctype.h>
 
 #define COMPILING_SMILES_CC
@@ -74,7 +57,7 @@ set_tdt_identifier_dataitem (const const_IWSubstring & d)
 {
   identifier_dataitem = d;
 
-  if (! identifier_dataitem.ends_with ('<'))
+  if (! identifier_dataitem.ends_with('<'))
     identifier_dataitem += '<';
 
   return;
@@ -89,12 +72,12 @@ static resizable_array_p<IWString> dataitems_to_append;
 void
 set_tdt_append_dataitem (const const_IWSubstring & a)
 {
-  IWString * tmp = new IWString (a);
+  IWString * tmp = new IWString(a);
 
-  if (! tmp->ends_with ('<'))
+  if (! tmp->ends_with('<'))
     *tmp += '<';
 
-  dataitems_to_append.add (tmp);
+  dataitems_to_append.add(tmp);
 
   return;
 }
@@ -110,23 +93,6 @@ void
 set_tdt_append_dataitem_content (int s)
 {
   append_dataitem_content = s;
-}
-
-/*
-  Sept 2003. Ran into ring openings and closings from ChemDraw that
-  went over 100!
-*/
-
-static int max_ring_digits_following_percent = 2;
-
-void
-set_max_ring_digits_following_percent (int s)
-{
-  assert (s > 1);
-
-  max_ring_digits_following_percent = s;
-
-  return;
 }
 
 static int file_scope_display_smiles_interpretation_error_messages = 1;
@@ -151,14 +117,14 @@ check_for_append (const const_IWSubstring & buffer,    // as read in
 
   for (int i = 0; i < na; i++)
   {
-    if (buffer.starts_with (*(dataitems_to_append[i])))
+    if (buffer.starts_with(*(dataitems_to_append[i])))
     {
       if (add_to_name.nchars())
         add_to_name += ' ';
 
       if (append_dataitem_content)    // need to remove tag and <>
       {
-        add_to_name += buffer.substr (dataitems_to_append[i]->length());
+        add_to_name += buffer.substr(dataitems_to_append[i]->length());
         add_to_name.chop();    // remove trailing >
       }
       else
@@ -170,10 +136,10 @@ check_for_append (const const_IWSubstring & buffer,    // as read in
 }
 
 int
-Molecule::write_molecule_usmi (ostream & os, const IWString & comment)
+Molecule::write_molecule_usmi (std::ostream & os, const IWString & comment)
 {
-  assert (ok());
-  assert (os.good());
+  assert(ok());
+  assert(os.good());
 
   os << unique_smiles();
 
@@ -189,10 +155,10 @@ Molecule::write_molecule_usmi (ostream & os, const IWString & comment)
 }
 
 int
-Molecule::write_molecule_nausmi (ostream & os, const IWString & comment)
+Molecule::write_molecule_nausmi (std::ostream & os, const IWString & comment)
 {
-  assert (ok());
-  assert (os.good());
+  assert(ok());
+  assert(os.good());
 
   if (UNIQUE_SMILES_ORDER_TYPE != _smiles_information.smiles_order_type())
     invalidate_smiles();
@@ -211,10 +177,10 @@ Molecule::write_molecule_nausmi (ostream & os, const IWString & comment)
 }
 
 int
-Molecule::write_molecule_smi (ostream & os, const IWString & comment)
+Molecule::write_molecule_smi (std::ostream & os, const IWString & comment)
 {
-  assert (ok());
-  assert (os.good());
+  assert(ok());
+  assert(os.good());
 
   os << smiles();
 
@@ -230,10 +196,10 @@ Molecule::write_molecule_smi (ostream & os, const IWString & comment)
 }
 
 int
-Molecule::write_molecule_rsmi (ostream & os, const IWString & comment)
+Molecule::write_molecule_rsmi (std::ostream & os, const IWString & comment)
 {
-  assert (ok());
-  assert (os.good());
+  assert(ok());
+  assert(os.good());
 
   os << random_smiles();
 
@@ -251,14 +217,14 @@ Molecule::write_molecule_rsmi (ostream & os, const IWString & comment)
 static void
 smiles_set_name (const char * s, int nchars, Molecule * m)
 {
-  const_IWSubstring tmp (s, nchars);
+  const_IWSubstring tmp(s, nchars);
 
 //cerr << "Setting name, nchars = " << nchars << " possible name '" << tmp << "'\n";
 
   tmp.strip_leading_blanks();
 
   if (tmp.nchars())
-    m->set_name (tmp);
+    m->set_name(tmp);
 
   return;
 }
@@ -279,7 +245,7 @@ class Smiles_Ring_Status: public resizable_array<atom_number_t>
     Smiles_Ring_Status();
 
     int complete() const;
-    int report_hanging_ring_closures (ostream &) const;
+    int report_hanging_ring_closures (std::ostream &) const;
 
     int encounter (int, atom_number_t, atom_number_t &, bond_type_t &);
 
@@ -308,7 +274,7 @@ Smiles_Ring_Status::complete() const
 }
 
 int
-Smiles_Ring_Status::report_hanging_ring_closures (ostream & os) const
+Smiles_Ring_Status::report_hanging_ring_closures (std::ostream & os) const
 {
   for (int i = 0; i < _number_elements; i++)
   {
@@ -350,7 +316,7 @@ Smiles_Ring_Status::encounter (int ring_number, atom_number_t a,
                                atom_number_t & other_end,
                                bond_type_t & bt)
 {
-  assert (ring_number >= 0);
+  assert(ring_number >= 0);
 
   if (ring_number >= _number_elements)     // definitely a new ring.
   {
@@ -363,9 +329,31 @@ Smiles_Ring_Status::encounter (int ring_number, atom_number_t a,
 
   else if (INVALID_ATOM_NUMBER != _things[ring_number])
   {
-//  cerr << "Encounter making bond between atom " << _things[ring_number] << endl;
+//  cerr << "Encounter ring " << ring_number << " making bond between atom " << _things[ring_number] << " type " << bt << " stored type " << _bt[ring_number] << endl;
     other_end = _things[ring_number];
     _things[ring_number] = INVALID_ATOM_NUMBER;
+
+    if (NOT_A_BOND == _bt[ring_number])    // was not set during ring opening, use what just came in
+    {
+      if (NOT_A_BOND == bt)
+        _bt[ring_number] = SINGLE_BOND | AROMATIC_BOND;
+      else 
+        _bt[ring_number] = bt;
+    }
+    else if (NOT_A_BOND == bt)      // was set during opening, and closing does not specify
+      bt = _bt[ring_number];
+    else if (bt == _bt[ring_number])    // great, same as on ring opening
+      ;
+    else if (SMI_DIRECTIONAL_UP & bt)
+      _bt[ring_number] = bt ^ SMI_DIRECTIONAL_UP;
+    else if (SMI_DIRECTIONAL_DOWN & bt)
+      _bt[ring_number] = bt ^ SMI_DIRECTIONAL_DOWN;
+    else
+    {
+      cerr << "Smiles_Ring_Status::encounter:inconsistent bonds at opening " << _bt[ring_number] << " and closing " << _bt[ring_number] << " of ring " << ring_number << " using last\n";
+      _bt[ring_number] = bt;
+    }
+
     bt = _bt[ring_number];
 //  cerr << "Returned bond type " << bt << endl;
     return 1;    // ring closure
@@ -384,6 +372,8 @@ Smiles_Ring_Status::encounter (int ring_number, atom_number_t a,
   _things[ring_number] = a;
   _bt[ring_number] = bt;
 
+//cerr << "_BT " << ring_number << ' ' << bt << endl;
+
   _rings_encountered++;
 
   return 0;      // ring opening
@@ -399,7 +389,7 @@ process_hcount (const char * smiles, int & hcount, int & nchars)
   hcount = 1;
   nchars = 1;
   smiles++;
-  if (isdigit (*smiles))
+  if (isdigit(*smiles))
   {
     hcount = *smiles - '0';
     nchars++;
@@ -448,7 +438,7 @@ process_charge_specifier (const char * smiles, int sign, formal_charge_t & fc,
 
   if (count > 1)
   {
-    if (reasonable_formal_charge_value (fc))
+    if (reasonable_formal_charge_value(fc))
       ;
     else if (file_scope_display_smiles_interpretation_error_messages)
       cerr << "process_charge_specifier: possibly unreasonable formal charge " << fc << endl;
@@ -458,13 +448,13 @@ process_charge_specifier (const char * smiles, int sign, formal_charge_t & fc,
 
 // There was only one '-' or '+'. Do we now have a digit?
 
-  if (isdigit (*smiles))
+  if (isdigit(*smiles))
   {
     int tmp = *smiles - '0';
     fc *= tmp;
     nchars++;
 
-    if (reasonable_formal_charge_value (fc))
+    if (reasonable_formal_charge_value(fc))
       ;
     else if (file_scope_display_smiles_interpretation_error_messages)
       cerr << "process_charge_specifier: possibly unreasonable formal charge " << fc << endl;
@@ -492,11 +482,11 @@ process_chirality_specifier (const char * smiles, int & chiral_count, int & ncha
 static const Element *
 fetch_or_create_R_element (const IWString & r)
 {
-  const Element * e = get_element_from_symbol_no_case_conversion (r);
+  const Element * e = get_element_from_symbol_no_case_conversion(r);
   if (NULL != e)
     return e;
 
-  return create_element_with_symbol (r);
+  return create_element_with_symbol(r);
 }
 
 /*
@@ -521,18 +511,18 @@ static const Element * smi_element_a = NULL;
 static void
 initialise_organic_subset()
 {
-  smi_element_star     = get_element_from_atomic_number (0);
-  smi_element_hydrogen = get_element_from_atomic_number (1);
-  smi_element_b    = get_element_from_atomic_number (5);
-  smi_element_c    = get_element_from_atomic_number (6);
-  smi_element_n    = get_element_from_atomic_number (7);
-  smi_element_o    = get_element_from_atomic_number (8);
-  smi_element_f    = get_element_from_atomic_number (9);
-  smi_element_p    = get_element_from_atomic_number (15);
-  smi_element_s    = get_element_from_atomic_number (16);
-  smi_element_cl   = get_element_from_atomic_number (17);
-  smi_element_br   = get_element_from_atomic_number (35);
-  smi_element_i    = get_element_from_atomic_number (53);
+  smi_element_star     = get_element_from_atomic_number(0);
+  smi_element_hydrogen = get_element_from_atomic_number(1);
+  smi_element_b    = get_element_from_atomic_number(5);
+  smi_element_c    = get_element_from_atomic_number(6);
+  smi_element_n    = get_element_from_atomic_number(7);
+  smi_element_o    = get_element_from_atomic_number(8);
+  smi_element_f    = get_element_from_atomic_number(9);
+  smi_element_p    = get_element_from_atomic_number(15);
+  smi_element_s    = get_element_from_atomic_number(16);
+  smi_element_cl   = get_element_from_atomic_number(17);
+  smi_element_br   = get_element_from_atomic_number(35);
+  smi_element_i    = get_element_from_atomic_number(53);
 
   return;
 }
@@ -673,7 +663,7 @@ parse_smiles_token (const char * smiles,
   {
     if (NULL == smi_element_a)
     {
-      smi_element_a = get_element_from_symbol_no_case_conversion ("a");
+      smi_element_a = get_element_from_symbol_no_case_conversion("a");
 //    cerr << "smi_element_a now " << smi_element_a << endl;
 
       if (NULL != smi_element_a)
@@ -684,7 +674,7 @@ parse_smiles_token (const char * smiles,
         return 0;
       }
       else
-        smi_element_a = create_element_with_symbol ('a');
+        smi_element_a = create_element_with_symbol('a');
     }
 
     e = smi_element_a;
@@ -697,12 +687,12 @@ parse_smiles_token (const char * smiles,
     return 1;
   }
 
-  if (islower (c))    // some kind of aromatic other than anything recognised
+  if (islower(c))    // some kind of aromatic other than anything recognised
   {
-    e = get_element_from_symbol_no_case_conversion (smiles, 1);
+    e = get_element_from_symbol_no_case_conversion(smiles, 1);
 
     if (NULL == e && auto_create_new_elements())
-      e = create_element_with_symbol (smiles[0]);
+      e = create_element_with_symbol(smiles[0]);
       
     if (NULL == e)
     {
@@ -720,7 +710,7 @@ parse_smiles_token (const char * smiles,
   if (file_scope_display_smiles_interpretation_error_messages)
   {
     cerr << "parse_smiles_token:cannot interpret smiles symbol '";
-    cerr.write (smiles, characters_to_process);
+    cerr.write(smiles, characters_to_process);
     cerr << "'\n";
   }
 
@@ -756,14 +746,25 @@ parse_smiles_token (const char * smiles,
                     formal_charge_t &    fc,
                     int             &    hcount,
                     int             &    chiral_count,
-                    int             &    atomic_mass)
+                    int             &    atomic_mass,
+                    int             &    atom_map)
 {
+#ifdef DEBUG_PARSE_SMILES_TOKEN
+  cerr << "parse_smiles_token ";
+
+  for (int i = 0; i < characters_to_process; ++i)
+  {
+    cerr << smiles[i];
+  }
+  cerr << endl;
+#endif
 
   aromatic = AROMATICITY_NOT_DETERMINED;
   fc = 0;
   hcount = 0;
   chiral_count = 0;
   atomic_mass = 0;
+  atom_map = 0;
 
   int rc = 1;      //  1 char is the open square bracket.
   const char * original_smiles_ptr = smiles;
@@ -771,7 +772,7 @@ parse_smiles_token (const char * smiles,
 
 // Is there an isotope specification
 
-  while (isdigit (*smiles))
+  while (isdigit(*smiles))
   {
     atomic_mass = 10 * atomic_mass + (*smiles - '0');
     rc++;
@@ -784,12 +785,12 @@ parse_smiles_token (const char * smiles,
 
   if (isalpha(*smiles))
   {
-    if (atomic_symbols_can_have_arbitrary_length())
-      tmp = element_from_long_smiles_string (smiles, characters_to_process, e);
+    if (atomic_symbols_can_have_arbitrary_length())     // note that if we have D and/or T in this case, we will not pick up the mass diff.... Fix if ever anyone cares...
+      tmp = element_from_long_smiles_string(smiles, characters_to_process, e);
     else  
-      tmp = element_from_smiles_string (smiles, characters_to_process, e);
+      tmp = element_from_smiles_string(smiles, characters_to_process, e);
 
-    if (0 == tmp && characters_to_process > 1 && ']' == smiles[1])
+    if (0 == tmp && characters_to_process > 1 && ']' == smiles[1])     
       tmp = maybe_deuterium_or_tritium(smiles, e, atomic_mass);
 
     if (0 == tmp)
@@ -799,7 +800,7 @@ parse_smiles_token (const char * smiles,
       return 0;
     }
 
-    if (isupper (*smiles))   // definitely not aromatic
+    if (isupper(*smiles))   // definitely not aromatic
       ;
     else if (e->organic())
       aromatic = AROMATIC;
@@ -857,7 +858,7 @@ parse_smiles_token (const char * smiles,
         return 0;
       }
       int tmp = 0;
-      if (! process_hcount (smiles, hcount, tmp))
+      if (! process_hcount(smiles, hcount, tmp))
       {
         cerr << "Cannot process h count specification '" << original_smiles_ptr << "'\n";
         return 0;
@@ -875,7 +876,7 @@ parse_smiles_token (const char * smiles,
         return 0;
       }
       int tmp = 0;
-      if (! process_charge_specifier (smiles, 1, fc, tmp))
+      if (! process_charge_specifier(smiles, 1, fc, tmp))
       {
         cerr << "Cannot process '+' specifier '" << original_smiles_ptr << "'\n";
         return 0;
@@ -894,7 +895,7 @@ parse_smiles_token (const char * smiles,
         return 0;
       }
       int tmp = 0;
-      if (! process_charge_specifier (smiles, -1, fc, tmp))
+      if (! process_charge_specifier(smiles, -1, fc, tmp))
       {
         cerr << "Cannot process '-' specifier '" << original_smiles_ptr << "'\n";
         return 0;
@@ -914,7 +915,7 @@ parse_smiles_token (const char * smiles,
       }
 
       int tmp = 0;
-      if (! process_chirality_specifier (smiles, chiral_count, tmp))
+      if (! process_chirality_specifier(smiles, chiral_count, tmp))
       {
         cerr << "Cannot process chirality specifier '" << original_smiles_ptr << "'\n";
         return 0;
@@ -925,10 +926,10 @@ parse_smiles_token (const char * smiles,
 
       chiral_encountered++;
     }
-    else if (isdigit (*smiles) && 2 == rc && "R" == e->symbol())
+    else if (isdigit(*smiles) && 2 == rc && "R" == e->symbol())
     {
       int r = 0;
-      while (isdigit (*smiles) && rc < characters_to_process)
+      while (isdigit(*smiles) && rc < characters_to_process)
       {
         r = 10 * r + (*smiles) - '0';
         rc++;
@@ -937,7 +938,7 @@ parse_smiles_token (const char * smiles,
 
       IWString tmp;
       tmp << "R" << r;
-      e = fetch_or_create_R_element (tmp);
+      e = fetch_or_create_R_element(tmp);
       if (NULL == e)
       {
         cerr << "Cannot build R# from smiles '" << tmp << "'\n";
@@ -958,10 +959,9 @@ parse_smiles_token (const char * smiles,
       smiles += (tmp + 1);
       rc += (tmp + 1);
     }
-    else if (':' == *smiles && characters_to_process > 1 && isdigit(smiles[1]))    // an atom number specification, just ignore
+    else if (':' == *smiles && characters_to_process > 1 && isdigit(smiles[1]))    // an atom number specification
     {
-      int notused;
-      int tmp = fetch_numeric(smiles+1, notused);
+      int tmp = fetch_numeric_char(smiles+1, atom_map, characters_to_process);
       smiles += (tmp + 1);
       rc += (tmp + 1);
     }
@@ -986,19 +986,19 @@ parse_smiles_token (const char * smiles,
 int
 Molecule::read_molecule_smi_ds (iwstring_data_source & input)
 {
-  assert (input.good());
+  assert(input.good());
 
   if (input.eof())
     return 0;
 
   IWString buffer;
 
-  EXTRA_STRING_RECORD (input, buffer, "read mol smi");
+  EXTRA_STRING_RECORD(input, buffer, "read mol smi");
 
   if (buffer.length() < 1)
     return 0;
 
-  if (! build_from_smiles (buffer.chars()))
+  if (! build_from_smiles(buffer.rawchars(), buffer.length()))
   {
     cerr << "Molecule::read_molecule_smi_ds: Cannot interpret smiles\n";
     cerr << buffer << endl;
@@ -1026,7 +1026,7 @@ set_smiles_tag (const const_IWSubstring & tag)
 {
   smiles_tag = tag;
 
-  if (! smiles_tag.ends_with ('<'))
+  if (! smiles_tag.ends_with('<'))
     smiles_tag += '<';
 
   return;
@@ -1035,12 +1035,12 @@ set_smiles_tag (const const_IWSubstring & tag)
 int
 Molecule::read_molecule_tdt_ds (iwstring_data_source & input)
 {
-  assert (input.good());
+  assert(input.good());
 
   if (input.eof())
     return 0;
 
-  input.set_skip_blank_lines (1);
+  input.set_skip_blank_lines(1);
 
   const_IWSubstring buffer;
 
@@ -1051,17 +1051,17 @@ Molecule::read_molecule_tdt_ds (iwstring_data_source & input)
 
   while (1)
   {
-    EXTRA_STRING_RECORD (input, buffer, "read mol tdt");
+    EXTRA_STRING_RECORD(input, buffer, "read mol tdt");
 
-    if (buffer.starts_with (smiles_tag) && 0 == got_structure)    // we only parse the first smiles in a TDT
+    if (buffer.starts_with(smiles_tag) && 0 == got_structure)    // we only parse the first smiles in a TDT
     {
       buffer += smiles_tag.length();     // skip over '$SMI<'
 
-      int close_angle_bracket = buffer.index ('>');
-      assert (close_angle_bracket >= 1);
+      int close_angle_bracket = buffer.index('>');
+      assert(close_angle_bracket >= 1);
 
       buffer.chop();
-      if (! build_from_smiles (buffer.rawchars(), close_angle_bracket))
+      if (! build_from_smiles(buffer.rawchars(), close_angle_bracket))
       {
         cerr << "Molecule::read_molecule_tdt_ds: Cannot interpret smiles\n";
         return 0;
@@ -1071,29 +1071,29 @@ Molecule::read_molecule_tdt_ds (iwstring_data_source & input)
 
 //    If this is a tdt in dump form, look for a PCN<> attribute.
 
-      int i = buffer.find (">PCN<");
+      int i = buffer.find(">PCN<");
       if (i < 0)
         continue;
 
-      const_IWSubstring zrest = buffer.substr (i + 5);
+      const_IWSubstring zrest = buffer.substr(i + 5);
 
 //    cerr << "The rest is '" << zrest << "'\n";
 
       if (zrest.nchars())
       {
-        int j = zrest.find ('>');
-        zrest.iwtruncate (j);
-        set_name (zrest);
+        int j = zrest.find('>');
+        zrest.iwtruncate(j);
+        set_name(zrest);
       }
 
       return 1;     // molecule and name is all we can do in this case
     }
 
-    if (buffer.starts_with (identifier_dataitem) && 0 == got_identifier) // PCN follows $SMI
+    if (buffer.starts_with(identifier_dataitem) && 0 == got_identifier) // PCN follows $SMI
     {
-      IWString tmp = substr (buffer, identifier_dataitem.nchars());
+      IWString tmp = substr(buffer, identifier_dataitem.nchars());
       tmp.chop();
-      set_name (tmp);
+      set_name(tmp);
 
       got_identifier = 1;
 
@@ -1121,12 +1121,12 @@ Molecule::read_molecule_tdt_ds (iwstring_data_source & input)
 
     if (read_extra_text_info())
     {
-      IWString * tmp = new IWString (buffer);
-      _text_info.add (tmp);
+      IWString * tmp = new IWString(buffer);
+      _text_info.add(tmp);
     }
 
     if (got_structure)
-      check_for_append (buffer, add_to_name);
+      check_for_append(buffer, add_to_name);
   }
 }
 
@@ -1138,7 +1138,7 @@ parse_coordinates (const char * smiles,
 {
   smiles += characters_processed;
 
-  assert ('{' == smiles[0] && '{' == smiles[1]);
+  assert('{' == smiles[0] && '{' == smiles[1]);
 
   smiles += 2;
 
@@ -1162,9 +1162,9 @@ parse_coordinates (const char * smiles,
     return 0;
   }
 
-  const_IWSubstring c (smiles, close_brace);
+  const_IWSubstring c(smiles, close_brace);
 
-  if (! coords.read (c, ','))
+  if (! coords.read(c, ','))
   {
     cerr << "parse_coordinates: cannot parse coordinates '" << c << "'\n";
     return 0;
@@ -1218,7 +1218,7 @@ Molecule::_smiles_add_bond (atom_number_t previous_atom,
   else
     type_to_add = BOND_TYPE_ONLY(bt);
 
-  if (! add_bond (previous_atom, current_atom, type_to_add, 1))    // last arg, 1, means partial molecule
+  if (! add_bond(previous_atom, current_atom, type_to_add, 1))    // last arg, 1, means partial molecule
     return 0;
 
   if (0 == (bt & SMI_DIRECTIONAL_EITHER))       // non directional
@@ -1231,7 +1231,7 @@ Molecule::_smiles_add_bond (atom_number_t previous_atom,
 
   Bond * b = _things[previous_atom]->last_item();
 
-  assert (previous_atom == b->a1());
+  assert(previous_atom == b->a1());
 
   if (bt & SMI_DIRECTIONAL_UP)
     b->set_directional_up();
@@ -1271,42 +1271,70 @@ fetch_ring_number (const char * s,
 
 static int
 fetch_ring_number (const char * s,
+                   int nchars,
                    int & ring_number,
                    int & characters_processed)
 {
-  if (isdigit (*s))
+  if (isdigit(*s))
   {
     ring_number = *s - '0';
     characters_processed = 1;
     return 1;
   }
 
+#ifdef DEBUG_FETCH_RING_NUMBER
+  cerr << "fetch_ring_number:looking at '" << *s << "', nchars " << nchars << endl;
+  for (int i = 0; i < nchars; ++i)
+  {
+    cerr << s[i];
+  }
+  cerr << endl;
+#endif
+
   if ('%' != *s)
+    return 0;
+
+  if (nchars < 3)     // shortest would be %nn
     return 0;
 
   s++;    // skip over the %
 
+  if ('(' != *s)    // must be a simple %nn
+  {
+    if (2 != fetch_numeric_char(s, ring_number, 2))
+      return 0;
+
+    characters_processed = 3;
+
+    return 1;
+  }
+
+// The more complex case of %(nnn)
+
+  nchars -= 2;      // we have consumed %(
+  s++;
+
   ring_number = 0;
-  for (int i = 0; i < max_ring_digits_following_percent; i++)
+
+  for (int i = 0; i < nchars; i++)
   {
     int j = *s - '0';
 
-    if (j < 0 || j > 9)
+    if (j >= 0 && j <= 9)
     {
-      if (i < 2)      // must have at least two digits following the % sign
-        return 0;
-
-      characters_processed = 1 + i;
+      ring_number = 10 * ring_number + j;
+      s++;
+    }
+    else if (')' == *s)
+    {
+      characters_processed = i + 3;
       return 1;
     }
-
-    ring_number = 10 * ring_number + j;
-    s++;
+    else
+      return 0;
   }
 
-  characters_processed = 1 + max_ring_digits_following_percent;
-
-  return 1;
+  return 0;
 }
 
 /*
@@ -1335,12 +1363,12 @@ fetch_ring_number (const char * s,
 
 #define CTDIM 7
 
-static int * compatability_table = NULL;
+static int * compatability_table = NULL;     // never freed
 
 static int
 initialise_compatability_table()
 {
-  compatability_table = new_int (CTDIM * CTDIM);
+  compatability_table = new_int(CTDIM * CTDIM);
 
 // What can begin a smarts
 
@@ -1440,9 +1468,9 @@ Molecule::_build_from_smiles (const char * smiles,
 
   if (_elements_allocated - _number_elements < characters_to_process)
   {
-    resize (_elements_allocated + characters_to_process);
+    resize(_elements_allocated + characters_to_process);
     if (_bond_list.elements_allocated() - _bond_list.number_elements() < characters_to_process)
-      _bond_list.resize (_bond_list.elements_allocated() + characters_to_process);
+      _bond_list.resize(_bond_list.elements_allocated() + characters_to_process);
   }
 
 // Various stack to keep track of branches. Probably should be combined into
@@ -1465,13 +1493,13 @@ Molecule::_build_from_smiles (const char * smiles,
   {
     const char * s = smiles + characters_processed;
 
-    if (characters_processed && (isdigit (*s) || '%' == *s))
+    if (characters_processed && (isdigit(*s) || '%' == *s))
     {
       int ring_number;
       int nchars;
-      if (! fetch_ring_number (s, ring_number, nchars))
+      if (! fetch_ring_number(s, characters_to_process - characters_processed, ring_number, nchars))
       {
-        smiles_error_message (smiles, characters_to_process, characters_processed, "Invalid ring specification");
+        smiles_error_message(smiles, characters_to_process, characters_processed, "Invalid ring specification");
         return 0;
       }
 //    cerr << "NCHARS " << nchars << " for ring " << ring_number << endl;
@@ -1481,14 +1509,14 @@ Molecule::_build_from_smiles (const char * smiles,
         bt = previous_bond_type;
       else if (PREVIOUS_TOKEN_DOT == previous_token_was)
       {
-        smiles_error_message (smiles, characters_to_process, characters_processed, "Ring opening cannot begin smiles");
+        smiles_error_message(smiles, characters_to_process, characters_processed, "Ring opening cannot begin smiles");
         return 0;
       }
       else
         bt = NOT_A_BOND;
 
       atom_number_t other_end;    // will be set when a ring closure
-      if (ring_status.encounter (ring_number, previous_atom, other_end, bt))   // ring closing
+      if (ring_status.encounter(ring_number, previous_atom, other_end, bt))   // ring closing
       {
 #ifdef DEBUG_BUILD_FROM_SMILES
         cerr << "Ring closing for ring " << ring_number << ", other end is " << other_end << ", bond " << bt << endl;
@@ -1496,7 +1524,7 @@ Molecule::_build_from_smiles (const char * smiles,
 
         if (previous_atom == other_end)
         {
-          smiles_error_message (smiles, characters_to_process, characters_processed, "consecutive ring opening and closing");
+          smiles_error_message(smiles, characters_to_process, characters_processed, "consecutive ring opening and closing");
           return 0;
         }
 
@@ -1504,9 +1532,16 @@ Molecule::_build_from_smiles (const char * smiles,
             NOT_A_BOND != bt &&
             bt != previous_bond_type)
         {
-          if (file_scope_display_smiles_interpretation_error_messages)
-            cerr << "Inconsistent ring opening (" << bt << ") and closing (" << previous_bond_type << ") bond types\n";
-          return 0;
+          if ((SMI_DIRECTIONAL_DOWN    ^ bt) == previous_bond_type)   // OK to have directional bond one end only, never really tested directional bonds both ends...
+            bt = previous_bond_type;
+          else if ((SMI_DIRECTIONAL_UP ^ bt) == previous_bond_type)
+            bt = previous_bond_type;
+          else
+          {
+            if (file_scope_display_smiles_interpretation_error_messages)
+              cerr << "Inconsistent ring opening (" << bt << ") and closing (" << previous_bond_type << ") bond types\n";
+            return 0;
+          }
         }
 
         if (PREVIOUS_TOKEN_BOND_SPECIFIER == previous_token_was)
@@ -1517,21 +1552,21 @@ Molecule::_build_from_smiles (const char * smiles,
 //      If we are closing a ring with a directional bond, we are looking
 //      down the bond in the opposite direction from when it was initially placed
 
-        if (! _smiles_add_bond (previous_atom, other_end, bt))
+        if (! _smiles_add_bond(previous_atom, other_end, bt))
         {
-          smiles_error_message (smiles, characters_to_process, characters_processed, "invalid bonding arrangement");
+          smiles_error_message(smiles, characters_to_process, characters_processed, "invalid bonding arrangement");
           return 0;
         }
 
-        Chiral_Centre * c = chiral_centre_at_atom (other_end);
+        Chiral_Centre * c = chiral_centre_at_atom(other_end);
         if (c)
-          c->got_ring_closure_bond (ring_number, _number_elements - 1);
+          c->got_ring_closure_bond(ring_number, _number_elements - 1);
 
         if (previous_atom_chiral_count)    // the previous atom was chiral
         {
-          if (! _smi_atom_bonded_to_chiral_centre (previous_atom, previous_atom_chiral_count, other_end))
+          if (! _smi_atom_bonded_to_chiral_centre(previous_atom, previous_atom_chiral_count, other_end))
           {
-            smiles_error_message (smiles, characters_to_process, characters_processed,
+            smiles_error_message(smiles, characters_to_process, characters_processed,
                           "Error processing atom attached to chiral atom");
             return 0;
           }
@@ -1542,9 +1577,9 @@ Molecule::_build_from_smiles (const char * smiles,
 #ifdef DEBUG_BUILD_FROM_SMILES
         cerr << "Ring opening for ring " << ring_number << " previous atom chiral " << previous_atom << endl;
 #endif
-        Chiral_Centre * c = chiral_centre_at_atom (previous_atom);
-        assert (c);
-        c->got_ring_opening_bond (ring_number, previous_atom_chiral_count);
+        Chiral_Centre * c = chiral_centre_at_atom(previous_atom);
+        assert(c);
+        c->got_ring_opening_bond(ring_number, previous_atom_chiral_count);
       }
 #ifdef DEBUG_BUILD_FROM_SMILES
       else
@@ -1560,7 +1595,7 @@ Molecule::_build_from_smiles (const char * smiles,
     {
       if (PREVIOUS_TOKEN_BOND_SPECIFIER == previous_token_was)
       {
-        smiles_error_message (smiles, characters_to_process, characters_processed, "Consecutive bond symbols");
+        smiles_error_message(smiles, characters_to_process, characters_processed, "Consecutive bond symbols");
         return 0;
       }
       if (PREVIOUS_TOKEN_DOT == previous_token_was || PREVIOUS_TOKEN_NOT_SPECIFIED)
@@ -1576,7 +1611,7 @@ Molecule::_build_from_smiles (const char * smiles,
     {
       if (PREVIOUS_TOKEN_BOND_SPECIFIER == previous_token_was)
       {
-        smiles_error_message (smiles, characters_to_process, characters_processed, "Consecutive bond symbols");
+        smiles_error_message(smiles, characters_to_process, characters_processed, "Consecutive bond symbols");
         return 0;
       }
       if (PREVIOUS_TOKEN_DOT == previous_token_was || PREVIOUS_TOKEN_NOT_SPECIFIED)
@@ -1592,7 +1627,7 @@ Molecule::_build_from_smiles (const char * smiles,
     {
       if (PREVIOUS_TOKEN_BOND_SPECIFIER == previous_token_was)
       {
-        smiles_error_message (smiles, characters_to_process, characters_processed, "Consecutive bond symbols");
+        smiles_error_message(smiles, characters_to_process, characters_processed, "Consecutive bond symbols");
         return 0;
       }
       if (PREVIOUS_TOKEN_DOT == previous_token_was || PREVIOUS_TOKEN_NOT_SPECIFIED)
@@ -1608,7 +1643,7 @@ Molecule::_build_from_smiles (const char * smiles,
     {
       if (PREVIOUS_TOKEN_BOND_SPECIFIER == previous_token_was)
       {
-        smiles_error_message (smiles, characters_to_process, characters_processed, "Consecutive bond symbols");
+        smiles_error_message(smiles, characters_to_process, characters_processed, "Consecutive bond symbols");
         return 0;
       }
       if (PREVIOUS_TOKEN_DOT == previous_token_was || PREVIOUS_TOKEN_NOT_SPECIFIED)
@@ -1625,27 +1660,27 @@ Molecule::_build_from_smiles (const char * smiles,
     {
       if (0 != paren_level)
       {
-        smiles_error_message (smiles, characters_to_process, characters_processed, "Un-closed parenthesis");
+        smiles_error_message(smiles, characters_to_process, characters_processed, "Un-closed parenthesis");
         return 0;
       }
       if ( (PREVIOUS_TOKEN_ATOM_SPECIFIER != previous_token_was) &&
            (PREVIOUS_TOKEN_RING_SPECIFIER != previous_token_was))
       {
-        smiles_error_message (smiles, characters_to_process, characters_processed, "Improperly terminated smiles");
+        smiles_error_message(smiles, characters_to_process, characters_processed, "Improperly terminated smiles");
         return 0;
       }
 
       if (characters_to_process - characters_processed > 1)
-        smiles_set_name (s + 1, characters_to_process - characters_processed - 1, this);
+        smiles_set_name(s + 1, characters_to_process - characters_processed - 1, this);
 
       return 1;
     }
     else if ('(' == *s)
     {
-      if (! previous_token_should_be (previous_token_was, 
+      if (! previous_token_should_be(previous_token_was, 
                      PREVIOUS_TOKEN_ATOM_SPECIFIER | PREVIOUS_TOKEN_RING_SPECIFIER))
       {
-        smiles_error_message (smiles, characters_to_process, characters_processed, 
+        smiles_error_message(smiles, characters_to_process, characters_processed, 
                               "Branch specifier can only follow an atom or ring specifier");
         return 0;
       }
@@ -1654,29 +1689,29 @@ Molecule::_build_from_smiles (const char * smiles,
 
       paren_level++;
 
-      atom_stack.add (previous_atom);
-      chirality_stack.add (previous_atom_chiral_count);
+      atom_stack.add(previous_atom);
+      chirality_stack.add(previous_atom_chiral_count);
 
       characters_processed++;
       previous_token_was = PREVIOUS_TOKEN_OPEN_PAREN;
     }
     else if (characters_processed && ')' == *s)
     {
-      if (! previous_token_should_be (previous_token_was,
+      if (! previous_token_should_be(previous_token_was,
                 PREVIOUS_TOKEN_ATOM_SPECIFIER | PREVIOUS_TOKEN_RING_SPECIFIER))
       {
-        smiles_error_message (smiles, characters_to_process, characters_processed, "Close paren can only follow an atom");
+        smiles_error_message(smiles, characters_to_process, characters_processed, "Close paren can only follow an atom");
         return 0;
       }
       if (0 == atom_stack.number_elements())
       {
-        smiles_error_message (smiles, characters_to_process, characters_processed, "Parenthesis mismatch");
+        smiles_error_message(smiles, characters_to_process, characters_processed, "Parenthesis mismatch");
         return 0;
       }
 
       if (0 == paren_level)
       {
-        smiles_error_message (smiles, characters_to_process, characters_processed, "Too many close paren's");
+        smiles_error_message(smiles, characters_to_process, characters_processed, "Too many close paren's");
         return 0;
       }
 
@@ -1694,14 +1729,14 @@ Molecule::_build_from_smiles (const char * smiles,
     {
       if (0 != paren_level)
       {
-        smiles_error_message (smiles, characters_to_process, characters_processed,
+        smiles_error_message(smiles, characters_to_process, characters_processed,
                               "Mismatched parentheses");
         return 0;
       }
 
       if (! valid_end_of_smiles_character(previous_token_was))
       {
-        smiles_error_message (smiles, characters_to_process, characters_processed,
+        smiles_error_message(smiles, characters_to_process, characters_processed,
                               "Invalid end of smiles character");
         return 0;
       }
@@ -1716,11 +1751,11 @@ Molecule::_build_from_smiles (const char * smiles,
     }
     else if (characters_processed && ('/' == *s))
     {
-      if (! previous_token_should_be (previous_token_was, 
+      if (! previous_token_should_be(previous_token_was, 
                 PREVIOUS_TOKEN_ATOM_SPECIFIER | PREVIOUS_TOKEN_OPEN_PAREN |
                 PREVIOUS_TOKEN_RING_SPECIFIER))
       {
-        smiles_error_message (smiles, characters_to_process, characters_processed, "Incorrectly placed / bond");
+        smiles_error_message(smiles, characters_to_process, characters_processed, "Incorrectly placed / bond");
         return 0;
       }
        
@@ -1732,11 +1767,11 @@ Molecule::_build_from_smiles (const char * smiles,
     }
     else if (characters_processed && ('\\' == *s))
     {
-      if (! previous_token_should_be (previous_token_was, 
+      if (! previous_token_should_be(previous_token_was, 
                 PREVIOUS_TOKEN_ATOM_SPECIFIER | PREVIOUS_TOKEN_OPEN_PAREN |
                 PREVIOUS_TOKEN_RING_SPECIFIER))
       {
-        smiles_error_message (smiles, characters_to_process, characters_processed, "Incorrectly placed \\ bond");
+        smiles_error_message(smiles, characters_to_process, characters_processed, "Incorrectly placed \\ bond");
         return 0;
       }
        
@@ -1748,24 +1783,24 @@ Molecule::_build_from_smiles (const char * smiles,
     }
     else if ('{' == *s && characters_processed && (characters_to_process - characters_processed >=9) && '{' == s[1])
     {
-      if (! previous_token_should_be (previous_token_was, PREVIOUS_TOKEN_ATOM_SPECIFIER))
+      if (! previous_token_should_be(previous_token_was, PREVIOUS_TOKEN_ATOM_SPECIFIER))
       {
-        smiles_error_message (smiles, characters_to_process, characters_processed, "Coordinates must follow an atom");
+        smiles_error_message(smiles, characters_to_process, characters_processed, "Coordinates must follow an atom");
         return 0;
       }
 
       Coordinates coords;
 
-      int nchars = parse_coordinates (smiles, characters_to_process, characters_processed, coords);
+      int nchars = parse_coordinates(smiles, characters_to_process, characters_processed, coords);
       if (0 == nchars)
       {
-        smiles_error_message (smiles, characters_to_process, characters_processed, "cannot parse coordinates");
+        smiles_error_message(smiles, characters_to_process, characters_processed, "cannot parse coordinates");
         return 0;
       }
 
       characters_processed += nchars;
 
-      _things[_number_elements - 1]->setxyz (coords);
+      _things[_number_elements - 1]->setxyz(coords);
     }
     else
     {
@@ -1775,15 +1810,16 @@ Molecule::_build_from_smiles (const char * smiles,
       int hcount;
       int chiral_count;
       int atomic_mass = 0;
+      int amap = 0;
 
       int tmp;
       if ('[' == *s)
-        tmp = parse_smiles_token (s, characters_to_process - characters_processed,
-                                  e, aromatic, fc, hcount, chiral_count, atomic_mass);
+        tmp = parse_smiles_token(s, characters_to_process - characters_processed,
+                                  e, aromatic, fc, hcount, chiral_count, atomic_mass, amap);
 
       else
       {
-        tmp = parse_smiles_token (s, characters_to_process - characters_processed, e, aromatic);
+        tmp = parse_smiles_token(s, characters_to_process - characters_processed, e, aromatic);
 //      cerr << "After parsing '" << s[0] << "' arom " << aromatic << endl;
 
         hcount = 0;
@@ -1797,32 +1833,35 @@ Molecule::_build_from_smiles (const char * smiles,
               " fc = " << fc << " hcount = " << hcount;
       if (chiral_count)
         cerr << " chiral = " << chiral_count;
+
+      if (amap)
+        cerr << " atom map " << amap;
       cerr << endl;
 #endif
 
       if (0 == tmp)
       {
-        smiles_error_message (smiles, characters_to_process, characters_processed, "Cannot parse");
+        smiles_error_message(smiles, characters_to_process, characters_processed, "Cannot parse");
         return 0;
       }
 
-      Atom * a = new Atom (e);
-      a->resize (3);
+      Atom * a = new Atom(e);
+      a->resize(3);
 
       if (atomic_mass)
-        a->set_isotope (atomic_mass);
+        a->set_isotope(atomic_mass);
       if (fc)
-        a->set_formal_charge (fc);
+        a->set_formal_charge(fc);
 
 //    Oct 2000. Try the underlying ::add() call. Should be OK... 
 
-      resizable_array_p<Atom>::add (a);
+      resizable_array_p<Atom>::add(a);
 
       if (AROMATICITY_NOT_DETERMINED != aromatic)
       {
         if (! input_aromatic_structures())
         {
-          smiles_error_message (smiles, characters_to_process, characters_processed, "aromatic smiles input not enabled");
+          smiles_error_message(smiles, characters_to_process, characters_processed, "aromatic smiles input not enabled");
           return 0;
         }
         aromatic_atoms[_number_elements - 1] = 1;
@@ -1831,10 +1870,15 @@ Molecule::_build_from_smiles (const char * smiles,
 //    If any specific hcount value came in make sure to set it as a known value.
 
       if (hcount)
-        a->set_implicit_hydrogens (hcount);
+        a->set_implicit_hydrogens(hcount);
+
+      if (amap > 0)
+        a->set_atom_map(amap);
+
+//    cerr << "Atom map " << a->atom_map() << endl;
 
       if ('[' == *s)
-        a->set_implicit_hydrogens_known (1);
+        a->set_implicit_hydrogens_known(1);
 
       if (INVALID_ATOM_NUMBER != previous_atom)
       {
@@ -1850,13 +1894,13 @@ Molecule::_build_from_smiles (const char * smiles,
           cerr << "New atom is chiral\n";
 #endif
 
-        _smiles_add_bond (previous_atom, _number_elements - 1, bt);
+        _smiles_add_bond(previous_atom, _number_elements - 1, bt);
 
         if (previous_atom_chiral_count)    // the previous atom was chiral
         {
-          if (! _smi_atom_bonded_to_chiral_centre (previous_atom, previous_atom_chiral_count, _number_elements - 1))
+          if (! _smi_atom_bonded_to_chiral_centre(previous_atom, previous_atom_chiral_count, _number_elements - 1))
           {
-            smiles_error_message (smiles, characters_to_process, characters_processed,
+            smiles_error_message(smiles, characters_to_process, characters_processed,
                           "Error processing atom attached to chiral atom");
             return 0;
           }
@@ -1870,20 +1914,20 @@ Molecule::_build_from_smiles (const char * smiles,
       {
         if (hcount > 1)
         {
-          smiles_error_message (smiles, characters_to_process, characters_processed,
+          smiles_error_message(smiles, characters_to_process, characters_processed,
                         "Too many Hydrogens on chiral atom");
           return 0;
         }
 
-        Chiral_Centre * tmp = new Chiral_Centre (_number_elements - 1);
-        if (! _smi_process_new_chiral_centre (tmp, hcount))
+        Chiral_Centre * tmp = new Chiral_Centre(_number_elements - 1);
+        if (! _smi_process_new_chiral_centre(tmp, hcount))
         {
           delete tmp;
-          smiles_error_message (smiles, characters_to_process, characters_processed,
+          smiles_error_message(smiles, characters_to_process, characters_processed,
                         "Error processing chiral specifier");
           return 0;
         }
-        _chiral_centres.add (tmp);
+        _chiral_centres.add(tmp);
       }
 
       previous_atom = _number_elements - 1;
@@ -1896,15 +1940,18 @@ Molecule::_build_from_smiles (const char * smiles,
 
   if (0 != paren_level)
   {
-    smiles_error_message (smiles, characters_to_process, characters_processed, "mismatched parentheses");
+    smiles_error_message(smiles, characters_to_process, characters_processed, "mismatched parentheses");
     return 0;
   }
 
   if (! valid_end_of_smiles_character(previous_token_was))
   {
-    smiles_error_message (smiles, characters_to_process, characters_processed, "invalid smiles end");
+    smiles_error_message(smiles, characters_to_process, characters_processed, "invalid smiles end");
     return 0;
   }
+
+//cerr << "LINE " << __LINE__ << " smiles\n";
+//debug_print(cerr);
 
   return 1;
 }
@@ -1915,14 +1962,14 @@ Molecule::_build_from_smiles (const char * smiles, int nchars,
 {
   Smiles_Ring_Status ring_status;
 
-  int rc = _build_from_smiles (smiles, nchars, ring_status, aromatic_atoms);
+  int rc = _build_from_smiles(smiles, nchars, ring_status, aromatic_atoms);
 
   if (rc && ! ring_status.complete())
   {
     if (file_scope_display_smiles_interpretation_error_messages)
     {
       cerr << "Hanging ring closures\n";
-      ring_status.report_hanging_ring_closures (cerr);
+      ring_status.report_hanging_ring_closures(cerr);
     }
     return 0;
   }
@@ -1933,20 +1980,20 @@ Molecule::_build_from_smiles (const char * smiles, int nchars,
 //(void) _assign_directional_bonds();
 
   if (ignore_all_chiral_information_on_input())
-    _chiral_centres.resize (0);
+    _chiral_centres.resize(0);
   else if (! _check_for_incomplete_chiral_specifications())
     return 0;
 
 // If we read any aromatic atoms, we must find a kekule form
 
-  if (aromatic_atoms && locate_item_in_array (1, _number_elements, aromatic_atoms) >= 0)
+  if (aromatic_atoms && locate_item_in_array(1, _number_elements, aromatic_atoms) >= 0)
   {
     if (add_implicit_hydrogens_to_isotopic_atoms_needing_hydrogens())
       _do_unfix_implicit_hydrogens_on_aromatic_isotopic_atoms(aromatic_atoms);
     else if (unset_all_implicit_hydrogens_known_attributes)
       _unset_all_implicit_hydrogens_known_attributes();
 
-    if (! find_kekule_form (aromatic_atoms))
+    if (! find_kekule_form(aromatic_atoms))
     {
       if (display_no_kekule_form_message())
         cerr << "Molecule::_build_from_smiles:find kekule form failed '" << _molecule_name << "'";
@@ -1991,7 +2038,7 @@ Molecule::_build_from_smiles (const char * smiles, int nchars)
 {
   resize (0);
 
-  assert (nchars > 0);
+  assert(nchars > 0);
 
   if ('.' != smiles[0])
     ;
@@ -1999,17 +2046,17 @@ Molecule::_build_from_smiles (const char * smiles, int nchars)
     return 1;
   else if (' ' == smiles[1])
   {
-    _molecule_name.set (smiles + 2, nchars - 2);
+    _molecule_name.set(smiles + 2, nchars - 2);
     return 1;
   }
 
   int * tmp;
   if (input_aromatic_structures())
-    tmp = new_int (nchars);
+    tmp = new_int(nchars);
   else 
     tmp = NULL;
 
-  int rc = _build_from_smiles (smiles, nchars, tmp);
+  int rc = _build_from_smiles(smiles, nchars, tmp);
 
   if (tmp)
     delete [] tmp;
@@ -2025,26 +2072,26 @@ Molecule::_build_from_smiles (const char * smiles, int nchars)
 int
 Molecule::build_from_smiles (const char * smiles)
 {
-  return build_from_smiles (smiles, static_cast<int>(strlen (smiles)));
+  return build_from_smiles(smiles, static_cast<int>(strlen(smiles)));
 }
 
 int
 Molecule::build_from_smiles (const char * smiles,
                              int nchars)
 {
-  return _build_from_smiles (smiles, nchars);
+  return _build_from_smiles(smiles, nchars);
 }
 
 int
 Molecule::build_from_smiles (const const_IWSubstring & smiles)
 {
-  return _build_from_smiles (smiles.rawchars(), smiles.nchars());
+  return _build_from_smiles(smiles.rawchars(), smiles.nchars());
 }
 
 int
 Molecule::build_from_smiles (const IWString & smiles)
 {
-  return _build_from_smiles (smiles.rawchars(), smiles.nchars());
+  return _build_from_smiles(smiles.rawchars(), smiles.nchars());
 }
 
 /*
@@ -2058,11 +2105,11 @@ static IWString datatype_name_for_structure_in_tdt_files = "$SMI<";
 int 
 set_datatype_name_for_structure_in_tdt_files (const char * new_dtname)
 {
-  assert (strlen (new_dtname));
+  assert(strlen(new_dtname));
 
   datatype_name_for_structure_in_tdt_files = new_dtname;
 
-  if (! datatype_name_for_structure_in_tdt_files.ends_with ('<'))
+  if (! datatype_name_for_structure_in_tdt_files.ends_with('<'))
     datatype_name_for_structure_in_tdt_files += '<';
 
   return 1;
@@ -2073,12 +2120,12 @@ set_datatype_name_for_structure_in_tdt_files (const char * new_dtname)
 */
 
 int
-Molecule::_write_molecule_tdt_pcn (ostream & os,
+Molecule::_write_molecule_tdt_pcn (std::ostream & os,
                                     const IWString & comment) const
 {
   if (_molecule_name.length())
   {
-    if (_molecule_name.contains ('>') || _molecule_name.contains ('|'))
+    if (_molecule_name.contains('>') || _molecule_name.contains('|'))
       os << "PCN<" << '"' << _molecule_name << "\">" << newline_string();
     else
       os << "PCN<" << _molecule_name << '>' << newline_string();
@@ -2143,48 +2190,48 @@ is_three_dots (const const_IWSubstring & smarts,
     if ('}' != smarts[i])
       continue;
 
-    smarts.from_to (characters_processed, i, three_dots_qualifier);
+    smarts.from_to(characters_processed, i, three_dots_qualifier);
     return 1;
   }
 
 // Never found a closing brace, bad news
 
-  smarts.from_to (characters_processed + 3, smarts_length - 1, three_dots_qualifier);
+  smarts.from_to(characters_processed + 3, smarts_length - 1, three_dots_qualifier);
 
   return 1;
 }
 
 int
-Molecule::write_molecule_tdt (ostream & os, const IWString & comment)
+Molecule::write_molecule_tdt (std::ostream & os, const IWString & comment)
 {
-  assert (ok());
-  assert (os.good());
+  assert(ok());
+  assert(os.good());
 
   os << datatype_name_for_structure_in_tdt_files << smiles() << '>' << newline_string();
 
-  return _write_molecule_tdt_pcn (os, comment);
+  return _write_molecule_tdt_pcn(os, comment);
 }
 
 int
-Molecule::write_molecule_tdt_unique (ostream & os, const IWString & comment)
+Molecule::write_molecule_tdt_unique (std::ostream & os, const IWString & comment)
 {
-  assert (ok());
-  assert (os.good());
+  assert(ok());
+  assert(os.good());
 
   os << datatype_name_for_structure_in_tdt_files << unique_smiles() << '>' << newline_string();
 
-  return _write_molecule_tdt_pcn (os, comment);
+  return _write_molecule_tdt_pcn(os, comment);
 }
 
 int
-Molecule::write_molecule_tdt_nausmi (ostream & os, const IWString & comment)
+Molecule::write_molecule_tdt_nausmi (std::ostream & os, const IWString & comment)
 {
-  assert (ok());
-  assert (os.good());
+  assert(ok());
+  assert(os.good());
 
   os << datatype_name_for_structure_in_tdt_files << non_aromatic_unique_smiles() << '>' << newline_string();
 
-  return _write_molecule_tdt_pcn (os, comment);
+  return _write_molecule_tdt_pcn(os, comment);
 }
 
 /*
@@ -2257,13 +2304,13 @@ Substructure_Atom::_parse_smarts_specifier (const const_IWSubstring & qsmarts,
     cerr << "Examining smarts token '" << *s << "', previous " << previous_token_was << endl;
 #endif
 
-    if (characters_processed && (isdigit (*s) || '%' == *s))
+    if (characters_processed && (isdigit(*s) || '%' == *s))    // we do not properly handle chirality here, fix sometime...
     {
       int ring_number;
       int nchars;
-      if (! fetch_ring_number (s, ring_number, nchars))
+      if (! fetch_ring_number(s, characters_to_process - characters_processed, ring_number, nchars))
       {
-        smiles_error_message (smarts, characters_to_process, characters_processed, "Invalid ring specification");
+        smiles_error_message(smarts, characters_to_process, characters_processed, "Invalid ring specification");
         return 0;
       }
 
@@ -2272,19 +2319,23 @@ Substructure_Atom::_parse_smarts_specifier (const const_IWSubstring & qsmarts,
 #endif
 
       Substructure_Bond * b;
+      bond_type_t bt = SINGLE_BOND; 
       if (PREVIOUS_TOKEN_WAS_BOND == previous_token_was)
+      {
         b = previous_bond;
+        bt = previous_bond->types_matched();
+      }
       else
       {
-        b = new Substructure_Bond;
+        b = new Substructure_Bond;                   // never freed, memory leak.
         b->make_single_or_aromatic();
+        bt = NOT_A_BOND;
       }
 
-      bond_type_t bt = SINGLE_BOND;             // not really used here
       atom_number_t other_end;    // will be set when a ring closure
-      if (ring_status.encounter (ring_number, previous_atom->unique_id(), other_end, bt))   // ring closing.
+      if (ring_status.encounter(ring_number, previous_atom->unique_id(), other_end, bt))   // ring closing.
       {
-        assert (NULL != completed[other_end]);
+        assert(NULL != completed[other_end]);
 
 #ifdef DEBUG_BUILD_FROM_SMARTS
         cerr << "Ring closure, atom at other end is " << other_end << " prev " << previous_atom->unique_id() << endl;
@@ -2296,27 +2347,28 @@ Substructure_Atom::_parse_smarts_specifier (const const_IWSubstring & qsmarts,
           return 0;
         }
 
-        b->set_atom (completed[other_end]);
-        previous_atom->_add_bond (b);
+        b->set_atom(completed[other_end]);
+        b->set_type(bt);
+        previous_atom->_add_bond(b);
       }
 
       previous_bond = NULL;
       characters_processed += nchars;
       previous_token_was = PREVIOUS_TOKEN_WAS_RING;
     }
-    else if (LOOKS_LIKE_SMARTS_BOND (*s) && check_compatiability_table (previous_token_was, PREVIOUS_TOKEN_WAS_BOND))
+    else if (LOOKS_LIKE_SMARTS_BOND(*s) && check_compatiability_table(previous_token_was, PREVIOUS_TOKEN_WAS_BOND))
     {
       if (NULL != previous_bond)
       {
-        smiles_error_message (smarts, characters_to_process, characters_processed, "Consecutive bonds");
+        smiles_error_message(smarts, characters_to_process, characters_processed, "Consecutive bonds");
         return 0;
       }
 
       previous_bond = new Substructure_Bond;
       int ncb;
-      if (! previous_bond->construct_from_smarts (s, characters_to_process - characters_processed, ncb))
+      if (! previous_bond->construct_from_smarts(s, characters_to_process - characters_processed, ncb))
       {
-        smiles_error_message (smarts, characters_to_process, characters_processed, "Cannot parse bond specifier");
+        smiles_error_message(smarts, characters_to_process, characters_processed, "Cannot parse bond specifier");
         return 0;
       }
 
@@ -2325,11 +2377,11 @@ Substructure_Atom::_parse_smarts_specifier (const const_IWSubstring & qsmarts,
       cerr << "Recognised as bond\n";
 #endif
     }
-    else if (is_three_dots (qsmarts, characters_processed, three_dots_qualifier) && check_compatiability_table (previous_token_was, PREVIOUS_TOKEN_WAS_THREE_DOTS))
+    else if (is_three_dots(qsmarts, characters_processed, three_dots_qualifier) && check_compatiability_table(previous_token_was, PREVIOUS_TOKEN_WAS_THREE_DOTS))
     {
       if (NULL != previous_bond)
       {
-        smiles_error_message (smarts, characters_to_process, characters_processed, "Cannot have ... after bond");
+        smiles_error_message(smarts, characters_to_process, characters_processed, "Cannot have ... after bond");
         return 0;
       }
 
@@ -2339,30 +2391,30 @@ Substructure_Atom::_parse_smarts_specifier (const const_IWSubstring & qsmarts,
 
       characters_processed += 3 + three_dots_qualifier.length();
 
-      Bond * b = new Bond (previous_atom->unique_id(), pst.last_query_atom_created() + 1, SINGLE_BOND);
-      pst.add_no_matched_atoms_between (b);
+      Bond * b = new Bond(previous_atom->unique_id(), pst.last_query_atom_created() + 1, SINGLE_BOND);
+      pst.add_no_matched_atoms_between(b);
 
       if (three_dots_qualifier.length())
       {
         Link_Atom * l = new Link_Atom;
-        if (! l->initialise_from_smarts (three_dots_qualifier))
+        if (! l->initialise_from_smarts(three_dots_qualifier))
         {
           delete l;
-          smiles_error_message (smarts, characters_to_process, characters_processed, "Invalid three dots qualifier\n");
+          smiles_error_message(smarts, characters_to_process, characters_processed, "Invalid three dots qualifier\n");
           return 0;
         }
 
-        l->set_a1 (previous_atom->unique_id());
-        l->set_a2 (pst.last_query_atom_created() + 1);
+        l->set_a1(previous_atom->unique_id());
+        l->set_a2(pst.last_query_atom_created() + 1);
 
-        pst.add_link_atom (l);
+        pst.add_link_atom(l);
       }
 
       Substructure_Atom * a = new Substructure_Atom;
-      pst.add_root_atom (a);
+      pst.add_root_atom(a);
 
-      const_IWSubstring newsmarts (qsmarts);
-      newsmarts.remove_leading_chars (characters_processed);
+      const_IWSubstring newsmarts(qsmarts);
+      newsmarts.remove_leading_chars(characters_processed);
 
       if (0 == newsmarts.length())
       {
@@ -2370,7 +2422,7 @@ Substructure_Atom::_parse_smarts_specifier (const const_IWSubstring & qsmarts,
         return 0;
       }
 
-      return a->_parse_smarts_specifier (newsmarts, pst, atoms_in_previous_disconnected_sections + atoms_this_fragment, ring_status);
+      return a->_parse_smarts_specifier(newsmarts, pst, atoms_in_previous_disconnected_sections + atoms_this_fragment, ring_status);
     }
     else if (' ' == *s)
     {
@@ -2379,7 +2431,7 @@ Substructure_Atom::_parse_smarts_specifier (const const_IWSubstring & qsmarts,
 #endif
       if (0 != paren_level)
       {
-        smiles_error_message (smarts, characters_to_process, characters_processed, "Un-closed parenthesis");
+        smiles_error_message(smarts, characters_to_process, characters_processed, "Un-closed parenthesis");
         return 0;
       }
 
@@ -2387,42 +2439,42 @@ Substructure_Atom::_parse_smarts_specifier (const const_IWSubstring & qsmarts,
     }
     else if ('(' == *s)
     {
-      if (! check_compatiability_table (previous_token_was, PREVIOUS_TOKEN_WAS_OPEN_PAREN))
+      if (! check_compatiability_table(previous_token_was, PREVIOUS_TOKEN_WAS_OPEN_PAREN))
       {
-        smiles_error_message (smarts, characters_to_process, characters_processed, 
+        smiles_error_message(smarts, characters_to_process, characters_processed, 
                               "Branch specifier can only follow an atom or ring specifier");
         return 0;
       }
 
-      assert (NULL == previous_bond);
+      assert(NULL == previous_bond);
 
 //    Push the various stacks.
 
-      assert (NULL == previous_bond);
+      assert(NULL == previous_bond);
 
       paren_level++;
 
-      atom_stack.add (previous_atom);
-      chirality_stack.add (previous_atom_chiral_count);
+      atom_stack.add(previous_atom);
+      chirality_stack.add(previous_atom_chiral_count);
 
       characters_processed++;
     }
     else if (characters_processed && ')' == *s)
     {
-      if (! check_compatiability_table (previous_token_was, PREVIOUS_TOKEN_WAS_CLOSE_PAREN))
+      if (! check_compatiability_table(previous_token_was, PREVIOUS_TOKEN_WAS_CLOSE_PAREN))
       {
-        smiles_error_message (smarts, characters_to_process, characters_processed, "Close paren can only follow an atom");
+        smiles_error_message(smarts, characters_to_process, characters_processed, "Close paren can only follow an atom");
         return 0;
       }
       if (0 == atom_stack.number_elements())
       {
-        smiles_error_message (smarts, characters_to_process, characters_processed, "Parenthesis mismatch");
+        smiles_error_message(smarts, characters_to_process, characters_processed, "Parenthesis mismatch");
         return 0;
       }
 
       if (0 == paren_level)
       {
-        smiles_error_message (smarts, characters_to_process, characters_processed, "Too many close paren's");
+        smiles_error_message(smarts, characters_to_process, characters_processed, "Too many close paren's");
         return 0;
       }
 
@@ -2430,7 +2482,7 @@ Substructure_Atom::_parse_smarts_specifier (const const_IWSubstring & qsmarts,
 
       if (NULL != previous_bond)
       {
-        smiles_error_message (smarts, characters_to_process, characters_processed, "Closing paren after bond??");
+        smiles_error_message(smarts, characters_to_process, characters_processed, "Closing paren after bond??");
         return 0;
       }
 
@@ -2443,15 +2495,15 @@ Substructure_Atom::_parse_smarts_specifier (const const_IWSubstring & qsmarts,
     }
     else if ('.' == *s)
     {
-      smiles_error_message (smarts, characters_to_process, characters_processed, 
+      smiles_error_message(smarts, characters_to_process, characters_processed, 
                             "disconnect '.' not allowed in smarts");
       return 0;
     }
     else if (characters_processed && ('/' == *s))
     {
-      if (! check_compatiability_table (previous_token_was, PREVIOUS_TOKEN_WAS_BOND))
+      if (! check_compatiability_table(previous_token_was, PREVIOUS_TOKEN_WAS_BOND))
       {
-        smiles_error_message (smarts, characters_to_process, characters_processed, "Incorrectly placed / bond");
+        smiles_error_message(smarts, characters_to_process, characters_processed, "Incorrectly placed / bond");
         return 0;
       }
        
@@ -2462,9 +2514,9 @@ Substructure_Atom::_parse_smarts_specifier (const const_IWSubstring & qsmarts,
     }
     else if (characters_processed && ('\\' == *s))
     {
-      if (! check_compatiability_table (previous_token_was, PREVIOUS_TOKEN_WAS_BOND))
+      if (! check_compatiability_table(previous_token_was, PREVIOUS_TOKEN_WAS_BOND))
       {
-        smiles_error_message (smarts, characters_to_process, characters_processed, "Incorrectly placed \\ bond");
+        smiles_error_message(smarts, characters_to_process, characters_processed, "Incorrectly placed \\ bond");
         return 0;
       }
        
@@ -2475,9 +2527,9 @@ Substructure_Atom::_parse_smarts_specifier (const const_IWSubstring & qsmarts,
     }
     else
     {
-      if (! check_compatiability_table (previous_token_was, PREVIOUS_TOKEN_WAS_ATOM))
+      if (! check_compatiability_table(previous_token_was, PREVIOUS_TOKEN_WAS_ATOM))
       {
-        smiles_error_message (smarts, characters_to_process, characters_processed, "incorrectly placed atom");
+        smiles_error_message(smarts, characters_to_process, characters_processed, "incorrectly placed atom");
         return 0;
       }
 
@@ -2489,11 +2541,11 @@ Substructure_Atom::_parse_smarts_specifier (const const_IWSubstring & qsmarts,
 
       int tmp;
       if ('[' == *s)
-        tmp = a->construct_from_smarts_token (s, characters_to_process - characters_processed);
+        tmp = a->construct_from_smarts_token(s, characters_to_process - characters_processed);
       else if ('*' == *s)
         tmp = 1;
       else
-        tmp = a->construct_from_smiles_token (s, characters_to_process - characters_processed);
+        tmp = a->construct_from_smiles_token(s, characters_to_process - characters_processed);
 
 #ifdef DEBUG_BUILD_FROM_SMARTS
       cerr << "After processing '" << s << "' tmp = " << tmp << endl;
@@ -2501,16 +2553,18 @@ Substructure_Atom::_parse_smarts_specifier (const const_IWSubstring & qsmarts,
 
       if (0 == tmp)
       {
-        smiles_error_message (smarts, characters_to_process, characters_processed, "Cannot parse smarts");
+        smiles_error_message(smarts, characters_to_process, characters_processed, "Cannot parse smarts");
         if (atoms_this_fragment > 0)      // only delete A if we created it
           delete a;
         return 0;
       }
 
       completed[atoms_in_previous_disconnected_sections + atoms_this_fragment] = a;
-      pst.set_last_query_atom_created (atoms_in_previous_disconnected_sections + atoms_this_fragment);
+      pst.set_last_query_atom_created(atoms_in_previous_disconnected_sections + atoms_this_fragment);
 
-      a->set_initial_atom_number (atoms_in_previous_disconnected_sections + atoms_this_fragment);
+      if (a->initial_atom_number() < 0)    // only change it if it is unset
+        a->set_initial_atom_number(atoms_in_previous_disconnected_sections + atoms_this_fragment);
+
       a->set_unique_id (atoms_in_previous_disconnected_sections + atoms_this_fragment);
 
       atoms_this_fragment++;
@@ -2531,8 +2585,8 @@ Substructure_Atom::_parse_smarts_specifier (const const_IWSubstring & qsmarts,
         cerr << "Making bond between atom " << previous_atom->unique_id() << " and " << atoms_this_fragment - 1 << endl;
 #endif
 
-        b->set_atom (previous_atom);
-        a->_add_bond (b);
+        b->set_atom(previous_atom);
+        a->_add_bond(b);
 
         previous_bond = NULL;
       }
@@ -2548,13 +2602,13 @@ Substructure_Atom::_parse_smarts_specifier (const const_IWSubstring & qsmarts,
 
   if (0 != paren_level)
   {
-    smiles_error_message (smarts, characters_to_process, characters_processed, "mismatched parentheses");
+    smiles_error_message(smarts, characters_to_process, characters_processed, "mismatched parentheses");
     return 0;
   }
 
   if (PREVIOUS_TOKEN_WAS_BOND == previous_token_was)
   {
-    smiles_error_message (smarts, characters_to_process, characters_processed, "a smarts cannot end with a bond");
+    smiles_error_message(smarts, characters_to_process, characters_processed, "a smarts cannot end with a bond");
     return 0;
   }
 
@@ -2575,12 +2629,12 @@ Substructure_Atom::parse_smarts_specifier (const const_IWSubstring & smarts,
                                            Parse_Smarts_Tmp & pst,
                                            int atoms_in_previous_disconnected_sections)
 {
-  const_IWSubstring mysmarts (smarts);
+  const_IWSubstring mysmarts(smarts);
   mysmarts.strip_leading_blanks();
 
   Smiles_Ring_Status ring_status;
 
-  int rc = _parse_smarts_specifier (mysmarts, pst, atoms_in_previous_disconnected_sections, ring_status);
+  int rc = _parse_smarts_specifier(mysmarts, pst, atoms_in_previous_disconnected_sections, ring_status);
 
   _attributes_specified = attributes_specified();
 
@@ -2591,7 +2645,7 @@ Substructure_Atom::parse_smarts_specifier (const const_IWSubstring & smarts,
 
   if (! ring_status.complete())
   {
-    ring_status.report_hanging_ring_closures (cerr);
+    ring_status.report_hanging_ring_closures(cerr);
     return 0;
   }
 
@@ -2603,12 +2657,13 @@ Substructure_Atom::parse_smarts_specifier (const_IWSubstring & smarts)
 {
   Parse_Smarts_Tmp pst;
 
-  pst.set_natoms (smarts.length());
+  pst.set_natoms(smarts.length());
 
   int notused = 0;
 
-  return parse_smarts_specifier (smarts, pst, notused);
+  return parse_smarts_specifier(smarts, pst, notused);
 }
+
 void
 reset_smi_file_scope_variables ()
 {
@@ -2617,7 +2672,6 @@ reset_smi_file_scope_variables ()
   identifier_dataitem  = "PCN<";
   dataitems_to_append.resize(0);
   append_dataitem_content = 1;
-  max_ring_digits_following_percent = 2;
   file_scope_display_smiles_interpretation_error_messages = 1;
   smi_element_star = NULL;   // initialised for check in parse_smiles_token
   ignore_tdts_with_no_smiles = 0;
@@ -2631,4 +2685,3 @@ reset_smi_file_scope_variables ()
 
   return;
 }
-// arch-tag: 7d66c747-e053-4ed8-b902-0db6e7234a5d

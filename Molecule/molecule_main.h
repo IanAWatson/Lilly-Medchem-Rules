@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef MOLECULE_MAIN_H
 #define MOLECULE_MAIN_H
 
@@ -32,6 +14,8 @@
 
     int  _remove_atom (atom_number_t);
 
+    void remove_atom_from_charge_arrays (const atom_number_t atom_to_remove);
+
     int _invalidate_for_changed_isotope ();
     int _exact_mass (const int * element_count, int highest_atomic_number,
                      int non_periodic_table_elements_present,
@@ -41,5 +25,8 @@
                             distance_t d, int * either_side);
 
     int _set_isotope_zero(atom_number_t zatom);
+
+    int _all_connections_saturated (const atom_number_t zatom, const atom_number_t ignore) const;
+    int _double_bond_needs_changing_for_graph_form (const Bond & b, const Mol2Graph & mol2graph) const;
 
 #endif

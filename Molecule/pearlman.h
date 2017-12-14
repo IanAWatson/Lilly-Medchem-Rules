@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef PEARLMAN_SSSR_H
 #define PEARLMAN_SSSR_H
 
@@ -51,7 +33,7 @@ class Beep: public IW_Bits_Base
     Beep (int);
 
     int ok () const;
-    int debug_print (ostream &) const;
+    int debug_print (std::ostream &) const;
 
     void set_pi_electrons (int p) { _pi_electrons = p;}
     int pi_electrons () const { return _pi_electrons;}
@@ -95,7 +77,7 @@ class Path_Message : public Beep
     Path_Message (const Path_Message *);
 
     int ok () const;
-    int debug_print (ostream &);
+    int debug_print (std::ostream &);
 
     atom_number_t start_atom () const { return _start_atom;}
     atom_number_t last_atom () const { return _last_atom;}
@@ -213,13 +195,13 @@ class Tnode
     ~Tnode ();
 
     int ok () const;
-    int debug_print (ostream &) const;
+    int debug_print (std::ostream &) const;
 
     int acon () const { return _acon;}
 
     void is_connected_to (int, atom_number_t, int);
 
-    int print_paths (ostream &) const;
+    int print_paths (std::ostream &) const;
 
     void receive (Path_Message * p) { _receive_buffer.add (p);}
 

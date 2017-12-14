@@ -1,23 +1,5 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef IWSTRING_H
-#define IWSTRING_H
+#define IWSTRING_H 1
 
 #if (__GNUC__ == 3)
 #if defined(linux)
@@ -26,6 +8,7 @@
 #endif
 
 #include <cstring>
+#include <iostream>
 
 #include <assert.h>
 
@@ -39,13 +22,8 @@
 #include <sstream>
 #endif
 
-/*#if defined (IWSGI) || (__GNUC_MINOR__ == 95)
-#include <strstream>
-#else
-#include <sstream>
-#endif*/
-
-using namespace std;
+using std::cerr;
+using std::endl;
 
 #if defined (__STRING__) || defined (__SGI_STL_STRING) || defined (_CPP_STRING) || defined (_IOSTREAM_) || defined (__STD_IOSTREAM__) || defined (_STLP_IOSTREAM) || defined (_GLIBCXX_STRING)
 #define IW_STD_STRING_DEFINED 1
@@ -128,7 +106,7 @@ class const_IWSubstring
     const_IWSubstring & operator = (const std::string &);
 #endif
 
-    int debug_print (ostream &) const;
+    int debug_print (std::ostream &) const;
 
     void make_empty () { _data = NULL; _nchars = 0;};
     void set (const char * s, int l) { _data = s; _nchars = l;}
@@ -136,6 +114,9 @@ class const_IWSubstring
 
     int length () const { return _nchars;}
     int nchars () const { return _nchars;}
+
+    const char * cend () const { return _data + _nchars;}
+    const char * cbegin () const { return _data;}
 
 //  Note that rawchars () does NOT null terminate the string. Caveat user!
 
@@ -167,6 +148,8 @@ class const_IWSubstring
     int numeric_value (float &) const;
     int numeric_value (double &) const;
     int numeric_value (long long &) const;
+    int numeric_value (unsigned long &) const;
+    int numeric_value (unsigned long long &) const;
 
     int starts_with (char) const;
     int starts_with (const char *) const;
@@ -399,20 +382,16 @@ class IWString : public resizable_array<char>
     IWString & operator = (const const_IWSubstring &);
     IWString & operator = (const IWString &);
 #if defined(__GNUC__)
-    IWString & operator = (ostringstream &);
+    IWString & operator = (std::ostringstream &);
 #elif defined(IWSGI)
-    IWString & operator = (ostrstream &);
+    IWString & operator = (std::ostrstream &);
 #endif
-
-/*#if defined (IWSGI) || (__GNUC_MINOR__ == 95)
-    IWString & operator = (ostrstream &);
-#else
-    IWString & operator = (ostringstream &);
-#endif*/
 
 #if defined (IW_STD_STRING_DEFINED)
     IWString & operator = (const std::string &);
 #endif
+
+    IWString & operator = (IWString &&);
 
     int operator == (char) const;
     int operator != (char) const;
@@ -524,6 +503,9 @@ class IWString : public resizable_array<char>
     int numeric_value (float &) const;
     int numeric_value (double &) const;
     int numeric_value (long long &) const;
+    int numeric_value (unsigned long &) const;
+
+    int numeric_value_fast(int &) const;
 
     const char * chars ();
     const char * null_terminated_chars ();
@@ -589,6 +571,8 @@ class IWString : public resizable_array<char>
     int gsub (char, const const_IWSubstring &);
     int gsub (char, const IWString &);
 
+    int unhtml();
+
     void operator += (const char * rhs);
     void operator += (char cc) {(void) add (cc);}
     void operator += (const const_IWSubstring &);
@@ -603,11 +587,16 @@ class IWString : public resizable_array<char>
     void append_number (long);
     void append_number (long long);
     void append_number (unsigned long long);
+    void append_number (unsigned long);
     void append_number (float);
     void append_number (double);
     void append_number (float, int);       // 2nd arg is the precision
     void append_number (double, int);      // 2nd arg is the precision
     void append_number (float, const char *);
+
+    // Ingvar: moved const around to match calls in tsclass and descriptor_file_to_01_fingerprints
+    // int append_hex(const unsigned char * v, const int n);
+    int append_hex(unsigned char const * v, const int n);
 
     void append (int, const char *);     // appends N copies of S
     void append (int, const IWString &);     // appends N copies of S
@@ -620,7 +609,7 @@ class IWString : public resizable_array<char>
     IWString & operator += (float f) { append_number (f); return *this;}
     IWString & operator += (double f) { append_number (f); return *this;}
 
-    int getline (istream &, char = '\n');
+    int getline (std::istream &, char = '\n');
     int getline (int fd, char = '\n');
 
 #ifdef ZLIB_H
@@ -682,8 +671,12 @@ class IWString : public resizable_array<char>
     IWString & operator << (long long);
     IWString & operator << (unsigned long long);
     IWString & operator << (unsigned int);
+    IWString & operator << (long unsigned int);
     IWString & operator << (float);
     IWString & operator << (double);
+#ifdef IW_STD_STRING_DEFINED
+    IWString & operator << (const std::string & s) { this->operator+=(s); return *this;}
+#endif
 
     int operator < (int) const;
     int operator <= (int) const;
@@ -968,8 +961,8 @@ const_IWSubstring::operator != (const char * rhs) const
   return 0 != ::strncmp (_data, rhs, l2);
 }
 
-inline ostream &
-operator << (ostream & os, const IWString & s)
+inline std::ostream &
+operator << (std::ostream & os, const IWString & s)
 {
   assert (s.ok ());
 
@@ -979,8 +972,8 @@ operator << (ostream & os, const IWString & s)
   return os.write (s.rawchars (), s.length ());
 }
 
-inline ostream &
-operator << (ostream & os, const IWString * s)
+inline std::ostream &
+operator << (std::ostream & os, const IWString * s)
 {
   assert (s->ok ());
 
@@ -990,8 +983,8 @@ operator << (ostream & os, const IWString * s)
   return os.write (s->rawchars (), s->length ());
 }
 
-inline ostream &
-operator << (ostream & os, const const_IWSubstring & s)
+inline std::ostream &
+operator << (std::ostream & os, const const_IWSubstring & s)
 {
   if (0 == s.nchars ())
     return os;
@@ -1032,12 +1025,12 @@ class IWString_and_File_Descriptor : public IWString
 
     int good () const { return (-1 != _fd && IWString::ok());}  // failed open sets _fd to -1
 
-    ssize_t write(const char * s, int nchars);
+    ssize_t write(const char * s, size_t nchars);
 
     int fd() const { return _fd;}
 
-    int active () const { return _fd > 0;}
-    int is_open() const { return _fd > 0;}
+    int active () const { return _fd > 0 || NULL != _gzfile;}
+    int is_open() const { return _fd > 0 || NULL != _gzfile;}
 
     int open(const char *);
     int close();
@@ -1066,18 +1059,6 @@ operator += (std::string & lhs, const const_IWSubstring & rhs)
 
 #endif
 
-#ifdef _GDBM_H_
-extern int operator == (const datum &, const const_IWSubstring &);
-extern int operator == (const const_IWSubstring &, const datum &);
-extern int operator != (const datum &, const const_IWSubstring &);
-extern int operator != (const const_IWSubstring &, const datum &);
-extern int operator == (const datum &, const IWString &);
-extern int operator == (const IWString &, const datum &);
-extern int operator != (const IWString &, const datum &);
-extern int operator != (const datum &, const IWString &);
-extern ostream & operator << (ostream & os, const datum & rhs);
-#endif
-
 #ifdef _DB_CXX_H_
 extern IWString & operator << (const Dbt &, IWString_and_File_Descriptor &);
 #endif
@@ -1094,18 +1075,12 @@ extern IWString operator + (const IWString &, const char *);
 extern IWString operator + (const IWString &, const IWString &);
 
 #if defined(__GNUC__)
-extern IWString & operator << (IWString &, ostringstream &);
+extern IWString & operator << (IWString &, std::ostringstream &);
 #elif defined(IWSGI)
-extern IWString & operator << (IWString &, ostrstream &);
+extern IWString & operator << (IWString &, std::ostrstream &);
 #endif
 
-/*#if defined (IWSGI) || (__GNUC_MINOR__ == 95)
-extern IWString & operator << (IWString &, ostrstream &);
-#else
-extern IWString & operator << (IWString &, ostringstream &);
-#endif*/
-
-extern int operator >> (istream &, IWString &);
+extern int operator >> (std::istream &, IWString &);
 
 extern const_IWSubstring substr (const IWString &, int, int = -1);
 extern const_IWSubstring substr (const const_IWSubstring &, int, int = -1);
@@ -1128,21 +1103,21 @@ extern int compress_descriptor_file_record (const const_IWSubstring & buffer,
 extern void set_default_iwstring_float_concatenation_precision (int s);
 extern void set_default_iwstring_double_concatenation_precision (int s);
 
+extern int char_name_to_char(IWString & s);
+
 /*
   Append a number to an ostream or IWString with a given width
   Initial implementation just for ints
 */
 
 template <typename O, typename T> int append_number(O &, T, int);
-template <> int append_number(ostream &, int, int);
+template <> int append_number(std::ostream &, int, int);
 template <> int append_number(IWString &, int, int);
 
-#endif
+#if defined(IW_IMPLEMENTATIONS_EXPOSED) || defined(APPEND_INT_FORM_IMPLEMENTATION)
 
-#if (IW_IMPLEMENTATIONS_EXPOSED) || defined(APPEND_INT_FORM_IMPLEMENTATION)
-
-#ifndef _APPEND_INT_FORM_SEEN
-#define _APPEND_INT_FORM_SEEN 1
+#ifndef APPEND_INT_FORM_DONE
+#define APPEND_INT_FORM_DONE
 
 template <typename I>
 void
@@ -1159,7 +1134,7 @@ IWString::_append_int_form (I znumber)
   while (znumber)
   {
     I j = znumber % 10;
-    buffer[ndigits++] = '0' + j;
+    buffer[ndigits++] = '0' + j;  // digits[j];
     znumber = znumber / 10;
   }
 
@@ -1178,10 +1153,7 @@ IWString::_append_int_form (I znumber)
 #endif
 #endif
 
-#if (IW_IMPLEMENTATIONS_EXPOSED) || defined(SPLIT_DV_IMPLEMENTATION)
-
-#ifndef SPLIT_INTO_DIRECTIVE_AND_VALUE_SEEN
-#define SPLIT_INTO_DIRECTIVE_AND_VALUE_SEEN 1
+#if defined(SPLIT_DV_IMPLEMENTATION) || defined(IW_IMPLEMENTATIONS_EXPOSED)
 
 template <typename T>
 int
@@ -1224,5 +1196,6 @@ const_IWSubstring::split_into_directive_and_value (const_IWSubstring & directive
 }
 
 #endif
-
 #endif
+
+/* arch-tag: a3c38e2b-3093-495e-a598-8ad0d05cc122 */

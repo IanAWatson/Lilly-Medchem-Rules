@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
 
 #include "misc.h"
@@ -33,8 +15,7 @@ Symmetry_Class_and_Canonical_Rank::Symmetry_Class_and_Canonical_Rank ()
 
 Symmetry_Class_and_Canonical_Rank::~Symmetry_Class_and_Canonical_Rank ()
 {
-  DELETE_IF_NOT_NULL (_canonical_rank);
-  DELETE_IF_NOT_NULL (_symmetry_class);
+  invalidate();
 
   return;
 }
@@ -42,8 +23,8 @@ Symmetry_Class_and_Canonical_Rank::~Symmetry_Class_and_Canonical_Rank ()
 int
 Symmetry_Class_and_Canonical_Rank::invalidate ()
 {
-  DELETE_IF_NOT_NULL (_canonical_rank);
-  DELETE_IF_NOT_NULL (_symmetry_class);
+  DELETE_IF_NOT_NULL_ARRAY(_canonical_rank);
+  DELETE_IF_NOT_NULL_ARRAY(_symmetry_class);
 
   return 1;
 }

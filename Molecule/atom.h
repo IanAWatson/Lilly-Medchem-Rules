@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 /*
   Atom class. 
   Note that connection information can be held by atoms.
@@ -25,8 +7,6 @@
 #define IW_ATOM_H 1
 
 #include <iostream>
-
-using namespace std;
 
 #include "iwmtypes.h"
 #include "element.h"
@@ -51,7 +31,7 @@ class Atom : public resizable_array <Bond *>, public Coordinates
     short _implicit_hydrogens_known;    // known value from file
 
     short _formal_charge;
-    short _nrings;
+    short _radical;
     short _nbonds;
 
 //  Some atoms may be classified as permanently aromatic
@@ -62,10 +42,13 @@ class Atom : public resizable_array <Bond *>, public Coordinates
 
     void * _user_specified_void_ptr;
 
+    int _atom_map;
+
 //  private functions
 
     void _default_values (const Element *);
     void _constructor_copy_atom_attributes (const Atom & other_atom);
+    int _compute_implicit_hydrogens (int & result);
 
     template <typename T> int _common_saturation (const T & comparitor) const;
 
@@ -77,7 +60,7 @@ class Atom : public resizable_array <Bond *>, public Coordinates
     Atom (const Atom &);
     ~Atom ();
 
-    int  debug_print (ostream &) const;
+    int  debug_print (std::ostream &) const;
 
     int ok () const { return NULL != _element;}
 
@@ -111,8 +94,8 @@ class Atom : public resizable_array <Bond *>, public Coordinates
     int is_halogen () const;
 
     const IWString & atomic_symbol () const;
-    const Element * element () const;
-    const Element & elementq () const;
+    const Element * element () const { return _element;}
+    const Element & elementq () const { return *_element;}
     atomic_number_t atomic_number () const;
 
     int atomic_symbol_hash_value () const { return _element->atomic_symbol_hash_value ();}
@@ -138,13 +121,16 @@ class Atom : public resizable_array <Bond *>, public Coordinates
     formal_charge_t formal_charge () const { return formal_charge_t (_formal_charge);}
     int set_formal_charge (formal_charge_t);
 
-    int nrings_computed () const { return ATOM_PROPERTY_UNKNOWN != _nrings;}
+//  int nrings_computed () const { return ATOM_PROPERTY_UNKNOWN != _nrings;}
 //  int nrings () const;
 //  int set_nrings (int r);
 //  int set_is_ring_atom ();
 //  int set_is_non_ring_atom ();
-    void invalidate_nrings () { _nrings = ATOM_PROPERTY_UNKNOWN;}
-    int in_another_ring ();
+//  void invalidate_nrings () { _nrings = ATOM_PROPERTY_UNKNOWN;}
+//  int in_another_ring ();
+
+    int  is_radical() const { return _radical;}
+    void set_radical(const int s ) { _radical = s;}
 
     void set_modified ();
 
@@ -211,7 +197,7 @@ class Atom : public resizable_array <Bond *>, public Coordinates
 
 //  Several molecule formats need coordinates written in a common format
 
-    int write_coordinates (ostream &, int = 0) const;
+    int write_coordinates (std::ostream &, int = 0) const;
 
     int fully_saturated () const;     // nbonds () == ncon ()
     int unsaturated () const;         // nbonds () < ncon ()
@@ -220,6 +206,10 @@ class Atom : public resizable_array <Bond *>, public Coordinates
     void * user_specified_void_ptr () { return _user_specified_void_ptr;}
     void set_user_specified_void_ptr (void * v) {_user_specified_void_ptr = v;}
 
+    int remove_connections_to_any_of_these_atoms (const int *);
+
+    int atom_map () const { return _atom_map;}
+    void set_atom_map (const int s) { _atom_map = s;}
 };
 extern void reset_atom_file_scope_variables();
 extern angle_t angle_between_atoms (const Atom &, const Atom &, const Atom &, const Atom &);
@@ -231,13 +221,14 @@ extern int how_many_atoms ();
 extern Coordinates & form_unit_vector (const Atom &, const Atom &);
 
 extern void set_display_abnormal_valence_messages (int);
+extern int  display_abnormal_valence_messages ();
 
 extern void set_copy_implicit_hydrogen_count_in_atom_copy_constructor (int s);
 
 extern int set_reasonable_formal_charge_range(formal_charge_t, formal_charge_t);
-extern int reasonable_formal_charge_value (formal_charge_t c);
-
-extern void set_alternate_valences_give_hcount(const int s);
+extern int reasonable_formal_charge_value(formal_charge_t c);
+extern void set_reset_implicit_hydrogens_known_on_bond_removal(const int s);
 extern void set_four_connected_neutral_nitrogen_has_h(const int s);
 
+extern void set_alternate_valences_give_hcount(const int s);
 #endif

@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
 
 /*
@@ -172,7 +154,7 @@ add_implicit_hydrogens_to_isotopic_atoms_needing_hydrogens()
 static int _write_single_bonds_in_smiles = 0;
 
 int
-write_single_bonds_in_smiles ()
+write_single_bonds_in_smiles()
 {
   return _write_single_bonds_in_smiles;
 }
@@ -200,10 +182,34 @@ set_display_unusual_hcount_warning_messages(int s)
 }
 
 int
-display_unusual_hcount_warning_messages ()
+display_unusual_hcount_warning_messages()
 {
   return file_scope_display_unusual_hcount_warning_messages;
 }
+
+static int _include_atom_map_with_smiles = 1;
+
+void
+set_include_atom_map_with_smiles(const int s)
+{
+  _include_atom_map_with_smiles = s;
+}
+
+int
+include_atom_map_with_smiles()
+{
+  return _include_atom_map_with_smiles;
+}
+
+/*
+  Sept 2003. Ran into ring openings and closings from ChemDraw that
+  went over 100!
+  Jul 2014. These molecules generate all kinds of problems.
+  How should %101 be parsed? Is it ring 10 followed by ring 1, or
+  is it ring 101?
+
+  Aug 2014. Implement the idea of %(nnn)
+*/
 
 /*
   Options for smiles are specified with the -SFLAG switch.
@@ -214,7 +220,7 @@ display_unusual_hcount_warning_messages ()
 static char sflag = 'K';
 
 int
-display_standard_smiles_options (ostream & os)
+display_standard_smiles_options (std::ostream & os)
 {
   os << "  -" << sflag << " <...>       Enter \"-" << sflag << " help\" for SMILES options\n";
 
@@ -222,29 +228,30 @@ display_standard_smiles_options (ostream & os)
 }
 
 int
-display_all_smiles_options (ostream & os)
+display_all_smiles_options (char flag, std::ostream & os)
 {
   assert (os.good());
 
-  os << "  -" << sflag << " nru         do not reuse ring closure numbers when outputting smiles\n";
-  os << "  -" << sflag << " ctb         include cis-trans bonds in the smiles\n";
-  os << "  -" << sflag << " <number>    use <number> as a seed for random smiles\n";
-  os << "  -" << sflag << " nochiral    exclude chiral info from all smiles produced\n";
-  os << "  -" << sflag << " coords      include coordinates in the smiles - '{{xx,yy,zz}}'\n";
-  os << "  -" << sflag << " Hiso        provide implicit Hydrogens to isotopic atoms needing H atoms\n";
-  os << "  -" << sflag << " nhis        exclude implicit Hydrogen information from smiles\n";
-  os << "  -" << sflag << " iusmi       include isotopic information when determining canonical order\n";
-  os << "  -" << sflag << " niusmi      exclude isotopic information when determining canonical order\n";
-  os << "  -" << sflag << " dbusmi      include directional bonding information when determining canonical order\n";
-  os << "  -" << sflag << " ndbusmi     exclude directional bonding information when determining canonical order\n";
-  os << "  -" << sflag << " rnoff=nn    add NN to all ring numbers\n";
-  os << "  -" << sflag << " mxrngd=nn   maximum number of digits in a % ring specification (default 2)\n";
-  os << "  -" << sflag << " nonH        do NOT write implicit Hydrogen info on pyrrole-like N atoms\n";
-  os << "  -" << sflag << " nihc        do NOT consider implicit Hydrogens during canonicalisation\n";
-  os << "  -" << sflag << " esssr       perceive the extended SSSR ring set\n";
-  os << "  -" << sflag << " noD         do NOT include the D operator in smarts generated\n";
-  os << "  -" << sflag << " iso01       when computing unique smiles, isotopes are zero or non zero\n";
-  os << "  -" << sflag << " rcsbd       include directionality in ring closure single bonds\n";
+  os << "  -" << flag << " nru         do not reuse ring closure numbers when outputting smiles\n";
+  os << "  -" << flag << " ctb         include cis-trans bonds in the smiles\n";
+  os << "  -" << flag << " <number>    use <number> as a seed for random smiles\n";
+  os << "  -" << flag << " nochiral    exclude chiral info from all smiles produced\n";
+  os << "  -" << flag << " coords      include coordinates in the smiles - '{{xx,yy,zz}}'\n";
+  os << "  -" << flag << " Hiso        provide implicit Hydrogens to isotopic atoms needing H atoms\n";
+  os << "  -" << flag << " nhis        exclude implicit Hydrogen information from smiles\n";
+  os << "  -" << flag << " iusmi       include isotopic information when determining canonical order\n";
+  os << "  -" << flag << " niusmi      exclude isotopic information when determining canonical order\n";
+  os << "  -" << flag << " dbusmi      include directional bonding information when determining canonical order\n";
+  os << "  -" << flag << " ndbusmi     exclude directional bonding information when determining canonical order\n";
+  os << "  -" << flag << " rnoff=nn    add NN to all ring numbers\n";
+  os << "  -" << flag << " nonH        do NOT write implicit Hydrogen info on pyrrole-like N atoms\n";
+  os << "  -" << flag << " nihc        do NOT consider implicit Hydrogens during canonicalisation\n";
+  os << "  -" << flag << " esssr       perceive the extended SSSR ring set\n";
+  os << "  -" << flag << " noD         do NOT include the D operator in smarts generated\n";
+  os << "  -" << flag << " iso01       when computing unique smiles, isotopes are zero or non zero\n";
+  os << "  -" << flag << " rcsbd       include directionality in ring closure single bonds\n";
+  os << "  -" << flag << " usv2        use faster, but incompatible unique smiles determination\n";
+  os << "  -" << flag << " nd4h        four connected neutral Nitrogen atoms have a Hydrogen\n";
 
   return 1;
 }
@@ -255,37 +262,37 @@ process_standard_smiles_options (Command_Line & cl, int verbose,
 {
   int i = 0;
   IWString tmp;
-  while (cl.value (sflag, tmp, i))
+  while (cl.value(sflag, tmp, i))
   {
     long seed;
 
     if ("nru" == tmp)
     {
-      set_smiles_reuse_ring_closure_numbers (0);
+      set_smiles_reuse_ring_closure_numbers(0);
       if (verbose)
         cerr << "Smiles will not re-use ring closure numbers\n";
     }
     else if ("ctb" == tmp)
     {
-      set_include_cis_trans_in_smiles (1);
+      set_include_cis_trans_in_smiles(1);
       if (verbose)
         cerr << "Cis trans bonds will be included in the smiles\n";
     }
     else if ("xtb" == tmp)
     {
-      set_include_cis_trans_in_smiles (0);
+      set_include_cis_trans_in_smiles(0);
       if (verbose)
         cerr << "Cis trans bonds will be excluded from smiles\n";
     }
     else if ("nochiral" == tmp)
     {
-      set_include_chiral_info_in_smiles (0);
+      set_include_chiral_info_in_smiles(0);
       if (verbose)
         cerr << "Will exclude chiral info from any smiles produced\n";
     }
     else if ("coords" == tmp)
     {
-      set_append_coordinates_after_each_atom (1);
+      set_append_coordinates_after_each_atom(1);
       if (verbose)
         cerr << "Will add coordinates to each atom in a smiles\n";
     }
@@ -297,43 +304,31 @@ process_standard_smiles_options (Command_Line & cl, int verbose,
     }
     else if ("iusmi" == tmp)
     {
-       set_include_isotopic_information_in_unique_smiles (1);
+       set_include_isotopic_information_in_unique_smiles(1);
     }
     else if ("niusmi" == tmp)
     {
-      set_include_isotopic_information_in_unique_smiles (0);
+      set_include_isotopic_information_in_unique_smiles(0);
     }
     else if ("dbusmi" == tmp)
     {
-      set_include_directional_bonding_information_in_unique_smiles (1);
+      set_include_directional_bonding_information_in_unique_smiles(1);
     }
     else if ("ndbusmi" == tmp)
     {
-      set_include_directional_bonding_information_in_unique_smiles (0);
+      set_include_directional_bonding_information_in_unique_smiles(0);
     }
-    else if (tmp.starts_with ("rnoff="))
+    else if (tmp.starts_with("rnoff="))
     {
-      tmp.remove_leading_chars (6);
+      tmp.remove_leading_chars(6);
       int o;
-      if (! tmp.numeric_value (o) || o < 0)
+      if (! tmp.numeric_value(o) || o < 0)
       {
         cerr << "Invalid ring number offset '" << tmp << "'\n";
         return 0;
       }
 
-      set_smiles_ring_number_offset (o);
-    }
-    else if (tmp.starts_with ("mxrngd="))
-    {
-      tmp.remove_leading_chars (7);
-      int m;
-      if (! tmp.numeric_value (m) || m < 2)
-      {
-        cerr << "The maximum number of digits in a ring specification must be a number > 1\n";
-        return 0;
-      }
-
-      set_max_ring_digits_following_percent (m);
+      set_smiles_ring_number_offset(o);
     }
     else if ("nonH" == tmp)
     {
@@ -367,14 +362,22 @@ process_standard_smiles_options (Command_Line & cl, int verbose,
     {
       set_include_directionality_in_ring_closure_bonds(1);
     }
+    else if ("usv2" == tmp)
+    {
+      set_unique_determination_version(2);
+    }
+    else if ("nd4h" == tmp)
+    {
+      set_four_connected_neutral_nitrogen_has_h(1);
+    }
     else if ("help" == tmp)
     {
-      display_all_smiles_options (cerr);
-      exit (5);    // note very different behaviour for help!
+      display_all_smiles_options(sflag, cerr);
+      exit(5);    // note very different behaviour for help!
     }
-    else if (cl.value (sflag, seed, i))
+    else if (cl.value(sflag, seed, i))
     {
-      set_smiles_random_number_seed (random_number_seed_t (seed));
+      set_smiles_random_number_seed(random_number_seed_t(seed));
       if (verbose)
         cerr << "Random smiles generated with seed " << seed << endl;
     }
@@ -624,15 +627,16 @@ Molecule::_process_atom_for_smiles (Smiles_Formation_Info & sfi,
   atom_number_t anchor = sfi.previous_atom();
 
 #ifdef DEBUG_PROCESS_ATOM_FOR_SMILES
-  cerr << "Processing atom " << zatom << "(" << a->atomic_symbol() << ")";
+  cerr << "Processing atom " << zatom << "(" << a->atomic_symbol() << ") ncon " << a->ncon() << " nbonds " << nbonds(zatom);
   if (a->formal_charge())
     cerr << " charge " << a->formal_charge();
+  cerr << " IH " << a->implicit_hydrogens();
   if (a->implicit_hydrogens_known())
     cerr << " ihknown";
   if (c)
-    cerr << " chiral centre";
+    cerr << " chiral";
   cerr << " anchor is " << anchor << endl;
-  cerr << "ncon = " << a->ncon() << " nbonds = " << nbonds (zatom) << endl;
+  a->debug_print(cerr);
 #endif
 
 //assert (ok_atom_number (zatom));
@@ -647,20 +651,21 @@ Molecule::_process_atom_for_smiles (Smiles_Formation_Info & sfi,
 
 #ifdef DEBUG_PROCESS_ATOM_FOR_SMILES
   cerr << "Atom type " << a->atomic_symbol() << " stored_hcount " << stored_hcount << " include_hcount_in_smiles " << include_hcount_in_smiles << endl;
+  cerr << "has " << a->implicit_hydrogens() << " IH, known? " << a->implicit_hydrogens_known() << endl;
 #endif
 
   if (! include_hcount_in_smiles)
     ;
   else if (0 == fc)
   {
-    if (stored_hcount == _compute_implicit_hydrogens (zatom))    // the most common case - normal
+    if (stored_hcount == _compute_implicit_hydrogens(zatom))    // the most common case - normal
       ;
     else if (a->implicit_hydrogens_known())     // probably a radical
       ;
     else
     {
       if (e->organic() && file_scope_display_unusual_hcount_warning_messages)
-        cerr << "Unusual hcount, atom " << zatom << "(" << a->atomic_symbol() << ") ncon = " << a->ncon() << " stored = " << stored_hcount << " implicit is " << _compute_implicit_hydrogens (zatom) << endl;
+        cerr << "Unusual hcount, atom " << zatom << "(" << a->atomic_symbol() << ") ncon = " << a->ncon() << " nbonds " << a->nbonds() << " stored = " << stored_hcount << " implicit is " << _compute_implicit_hydrogens(zatom) << endl;
       hcount = stored_hcount;
     }
   }
@@ -669,6 +674,8 @@ Molecule::_process_atom_for_smiles (Smiles_Formation_Info & sfi,
 
 // Daylight needs to include non zero hcount with aromatic nitrogens and phosphorus.
 // Actually, Daylight seems never to aromatise phosphorus...
+
+//cerr << __LINE__ << " hcount " << hcount << endl;
 
   if (hcount >= 0)            // already set
     ;
@@ -683,7 +690,7 @@ Molecule::_process_atom_for_smiles (Smiles_Formation_Info & sfi,
     if (7 == z || 15 == z)
     {
       aromaticity_type_t arom;
-      if (aromaticity (zatom, arom) && IS_AROMATIC_ATOM (arom))
+      if (aromaticity(zatom, arom) && IS_AROMATIC_ATOM(arom))
         hcount = stored_hcount;
 
 #ifdef DEBUG_PROCESS_ATOM_FOR_SMILES
@@ -696,7 +703,7 @@ Molecule::_process_atom_for_smiles (Smiles_Formation_Info & sfi,
 // excluding chirality from smiles, so we need to fetch the value again
 
   int ihknown = a->implicit_hydrogens_known();
-  if (! _include_chiral_info_in_smiles && ihknown && (NULL != chiral_centre_at_atom (zatom)) && hcount < 0 && 0 == a->formal_charge() && 0 == a->isotope() && e->organic())
+  if (! _include_chiral_info_in_smiles && ihknown && (NULL != chiral_centre_at_atom(zatom)) && hcount < 0 && 0 == a->formal_charge() && 0 == a->isotope() && e->organic())
     ihknown = 0;
 
   int need_to_close_square_bracket = 0;
@@ -704,7 +711,7 @@ Molecule::_process_atom_for_smiles (Smiles_Formation_Info & sfi,
 // Whenever a square bracket atom is encountered, the H count must always be explicit. 
 
 #ifdef DEBUG_PROCESS_ATOM_FOR_SMILES
-  cerr << "Atom " << zatom << " z = " << a->atomic_number() << " c is " << c << " hcount " << hcount << ", ihknown " << ihknown << endl;
+  cerr << "Atom " << zatom << " z = " << a->atomic_number() << " ncon " << a->ncon() << " c is " << c << " hcount " << hcount << ", ihknown " << ihknown << " stored_hcount " << stored_hcount << endl;
   cerr << "Line " << __LINE__ << ", length " << smiles.length() << endl;
 #endif
 
@@ -713,7 +720,8 @@ Molecule::_process_atom_for_smiles (Smiles_Formation_Info & sfi,
       0 != fc ||
       e->needs_square_brackets() ||
       a->isotope() ||
-      ihknown)               // implicit_hydrogens_known() - possibly adjusted above
+      ihknown ||
+      (a->atom_map() > 0 && _include_atom_map_with_smiles))       // implicit_hydrogens_known() - possibly adjusted above
   {
     smiles += '[';
 //  cerr << "Appended square bracket '" << smiles << "' hcount " << hcount << " ihknown " << ihknown << endl;
@@ -724,24 +732,25 @@ Molecule::_process_atom_for_smiles (Smiles_Formation_Info & sfi,
 
   aromaticity_type_t arom = NOT_AROMATIC;
   if (include_aromaticity_in_smiles)
-    (void) aromaticity (zatom, arom);
+    (void) aromaticity(zatom, arom);
 
-  int rc = e->append_smiles_symbol (smiles, arom, a->isotope());
+  int rc = e->append_smiles_symbol(smiles, arom, a->isotope());
 
   if (c)
-  {
-    c->append_smiles_chirality_symbol (smiles, zorder, anchor, 
+    c->append_smiles_chirality_symbol(smiles, zorder, anchor, 
                                        ring_opening_bonds, ring_closures);
-  }
 
-  finish_smiles_atom (smiles, a->atomic_number(), hcount, fc);
+  finish_smiles_atom(smiles, a->atomic_number(), hcount, fc);
+
+  if (_include_atom_map_with_smiles && a->atom_map() > 0)
+    smiles << ':' << a->atom_map();
 
 //cerr << "Square bracket needed " << need_to_close_square_bracket << endl;
   if (need_to_close_square_bracket)
     smiles += ']';
 
   if (append_coordinates_after_each_atom)
-    do_append_coordinates (smiles, a);
+    do_append_coordinates(smiles, a);
 
 //cerr << "After addition, length " << smiles.length() << endl;
 
@@ -758,7 +767,7 @@ Molecule::_process_atom_for_smiles (Smiles_Formation_Info & sfi,
                                     IWString & smiles)
 {
   if (! sfi.write_smiles())
-    return _append_smarts_equivalent (sfi, smiles);
+    return _append_smarts_equivalent(sfi, smiles);
 
   atom_number_t zatom = sfi.zatom();
 
@@ -777,7 +786,7 @@ Molecule::_process_atom_for_smiles (Smiles_Formation_Info & sfi,
   const Element * e = a->element();
 
   if (a->permanent_aromatic())
-    return append_permanent_aromatic (smiles, a);
+    return append_permanent_aromatic(smiles, a);
 
 // Look for unusual H counts. Remember, we must specify the H count for any
 // charged atoms
@@ -792,14 +801,14 @@ Molecule::_process_atom_for_smiles (Smiles_Formation_Info & sfi,
     ;
   else if (0 == fc)
   {
-    if (stored_hcount == _compute_implicit_hydrogens (zatom))     // the most common and normal case
+    if (stored_hcount == _compute_implicit_hydrogens(zatom))     // the most common and normal case
       ;
     else if (a->implicit_hydrogens_known())      // probably a radical or something
       ;
     else
     {
       if (e->organic() && a->ncon() && file_scope_display_unusual_hcount_warning_messages)
-        cerr << "Unusual hcount, atom " << zatom << "(" << a->atomic_symbol() << ") ncon = " << a->ncon() << " stored = " << stored_hcount << " implicit is " << _compute_implicit_hydrogens (zatom) << endl;
+        cerr << "Unusual hcount, atom " << zatom << "(" << a->atomic_symbol() << ") ncon = " << a->ncon() << " stored = " << stored_hcount << " implicit is " << _compute_implicit_hydrogens(zatom) << endl;
       hcount = stored_hcount;
     }
   }
@@ -814,7 +823,7 @@ Molecule::_process_atom_for_smiles (Smiles_Formation_Info & sfi,
 
 // Whenever a square bracket atom is encountered, the H count must always be explicit. 
 
-  if (hcount >= 0 || 0 != fc || e->needs_square_brackets() || a->isotope() || a->implicit_hydrogens_known())
+  if (hcount >= 0 || 0 != fc || e->needs_square_brackets() || a->isotope() || a->implicit_hydrogens_known() || (a->atom_map() && _include_atom_map_with_smiles))
   {
     smiles += '[';
     need_to_close_square_bracket = 1;
@@ -822,23 +831,41 @@ Molecule::_process_atom_for_smiles (Smiles_Formation_Info & sfi,
       hcount = stored_hcount;
   }
 
-  int rc = e->append_smiles_symbol (smiles, NOT_AROMATIC, a->isotope());
+  int rc = e->append_smiles_symbol(smiles, NOT_AROMATIC, a->isotope());
 
-  finish_smiles_atom (smiles, a->atomic_number(), hcount, fc);
+  finish_smiles_atom(smiles, a->atomic_number(), hcount, fc);
+
+  if (a->atom_map() && _include_atom_map_with_smiles)
+    smiles << ':' << a->atom_map();
 
   if (need_to_close_square_bracket)
     smiles += ']';
 
   if (append_coordinates_after_each_atom)
-    do_append_coordinates (smiles, a);
+    do_append_coordinates(smiles, a);
 
   return rc;
 }
 
+/*int
+include_atom_in_smiles (const Molecule * m, atom_number_t a)
+{
+  assert (OK_ATOM_NUMBER (m, a));
 
+  const Element * e = m->elementi (a);
+
+  if (1 != e->atomic_number())
+    return 1;
+  if (0 != m->formal_charge (a))
+    return 1;
+  if (m->isotope (a))
+    return 1;
+
+  return 0;
+}*/
 
 int
-Molecule::_unset_implicit_hydrogens_known_if_computed_matches ()
+Molecule::_unset_implicit_hydrogens_known_if_computed_matches()
 {
   int rc = 0;
 
@@ -850,13 +877,13 @@ Molecule::_unset_implicit_hydrogens_known_if_computed_matches ()
       continue;
 
     int h;
-    if (! a->compute_implicit_hydrogens (h))
+    if (! a->compute_implicit_hydrogens(h))
       continue;
 
     if (a->implicit_hydrogens() != h)    // computed and actual differ, must remain a special case
       continue;
 
-    a->set_implicit_hydrogens_known (0);
+    a->set_implicit_hydrogens_known(0);
     rc++;
   }
 
@@ -864,7 +891,7 @@ Molecule::_unset_implicit_hydrogens_known_if_computed_matches ()
 }
 
 int
-Molecule::_unset_all_implicit_hydrogens_known_attributes ()
+Molecule::_unset_all_implicit_hydrogens_known_attributes()
 {
   int rc = 0;
 
@@ -876,7 +903,7 @@ Molecule::_unset_all_implicit_hydrogens_known_attributes ()
     if (! a->implicit_hydrogens_known())
       continue;
 
-    a->set_implicit_hydrogens_known (0);
+    a->set_implicit_hydrogens_known(0);
     int notused;
     (void) a->recompute_implicit_hydrogens(notused);
     rc++;
@@ -928,7 +955,17 @@ Smiles_Formation_Info::make_smarts_embedding (atom_number_t zatom) const
   return _make_smarts_embedding[zatom];
 }
 
+/*void
+Smiles_Formation_Info::set_create_embedding_smarts (atom_number_t zatom,
+                                                    int s)
+{
+  if (NULL == _create_embedding)
+    _create_embedding = new_int(_natoms);
 
+  _create_embedding[zatom] = s;
+
+  return;
+*/
 
 Temporarily_Set_Include_Chiral_Info_in_Smiles::Temporarily_Set_Include_Chiral_Info_in_Smiles (int c)
 {

@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef CHARGE_ASSIGNER_H
 #define CHARGE_ASSIGNER_H
 
@@ -150,12 +132,15 @@ class Charge_Assigner : public resizable_array_p<Substructure_Hit_Statistics>
     ~Charge_Assigner ();
 
     int construct_from_command_line (Command_Line &, int = 0, char = 'G');
+    int build (const const_IWSubstring &);
 
     void set_verbose (int v) { _verbose = v;}
 
-    int report (ostream &) const;
+    int report (std::ostream &) const;
 
     void set_assigned_charge_multiplier (int s) { _assigned_charge_multiplier = s;}
+
+    void set_min_distance_between_charges (int s) { _min_distance_between_charges = s;}
 
 //  array is actual charges assigned
 
@@ -170,6 +155,6 @@ class Charge_Assigner : public resizable_array_p<Substructure_Hit_Statistics>
     void set_apply_charges_to_molecule (int s) { _apply_charges_to_molecule = s;}
 };
 
-extern void display_standard_charge_assigner_options (ostream &, char);
+extern void display_standard_charge_assigner_options (std::ostream &, char);
 
 #endif

@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2012  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef TOGGLE_KEKULE_FORM_H
 #define TOGGLE_KEKULE_FORM_H
 
@@ -51,6 +33,10 @@ class Toggle_Kekule_Form_Temporary_Arrays
 
     int * _process_these;
 
+//  We keep track of which bonds are OK already
+
+    int * _correct;
+
 //  When we get an atom that cannot be changed, all rings that contain
 //  that atom cannot change
 
@@ -68,6 +54,8 @@ class Toggle_Kekule_Form_Temporary_Arrays
     int * has_double_bond () { return _has_double_bond;}
     int * process_these () { return _process_these;}
 
+    int * correct () { return _correct;}
+
     void set_ring_can_toggle (int r, int s) { _ring_can_vary[r] = s;}
     int  ring_can_toggle (int r) const { return _ring_can_vary[r];}
 
@@ -80,15 +68,15 @@ class Toggle_Kekule_Form
   private:
     resizable_array_p<Bond> _bond;
 
-//  Whether or not each Bond is already of the requested bond type
-
-    int * _correct;
-
 //  By default, we do NOT allow a pyrrole Nitrogen to toggle
 
     int _allow_pyrrole_to_change;
 
     int _display_error_messages;
+
+//  If we get in molecules that have come from reactions, there may be issues with the Hydrogen count
+
+    int _unset_unnecessary_implicit_hydrogens_known_values;
 
 //  private functions
 
@@ -98,13 +86,17 @@ class Toggle_Kekule_Form
 
     void _set_all_bonds_to_single (Molecule & m,
                                    int id,
+                                   Set_of_Atoms & double_bonds_to_be_restored,
                                    Toggle_Kekule_Form_Temporary_Arrays &) const;
+
+    int _restore_previous_bonding (Molecule & m, const Set_of_Atoms & bonds_to_be_restored) const;
 
     int _bond_is_correct (const Molecule & m,
                           const Set_of_Atoms & embedding,
                           const Bond * b) const;
     int _all_bonds_correct (const Molecule & m,
-                            const Set_of_Atoms & embedding);
+                            const Set_of_Atoms & embedding,
+                            Toggle_Kekule_Form_Temporary_Arrays &) const;
     int _all_bonds_aromatic (Molecule & m,
                              const Set_of_Atoms & embedding) const;
     int _all_atoms_aromatic (Molecule & m, int, int, Toggle_Kekule_Form_Temporary_Arrays &) const;
@@ -136,6 +128,7 @@ class Toggle_Kekule_Form
                               resizable_array<int> & atoms_to_process,
                               int rid,
                               int zitem,
+                              const atom_number_t prev,
                               Toggle_Kekule_Form_Temporary_Arrays &) const;
     int _process_ring_system (Molecule & m,
                               const Set_of_Atoms & embedding,
@@ -162,11 +155,13 @@ class Toggle_Kekule_Form
     ~Toggle_Kekule_Form ();
 
     int ok () const;
-    int debug_print (ostream &) const;
+    int debug_print (std::ostream &) const;
 
     int active () const { return _bond.number_elements ();}
 
     void set_display_error_messages (int s) { _display_error_messages = s;}
+
+    void set_unset_unnecessary_implicit_hydrogens_known_values(const int s) { _unset_unnecessary_implicit_hydrogens_known_values = s;}
 
     const Bond * contains_bond (atom_number_t a1, atom_number_t a2) const;
     int will_change_ring (const Ring * r, const Set_of_Atoms &) const;
@@ -178,13 +173,17 @@ class Toggle_Kekule_Form
 
     void set_allow_pyrrole_to_change (int s) { _allow_pyrrole_to_change = s;}
 
-    int write_msi (ostream &, const IWString &, const char *) const;
+    int write_msi (std::ostream &, const IWString &, const char *) const;
 
     int ok_embedding (const Set_of_Atoms & embedding) const;
 
     int process (Molecule &, const Set_of_Atoms &, int &);
 
     int process (Molecule &, atom_number_t a1, atom_number_t a2, bond_type_t bt, int & changed);
+
+    void adjust_for_subset(const int * include_these_atoms);
+
+    void reset () { _bond.resize(0); return;}
 };
 
 #endif

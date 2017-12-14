@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2012  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef COMPILING_MOLECULER_CC
    YIPES, THIS FILE SHOULD ONLY BE INCLUDED WHEN COMPILING MOLECULER_CC
 #endif
@@ -58,7 +40,7 @@
     int experimental_sssr ();
     int experimental_nrings (atom_number_t);
     const int * experimental_ring_membership ();
-    int experimental_print_ring_info (ostream &) const;
+    int experimental_print_ring_info (std::ostream &) const;
 
     int experimental_bonds_between (atom_number_t, atom_number_t);
 
@@ -130,3 +112,4 @@
   private:
 
     int _just_one_unclassified_spinach_connection (atom_number_t zatom, const int * spinach) const;
+    int _pi_electrons_in_ring(const atom_number_t zatom, int & result) const;

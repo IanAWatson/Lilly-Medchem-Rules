@@ -1,30 +1,13 @@
-/**************************************************************************
-
-    Copyright (C) 2012  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <memory>
-using namespace std;
+#include <iostream>
+using std::cerr;
+using std::endl;
 
 #ifdef IW_USE_TBB_SCALABLE_ALLOCATOR
 #include "tbb/scalable_allocator.h"
 #endif
 
 #include "misc.h"
-#include "iw_auto_array.h"
 
 /*
   We need some private molecule functions
@@ -304,14 +287,14 @@ Molecule::create_components (int bond_number,
                              Molecule & m1,
                              Molecule & m2)
 {
-  assert (1 == number_fragments());
-  assert (0 == m1.natoms());
-  assert (0 == m2.natoms());
+  assert(1 == number_fragments());
+  assert(0 == m1.natoms());
+  assert(0 == m2.natoms());
 
   compute_aromaticity_if_needed();
 
   const Bond * b = _bond_list[bond_number];
-  assert (0 == b->nrings());
+  assert(0 == b->nrings());
 
   atom_number_t break1 = b->a1();
   atom_number_t break2 = b->a2();
@@ -320,9 +303,9 @@ Molecule::create_components (int bond_number,
 
 // Lazy, we need 3 arrays, just allocate one
 
-  int * tmp = new_int(_number_elements * 2); iw_auto_array<int> free_tmp(tmp);
+  int * tmp = new_int(_number_elements * 2); std::unique_ptr<int[]> free_tmp(tmp);
 
-  _identify_side_of_bond (tmp, break1 , 1, break2);
+  identify_side_of_bond(tmp, break1 , 1, break2);
 
   int * xref = tmp + _number_elements;
 
@@ -432,10 +415,247 @@ Molecule::create_components (int bond_number,
     }
   }
 
-  assert (m1.ok());
-  assert (m2.ok());
+  assert(m1.ok());
+  assert(m2.ok());
 
   return 1;
+}
+
+/*static void
+translate_atom_numbers (Chiral_Centre & c,
+                        const int initial_natoms,
+                         const int * xref)
+{
+  c.set_centre(xref[c.a()] - initial_natoms);
+
+  atom_number_t a = c.top_front();
+  if (a >= 0)
+    c.set_top_front(xref[a] - initial_natoms);
+
+  a = c.top_back();
+  if (a >= 0)
+    c.set_top_back(xref[a] - initial_natoms);
+
+  a = c.left_down();
+  if (a >= 0)
+    c.set_left_down(xref[a] - initial_natoms);
+
+  a = c.right_down();
+  if (a >= 0)
+    c.set_right_down(xref[a] - initial_natoms);
+
+  return;
+}*/
+
+/*
+  There are lots of use cases of create_components where all we really want
+  is to separate the fragments. Leaving one fragment in the initial molecule
+  and just creating a separate, single, molecule is fine.
+
+  ZATOM will be an atom in the fragment that will remain in THIS
+*/
+
+//#define DEBUG_SPLIT_OFF_FRAGMENTS
+
+int
+Molecule::split_off_fragments (const atom_number_t zatom, Molecule & frags)
+{
+#ifdef DEBUG_SPLIT_OFF_FRAGMENTS
+  cerr << "Molecule::split_off_fragments start, parent contains " << nrings() << " rings\n";
+#endif
+  if (_charges || _atom_type)
+  {
+    cerr << "Molecule::split_off_fragments:does not work with molecules having partial charges and/or atom types. See Ian\n";    // laziness
+    return 0;
+  }
+
+  assert(number_fragments() > 1);
+  assert(0 == frags.natoms());
+
+  int * tmp = new_int(_number_elements); std::unique_ptr<int[]> free_tmp(tmp);
+
+  identify_side_of_bond(tmp, zatom, 1, INVALID_ATOM_NUMBER);
+
+  const int initial_natoms = _number_elements;
+
+#ifdef DEBUG_SPLIT_OFF_FRAGMENTS
+  for (auto i = 0; i < initial_natoms; ++i)
+  {
+    cerr << " atom " << i << " atomic number " << atomic_number(i) << " side " << tmp[i] << endl;
+  }
+#endif
+
+  int atoms_in_residual = 0;
+  int atoms_in_fragments = 0;
+
+  for (int i = 0; i < initial_natoms; ++i)
+  {
+    if (1 == tmp[i])
+    {
+      tmp[i] = atoms_in_residual;
+      atoms_in_residual++;
+    }
+    else
+    {
+      tmp[i] = initial_natoms + atoms_in_fragments;
+      atoms_in_fragments++;
+    }
+
+#ifdef DEBUG_SPLIT_OFF_FRAGMENTS
+    cerr << " xref " << i << " " << tmp[i] << endl;
+#endif
+  }
+
+  return _common_fragment_extraction(tmp, initial_natoms, atoms_in_residual, atoms_in_fragments, frags);
+}
+
+int
+Molecule::excise_fragment (const atom_number_t zatom, Molecule & frag)
+{
+  assert(number_fragments() > 1);
+  assert(0 == frag.natoms());
+
+  int * tmp = new_int(_number_elements); std::unique_ptr<int[]> free_tmp(tmp);
+
+  identify_side_of_bond(tmp, zatom, 1, INVALID_ATOM_NUMBER);    // just doing a cheap fragment membership. tmp = 1 means being removed
+
+  const int initial_natoms = _number_elements;
+
+#ifdef DEBUG_EXCISE_FRAGMENT
+  for (auto i = 0; i < initial_natoms; ++i)
+  {
+    cerr << " atom " << i << " atomic number " << atomic_number(i) << " side " << tmp[i] << endl;
+  }
+#endif
+
+  int atoms_in_residual = 0;
+  int atoms_in_fragment = 0;
+
+  for (int i = 0; i < initial_natoms; ++i)
+  {
+    if (0 == tmp[i])     // in the residual
+    {
+      tmp[i] = atoms_in_residual;
+      atoms_in_residual++;
+    }
+    else
+    {
+      tmp[i] = initial_natoms + atoms_in_fragment;
+      atoms_in_fragment++;
+    }
+
+#ifdef DEBUG_EXCISE_FRAGMENT
+    cerr << " xref " << i << " " << tmp[i] << endl;
+#endif
+  }
+
+  return _common_fragment_extraction(tmp, initial_natoms, atoms_in_residual, atoms_in_fragment, frag);
+}
+
+int
+Molecule::_common_fragment_extraction (int * tmp,
+                                       const int initial_natoms,
+                                       const int atoms_in_residual,
+                                       const int atoms_in_fragment,
+                                       Molecule & f)
+{
+  assert(atoms_in_residual + atoms_in_fragment == initial_natoms);
+
+  if (0 == atoms_in_fragment || 0 == atoms_in_residual)
+  {
+    cerr << "Molecule::excise_fragment:all atoms in one frgament\n";
+    return 0;
+  }
+
+  f.resize(atoms_in_fragment);
+
+  for (int i = initial_natoms - 1; i >= 0; --i)
+  {
+    if (tmp[i] < initial_natoms)    // being retained
+      continue;
+
+    Atom * a = this->remove_no_delete(i);
+    f.add(a);
+  }
+
+  if (f._number_elements > 1)    // reverse the array to preserve atom numbering
+  {
+    for (int i = 0, j = f._number_elements - 1; i < j; ++i, --j)
+    {
+      std::swap(f._things[i], f._things[j]);
+    }
+  }
+
+  for (int i = _bond_list.number_elements() - 1; i >= 0; --i)
+  {
+    Bond * b = _bond_list[i];
+
+    const atom_number_t a1 = b->a1();
+    const atom_number_t a2 = b->a2();
+//  cerr << " bond in starting molecule btw " << a1 << " (" << tmp[a1] << ") and " << a2 << " (" << tmp[a2] << ")\n";
+
+    if (tmp[a1] < initial_natoms)    // being retained, just renumber
+    {
+      b->set_a1a2(tmp[a1], tmp[a2]);
+//    cerr << "  bond in residual btw " << b->a1() << " and " << b->a2() << endl;
+    }
+    else              // needs to go to the new molecule
+    {
+      b = _bond_list.remove_no_delete(i);
+      b->set_a1a2(tmp[a1] - initial_natoms, tmp[a2] - initial_natoms);
+      f._bond_list.add(b);
+//    cerr << "  bond in fragment btw " << b->a1() << " and " << b->a2() << endl;
+    }
+  }
+
+// for chiral centres, we need numbering in each molecule
+
+  const int nc = _chiral_centres.number_elements();
+  if (nc)
+  {
+    for (int i = nc - 1; i >= 0; --i)
+    {
+      const atom_number_t c = _chiral_centres[i]->a();
+
+      if (tmp[c] >= initial_natoms)    // must go to f
+      {
+        Chiral_Centre * c = _chiral_centres.remove_no_delete(i);
+        f._chiral_centres.add(c);
+      }
+      else
+        _chiral_centres[i]->adjust_atom_numbers(tmp);
+    }
+
+    const auto ncf = f._chiral_centres.number_elements();
+    if (ncf)
+    {
+      for (int i = 0; i < initial_natoms; ++i)
+      {
+        if (tmp[i] >= initial_natoms)
+          tmp[i] -= initial_natoms;
+      }
+
+      for (int i = 0; i < ncf; ++i)
+      {
+        Chiral_Centre * c = f._chiral_centres[i];
+        c->adjust_atom_numbers(tmp);
+      }
+    }
+  }
+
+  _set_modified();     // rings and aromaticity too hard, just recompute
+
+#ifdef DEBUG_EXCISE_FRAGMENT
+  cerr << "excise_fragment:residual contains " << _number_elements << " atoms and " << _bond_list.size() << " bonds. Frags " << f._number_elements << " and " << f._bond_list.size() << " bonds\n";
+  this->debug_print(cerr);
+  cerr << "FRAG\n";
+  f.debug_print(cerr);
+#endif
+
+  assert(f.ok());
+  assert(ok());
+
+  return atoms_in_fragment;
 }
 
 /*
@@ -476,8 +696,7 @@ Molecule::create_components_across_bonds (const int * rmbond,
   if (0 == n)
     return 0;
 
-  cerr << "Line " << __LINE__ ;
-  _fragment_information.debug_print(cerr);
+//_fragment_information.debug_print(cerr);
   Fragment_Information frag_info;
 
   _compute_fragment_information(frag_info, 0);   // 0 means do NOT update ring info
@@ -485,18 +704,16 @@ Molecule::create_components_across_bonds (const int * rmbond,
   int nf = frag_info.number_fragments();
 
   const int * in_frag = frag_info.fragment_membership();
-  cerr << "Line " << __LINE__ ;
-  _fragment_information.debug_print(cerr);
+//_fragment_information.debug_print(cerr);
 
   for (int i = 1; i <= nf; i++)
   {
     Molecule * m = new Molecule;
-    create_subset (*m, in_frag, i);
+    create_subset(*m, in_frag, i);
     components.add(m);
   }
 
-  cerr << "Line " << __LINE__ ;
-  _fragment_information.debug_print(cerr);
+//_fragment_information.debug_print(cerr);
   for (int i = n - 1; i >= 0; i--)
   {
     Bond * abl = add_back_later[i];
@@ -521,7 +738,9 @@ Molecule::create_subset (Molecule & subset,
                          int id,
                          int * xref) const
 {
+  int ndx = subset.natoms();    // we can start with a non-empty molecule
   int rc = 0;
+
   for (int i = 0; i < _number_elements; i++)
   {
     if (id != process_these[i])
@@ -531,23 +750,24 @@ Molecule::create_subset (Molecule & subset,
     }
 
     const Atom * a = _things[i];
-    Atom * as = new Atom (a);
-    subset.Molecule::add (as);
+    Atom * as = new Atom(a);
+    subset.Molecule::add(as);
 
-    if (copy_user_specified_atom_void_ptrs_during_create_subset)
+    if (copy_user_specified_atom_void_ptrs_during_create_subset)    // actually it always happens in the Atom copy constructor...
       as->set_user_specified_void_ptr(const_cast<void *>(a->user_specified_void_ptr()));
 
-    xref[i] = rc;
+    xref[i] = ndx;
 
+    ndx++;
     rc++;
 
 //  cerr << "Atom " << i << " becomes subset atom " << xref[i] << endl;
 
     if (_charges)
     {
-      charge_t q = charge_on_atom (i);
+      charge_t q = charge_on_atom(i);
       if (q)
-        subset.set_charge (xref[i], q);
+        subset.set_charge(xref[i], q);
     }
   }
 
@@ -567,7 +787,7 @@ Molecule::create_subset (Molecule & subset,
     if (xref[a2] < 0)
       continue;
 
-    subset.add_bond (xref[a1], xref[a2], b->btype());
+    subset.add_bond(xref[a1], xref[a2], b->btype());
 
     if (b->is_directional())
       directional_bonds_may_be_present++;
@@ -575,8 +795,8 @@ Molecule::create_subset (Molecule & subset,
       wedge_bonds_may_be_present++;
   }
 
-  if (0 == subset.natoms())
-    cerr << "Molecule::create_subset: warning empty molecule created\n";
+//if (0 == subset.natoms())
+//  cerr << "Molecule::create_subset: warning empty molecule created\n";
 
 // What if there are chiral centres
 
@@ -608,23 +828,23 @@ Molecule::create_subset (Molecule & subset,
 //  cerr << "in subset " << c->all_atoms_in_subset(process_these, id) << endl;
 //  c->debug_print(cerr);
 
-    if (c->all_atoms_in_subset (process_these, id))
+    if (c->all_atoms_in_subset(process_these, id))
     {
-      Chiral_Centre * nc = new Chiral_Centre (j);
-      if (! nc->make_copy (*c, xref))
+      Chiral_Centre * nc = new Chiral_Centre(j);
+      if (! nc->make_copy(*c, xref))
       {
         cerr << "Molecule::create_subset: yipes, make copy chiral centre failed\n";
-        nc->debug_print (cerr);
+        nc->debug_print(cerr);
         return 0;
       }
 
-      subset._chiral_centres.add (nc);
+      subset._chiral_centres.add(nc);
     }
     else     // only some of the atoms are in the subset. No chiral centre in the subset molecule
     {
       Atom * a = subset._things[j];
-      a->set_implicit_hydrogens_known (0);
-      a->recompute_implicit_hydrogens (j);
+      a->set_implicit_hydrogens_known(0);
+      a->recompute_implicit_hydrogens(j);
     }
   }
 
@@ -637,7 +857,7 @@ Molecule::create_subset (Molecule & subset,
     _transfer_wedge_bond_info(subset, xref);
 
   subset.recompute_implicit_hydrogens();
-//subset.debug_print (cerr);
+//subset.debug_print(cerr);
   return rc;
 }
 
@@ -646,12 +866,12 @@ Molecule::create_subset (Molecule & subset,
                          const int * process_these,
                          int id) const
 {
-  assert (ok());
-  assert (subset.ok());
+  assert(ok());
+  assert(subset.ok());
 
-  int * tmp = new_int (_number_elements, -1); iw_auto_array<int> free_tmp (tmp);
+  int * tmp = new_int(_number_elements, -1); std::unique_ptr<int[]> free_tmp(tmp);
 
-  return create_subset (subset, process_these, id, tmp);
+  return create_subset(subset, process_these, id, tmp);
 }
 
 int
@@ -689,10 +909,11 @@ Molecule::create_components (const int * fragID,
   return fcntr;
 }
 
+template <typename T>
 int
-Molecule::create_components (resizable_array_p<Molecule> & components)
+Molecule::create_components (resizable_array_p<T> & components)
 {
-  assert (ok());
+  assert(ok());
 
   if (0 == _number_elements)
     return 0;
@@ -710,9 +931,9 @@ Molecule::create_components (resizable_array_p<Molecule> & components)
     return 0;
   }
 
-  int * tmp = new int[_number_elements]; iw_auto_array<int> free_tmp (tmp);
+  int * tmp = new int[_number_elements]; std::unique_ptr<int[]> free_tmp(tmp);
 
-  fragment_membership (tmp);
+  fragment_membership(tmp);
 
   assign_bond_numbers_to_bonds_if_needed();
 
@@ -720,26 +941,28 @@ Molecule::create_components (resizable_array_p<Molecule> & components)
   {
 //  cerr << "Creating component from fragment " << i << endl;
 
-    Molecule * m = new Molecule;
-    create_subset (*m, tmp, i);
-    components.add (m);
+    T * m = new T;
+    create_subset(*m, tmp, i);
+    components.add(m);
   }
 
-  assert (nf == components.number_elements());
+  assert(nf == components.number_elements());
 
   return nf;
 }
 
+template int Molecule::create_components(resizable_array_p<Molecule>&);
+
 int
 Molecule::fragment_membership (int * f)
 {
-  assert (ok());
-  assert (NULL != f);
+  assert(ok());
+  assert(NULL != f);
 
   if (! _fragment_information.contains_valid_data())
     (void) number_fragments();
 
-  copy_vector (f, _fragment_information.fragment_membership(), _number_elements);
+  copy_vector(f, _fragment_information.fragment_membership(), _number_elements);
 
   return number_fragments();
 }
@@ -747,16 +970,18 @@ Molecule::fragment_membership (int * f)
 int
 Molecule::fragment_membership (atom_number_t a)
 {
+  assert (ok_atom_number(a));
+
   if (! _fragment_information.contains_valid_data())
     (void) number_fragments();
 
-  return _fragment_information.fragment_membership (a);
+  return _fragment_information.fragment_membership(a);
 }
 
 int
 Molecule::number_fragments()
 {
-  assert (ok());
+  assert(ok());
 
   if (_fragment_information.contains_valid_data())
     return _fragment_information.number_fragments();
@@ -764,27 +989,25 @@ Molecule::number_fragments()
   if (0 == _number_elements)
     return 0;
 
-  return _compute_fragment_information (_fragment_information);
+  return _compute_fragment_information(_fragment_information);
 }
 
 int
 Molecule::atoms_in_fragment (int zfrag) 
 {
-  assert (zfrag >= 0);
+  assert(zfrag >= 0);
 
-  int nf = number_fragments();
+  assert(zfrag < number_fragments());
 
-  assert (zfrag < nf);
-
-  return _fragment_information.atoms_in_fragment (zfrag);
+  return _fragment_information.atoms_in_fragment(zfrag);
 }
 
 int
 Molecule::atoms_in_fragment (Set_of_Atoms & aif,
                              int f)
 {
-  assert (ok());
-  assert (0 == aif.number_elements());
+  assert(ok());
+  assert(0 == aif.number_elements());
 
   if (0 == _number_elements)
     return 0;
@@ -798,47 +1021,63 @@ Molecule::atoms_in_fragment (Set_of_Atoms & aif,
 
   if (1 == nf)
   {
-    aif.resize (_number_elements);
+    aif.resize(_number_elements);
     for (int i = 0; i < _number_elements; i++)
     {
-      aif.add (i);
+      aif.add(i);
     }
 
     return _number_elements;
   }
 
-  assert (f >= 0 && f < nf);
+  assert(f >= 0 && f < nf);
 
-  _fragment_information.atoms_in_fragment (_number_elements, f, aif);
+  _fragment_information.atoms_in_fragment(_number_elements, f, aif);
 
-  return _fragment_information.atoms_in_fragment (f);
+  return _fragment_information.atoms_in_fragment(f);
 }
 
 int
-Molecule::atoms_in_largest_fragment ()
+Molecule::atoms_in_largest_fragment()
 {
   if (0 == _number_elements)
     return 0;
 
-  int nf = number_fragments();
+  const int f = largest_fragment();
+
+  return _fragment_information.atoms_in_fragment(f);
+}
+
+int
+Molecule::largest_fragment ()
+{
+  if (0 == _number_elements)
+    return 0;
+
+  const int nf = number_fragments();
 
   if (1 == nf)
     return _number_elements;
 
-  int rc = _fragment_information.atoms_in_fragment(0);
+  int lf = _fragment_information.atoms_in_fragment(0);
+  int rc = 0;
 
-  if (2 == nf)    // probably a common case..
+  if (2 == nf)    // a common case
   {
-    if (_fragment_information.atoms_in_fragment(1) > rc)
-      return _fragment_information.atoms_in_fragment(1);
+    if (_fragment_information.atoms_in_fragment(1) > lf)
+      return 1;
     else
-      return rc;
+      return 0;
   }
+
 
   for (int i = 1; i < nf; i++)
   {
-    if (_fragment_information.atoms_in_fragment(i) > rc)
-      rc = _fragment_information.atoms_in_fragment(i);
+    if (_fragment_information.atoms_in_fragment(i) > lf)
+    {
+      lf = _fragment_information.atoms_in_fragment(i);
+      rc = i;
+    }
   }
 
   return rc;
@@ -857,11 +1096,11 @@ Molecule::add_atoms_in_fragment (Set_of_Atoms & aif,
 {
   Set_of_Atoms tmp;
 
-  atoms_in_fragment (tmp, f);
+  atoms_in_fragment(tmp, f);
 
   aif += tmp;
 
-  return atoms_in_fragment (f);
+  return atoms_in_fragment(f);
 }
 
 int
@@ -872,7 +1111,7 @@ Molecule::reduce_to_largest_fragment()
   if (nf <= 1)
     return 1;
 
-  int maxat = _fragment_information.atoms_in_fragment (0);    // largest number of atoms in a fragment
+  int maxat = _fragment_information.atoms_in_fragment(0);    // largest number of atoms in a fragment
 
   int imax  = 0;                        // which fragment
 
@@ -883,7 +1122,7 @@ Molecule::reduce_to_largest_fragment()
   {
     for (int i = 1; i < nf; i++)
     {
-      int j = _fragment_information.atoms_in_fragment (i);
+      int j = _fragment_information.atoms_in_fragment(i);
 
       if (j > maxat)
       {
@@ -894,30 +1133,30 @@ Molecule::reduce_to_largest_fragment()
   }
 
   Set_of_Atoms atoms_to_be_removed;
-  atoms_to_be_removed.resize (maxat);
+  atoms_to_be_removed.resize(maxat);
 
   const int * fragment_membership = _fragment_information.fragment_membership();
 
   for (int i = 0; i < _number_elements; i++)
   {
     if (fragment_membership[i] != imax)
-      atoms_to_be_removed.add (i);
+      atoms_to_be_removed.add(i);
   }
 
-  return remove_atoms (atoms_to_be_removed);
+  return remove_atoms(atoms_to_be_removed);
 }
 
 atom_number_t
 Molecule::first_atom_in_fragment (int f)
 {
-  assert (f >= 0);
+  assert(f >= 0);
 
   int nf = number_fragments();
 
   if (1 == nf)
     return 0;
 
-  assert (f < nf);
+  assert(f < nf);
 
   const int * fragment_membership = _fragment_information.fragment_membership();
 
@@ -935,11 +1174,9 @@ Molecule::first_atom_in_fragment (int f)
 int
 Molecule::rings_in_fragment (int f)
 {
-  assert (f >= 0);
+  assert(f >= 0);
 
-  int nf = number_fragments();
-
-  assert (f < nf);
+  assert(f < number_fragments());
 
   return _fragment_information.rings_in_fragment(f);
 }
@@ -971,11 +1208,11 @@ Molecule::create_subset_by_bond (Molecule & subset,
                                  const int * these_bonds_only,
                                  int flag) const
 {
-  subset.resize (0);
+  subset.resize(0);
 
   int bond_lookup_table_size = _number_elements * (_number_elements - 1) + _number_elements + 1;
 
-  int * bond_lookup_table = new_int (bond_lookup_table_size);
+  int * bond_lookup_table = new_int(bond_lookup_table_size);
 
   if (NULL == bond_lookup_table)
   {
@@ -983,16 +1220,16 @@ Molecule::create_subset_by_bond (Molecule & subset,
     return 0;
   }
 
-  iw_auto_array<int> free_bond_lookup_table (bond_lookup_table);
+  std::unique_ptr<int[]> free_bond_lookup_table(bond_lookup_table);
 
-  int * xref = new_int (_number_elements, -1);
+  int * xref = new_int(_number_elements, -1);
   if (NULL == xref)
   {
     cerr << "Molecule::create_subset_by_bond:cannot allocate xref array " << _number_elements << endl;
     return 0;
   }
 
-  iw_auto_array<int> free_xref (xref);
+  std::unique_ptr<int[]> free_xref(xref);
 
   int nb = _bond_list.number_elements();
 
@@ -1017,7 +1254,7 @@ Molecule::create_subset_by_bond (Molecule & subset,
 
     atom_number_t a1 = i % _number_elements;
 
-    _create_bond_subset_starting_with (subset, a1, bond_lookup_table, xref);
+    _create_bond_subset_starting_with(subset, a1, bond_lookup_table, xref);
   }
 
   return subset._number_elements;
@@ -1030,25 +1267,25 @@ Molecule::_create_bond_subset_starting_with (Molecule & subset,
                                              int * xref) const
 {
   Set_of_Atoms atoms_to_be_processed;
-  atoms_to_be_processed.resize (_number_elements);
+  atoms_to_be_processed.resize(_number_elements);
 
   int x = subset._number_elements;    // the atom number it will get
 
-  Atom * a = new Atom (_things[zatom]);
-  a->set_implicit_hydrogens_known (0);
-  subset.add (a);
+  Atom * a = new Atom(_things[zatom]);
+  a->set_implicit_hydrogens_known(0);
+  subset.add(a);
 
 //cerr << "Starting subset with atom " << zatom << endl;
 
   xref[zatom] = x;
 
-  atoms_to_be_processed.add (zatom);
+  atoms_to_be_processed.add(zatom);
 
   while (atoms_to_be_processed.number_elements() > 0)
   {
     atom_number_t current_atom = atoms_to_be_processed.pop();
 
-    assert (xref[current_atom] >= 0);
+    assert(xref[current_atom] >= 0);
 
     const Atom * a = _things[current_atom];
 
@@ -1056,7 +1293,7 @@ Molecule::_create_bond_subset_starting_with (Molecule & subset,
 
     for (int i = 0; i < acon; i++)
     {
-      const Bond * b = a->item (i);
+      const Bond * b = a->item(i);
 
       atom_number_t a1 = b->a1();
       atom_number_t a2 = b->a2();
@@ -1064,36 +1301,36 @@ Molecule::_create_bond_subset_starting_with (Molecule & subset,
       if (0 == bond_lookup_table[a1 * _number_elements + a2])
         continue;
 
-      atom_number_t o = b->other (current_atom);
+      atom_number_t o = b->other(current_atom);
 
       if (xref[o] >= 0)   // already done that, need to put bond between them
       {
-        if (! subset.are_bonded (xref[current_atom], xref[o]))
-          subset.add_bond (xref[current_atom], xref[o], b->btype());
-        turn_off_bond (current_atom, o, bond_lookup_table, _number_elements);
+        if (! subset.are_bonded(xref[current_atom], xref[o]))
+          subset.add_bond(xref[current_atom], xref[o], b->btype());
+        turn_off_bond(current_atom, o, bond_lookup_table, _number_elements);
         continue;
       }
 
       int x = subset._number_elements;    // the atom number it will get in the new molecule
 
-      Atom * t = new Atom (_things[o]);
-      t->set_implicit_hydrogens_known (0);
-      subset.add (t);
+      Atom * t = new Atom(_things[o]);
+      t->set_implicit_hydrogens_known(0);
+      subset.add(t);
 
-      subset.add_bond (xref[current_atom], x, b->btype());
+      subset.add_bond(xref[current_atom], x, b->btype());
 
-      turn_off_bond (current_atom, o, bond_lookup_table, _number_elements);
+      turn_off_bond(current_atom, o, bond_lookup_table, _number_elements);
 
       xref[o] = x;
 
-      atoms_to_be_processed.add (o);
+      atoms_to_be_processed.add(o);
     }
   }
 
   for (int i = 0; i < subset._number_elements; i++)
   {
     int notused;
-    subset._things[i]->recompute_implicit_hydrogens (notused);
+    subset._things[i]->recompute_implicit_hydrogens(notused);
   }
 
   return subset._number_elements;
@@ -1125,7 +1362,7 @@ Fragment_Information::contains_valid_data() const
 }
 
 int
-Fragment_Information::debug_print (ostream & os) const
+Fragment_Information::debug_print (std::ostream & os) const
 {
   if (_number_fragments >= 0)
     os << "Molecule contains " << _number_fragments << " components\n";
@@ -1136,7 +1373,7 @@ Fragment_Information::debug_print (ostream & os) const
     {
       os << "Fragment " << i << ", " << _atoms_in_fragment[i] << " atoms, " << _bonds_in_fragment[i] << " bonds";
 
-      os << " " << rings_in_fragment (i) << " rings\n";
+      os << " " << rings_in_fragment(i) << " rings\n";
     }
   }
 
@@ -1152,7 +1389,7 @@ Fragment_Information::initialise (int matoms)
 {
   if (NULL == _fragment_membership)
   {
-    _fragment_membership = new_int (matoms, FRAGMENT_MEMBERSHIP_NOT_SET);
+    _fragment_membership = new_int(matoms, FRAGMENT_MEMBERSHIP_NOT_SET);
     if (NULL == _fragment_membership)
     {
       cerr << "Fragment_Information::initialise:cannot allocate " << matoms << " atoms\n";
@@ -1160,12 +1397,12 @@ Fragment_Information::initialise (int matoms)
     }
   }
   else
-    set_vector (_fragment_membership, matoms, FRAGMENT_MEMBERSHIP_NOT_SET);
+    set_vector(_fragment_membership, matoms, FRAGMENT_MEMBERSHIP_NOT_SET);
 
   _number_fragments = -1;
 
-  _atoms_in_fragment.resize_keep_storage (0);
-  _bonds_in_fragment.resize_keep_storage (0);
+  _atoms_in_fragment.resize_keep_storage(0);
+  _bonds_in_fragment.resize_keep_storage(0);
 
   return 1;
 }
@@ -1191,8 +1428,8 @@ Fragment_Information::invalidate()
     _fragment_membership = NULL;
   }
 
-  _atoms_in_fragment.resize_keep_storage (0);
-  _bonds_in_fragment.resize_keep_storage (0);
+  _atoms_in_fragment.resize_keep_storage(0);
+  _bonds_in_fragment.resize_keep_storage(0);
 
   return;
 }
@@ -1219,12 +1456,12 @@ Fragment_Information::all_atoms_in_one_fragment (int natoms, int nbonds)
 int
 Fragment_Information::set_number_fragments (int nf)
 {
-  assert (nf > 0);
+  assert(nf > 0);
 
   _number_fragments = nf;
 
-  _atoms_in_fragment.extend (nf);
-  _bonds_in_fragment.extend (nf);
+  _atoms_in_fragment.extend(nf);
+  _bonds_in_fragment.extend(nf);
 
   return 1;
 }
@@ -1234,14 +1471,14 @@ Fragment_Information::atoms_in_fragment (int matoms,
                                          int f,
                                          Set_of_Atoms & s) const
 {
-  s.resize_keep_storage (0);
+  s.resize_keep_storage(0);
 
-  assert (f >= 0 && f < _number_fragments);
+  assert(f >= 0 && f < _number_fragments);
 
   for (int i = 0; i < matoms; i++)
   {
     if (f == _fragment_membership[i])
-      s.add (i);
+      s.add(i);
   }
 
   return s.number_elements();
@@ -1257,25 +1494,21 @@ Molecule::_compute_fragment_information (Fragment_Information & fragment_informa
   if (0 == _number_elements)
     return 1;
 
-  fragment_information.initialise (_number_elements);
+  fragment_information.initialise(_number_elements);
 
   int * fragment_membership = fragment_information.fragment_membership();
 
   Set_of_Atoms mystack;
-  mystack.resize (_number_elements);
+  mystack.resize(_number_elements);
 
   int nf = 0;
 
-  while (1)
+  for (int i = 0; i < _number_elements; ++i)
   {
-    atom_number_t i = locate_item_in_array (FRAGMENT_MEMBERSHIP_NOT_SET, _number_elements, fragment_membership);
+    if (FRAGMENT_MEMBERSHIP_NOT_SET != fragment_membership[i])
+      continue;
 
-//  cerr << "Fragment " << nf << " starts with atom " << i << endl;
-
-    if (i < 0)
-      break;
-
-    mystack.add (i);
+    mystack.add(i);
 
     while (mystack.number_elements() > 0)
     {
@@ -1292,19 +1525,19 @@ Molecule::_compute_fragment_information (Fragment_Information & fragment_informa
   
       for (int i = 0; i < acon; i++)
       {
-        atom_number_t j = a->other (zatom, i);
+        atom_number_t j = a->other(zatom, i);
 
         if (FRAGMENT_MEMBERSHIP_NOT_SET == fragment_membership[j])
-          mystack.add (j);
+          mystack.add(j);
       }
     }
 
     nf++;
   }
 
-  assert (nf > 0);
+  assert(nf > 0);
 
-  if (! fragment_information.set_number_fragments (nf))
+  if (! fragment_information.set_number_fragments(nf))
     return 0;
 
   resizable_array<int> & atoms_in_fragment = fragment_information.atoms_in_fragment();
@@ -1327,7 +1560,7 @@ Molecule::_compute_fragment_information (Fragment_Information & fragment_informa
   {
     bonds_in_fragment[i] = bonds_in_fragment[i] / 2;
 
-    if (0 == fragment_information.rings_in_fragment (i))
+    if (0 == fragment_information.rings_in_fragment(i))
       fragments_with_no_rings++;
   }
 
@@ -1340,7 +1573,7 @@ Molecule::_compute_fragment_information (Fragment_Information & fragment_informa
   }
   for (int i = 0; i < nf; i++)
   {
-    cerr << "Fragment " << i << " " << atoms_in_fragment[i] << " atoms and " << bonds_in_fragment[i] << " bonds, nr = " << _fragment_information.rings_in_fragment (i) << endl;
+    cerr << "Fragment " << i << " " << atoms_in_fragment[i] << " atoms and " << bonds_in_fragment[i] << " bonds, nr = " << _fragment_information.rings_in_fragment(i) << endl;
   }
 #endif
 
@@ -1359,7 +1592,7 @@ Molecule::_compute_fragment_information (Fragment_Information & fragment_informa
   {
     int f = fragment_membership[i];
 
-    if (0 == fragment_information.rings_in_fragment (f))
+    if (0 == fragment_information.rings_in_fragment(f))
       _ring_membership[i] = 0;
   }
 
@@ -1373,7 +1606,7 @@ next_available_atom (int needle,
                      const int * include_atom,
                      int & istart)
 {
-  assert (NULL != include_atom);
+  assert(NULL != include_atom);
 
   for ( ; istart < n; istart++)
   {
@@ -1411,22 +1644,25 @@ next_available_atom (int needle,
 }
 
 /*
-  When doing a subset, we don't do any extra ring stuff
+  Split off to separate function if doing a subset
 */
 
 int
-Molecule::compute_fragment_information (Fragment_Information & fragment_information,
-                                        const int * include_atom) const
+Molecule::compute_fragment_information(Fragment_Information & fragment_information,
+                                       const int * include_atom) const
 {
   if (0 == _number_elements)
     return 1;
 
-  fragment_information.initialise (_number_elements);
+  fragment_information.initialise(_number_elements);
+
+  if (NULL != include_atom)
+    return _compute_fragment_information_subset(fragment_information, include_atom);
 
   int * fragment_membership = fragment_information.fragment_membership();
 
   Set_of_Atoms mystack;
-  mystack.resize (_number_elements);
+  mystack.resize(_number_elements);
 
   int nf = 0;
 
@@ -1434,39 +1670,32 @@ Molecule::compute_fragment_information (Fragment_Information & fragment_informat
 
   while (1)
   {
-    atom_number_t i;
-    if (NULL == include_atom)
-      i = next_available_atom (FRAGMENT_MEMBERSHIP_NOT_SET, _number_elements, fragment_membership, istart);
-    else 
-      i = next_available_atom (FRAGMENT_MEMBERSHIP_NOT_SET, _number_elements, fragment_membership, include_atom, istart);
+    const atom_number_t i = next_available_atom(FRAGMENT_MEMBERSHIP_NOT_SET, _number_elements, fragment_membership, istart);
 
     if (i < 0)
       break;
 
-    mystack.add (i);
+    mystack.add(i);
 
     while (mystack.number_elements() > 0)
     {
-      atom_number_t zatom = mystack.pop();
-
-      Atom * a = _things[zatom];
+      const atom_number_t zatom = mystack.pop();
 
       if (fragment_membership[zatom] >= 0)
         continue;
 
       fragment_membership[zatom] = nf;
 
-      int acon = a->ncon();
+      const Atom * a = _things[zatom];
+
+      const int acon = a->ncon();
   
       for (int i = 0; i < acon; i++)
       {
-        atom_number_t j = a->other (zatom, i);
-
-        if (NULL != include_atom && 0 == include_atom[j])
-          continue;
+        atom_number_t j = a->other(zatom, i);
 
         if (FRAGMENT_MEMBERSHIP_NOT_SET == fragment_membership[j])
-          mystack.add (j);
+          mystack.add(j);
       }
     }
 
@@ -1478,50 +1707,124 @@ Molecule::compute_fragment_information (Fragment_Information & fragment_informat
     cerr << "Molecule::compute_fragment_information:subset contains no atoms\n";
     return 0;
   }
-  assert (nf > 0);
+  assert(nf > 0);
 
-  if (! fragment_information.set_number_fragments (nf))
+  if (! fragment_information.set_number_fragments(nf))
     return 0;
+
+  resizable_array<int> & atoms_in_fragment = fragment_information.atoms_in_fragment();
+  resizable_array<int> & bonds_in_fragment = fragment_information.bonds_in_fragment();
+
+  int * aif = atoms_in_fragment.rawdata();   // access raw data for speed
+  for (int i = 0; i < _number_elements; i++)
+  {
+    const int f = fragment_membership[i];
+    aif[f]++;
+  }
+
+  const int nb = nedges();
+
+  int * bif = bonds_in_fragment.rawdata();    // for speed
+  for (int i = 0; i < nb; ++i)
+  {
+    const Bond * b = _bond_list[i];
+
+    const atom_number_t a = b->a1();    // no subsetting, no need to check other end of bond
+
+    const int f = fragment_membership[a];
+
+    bif[f]++;
+  }
+
+  return nf;
+}
+
+int
+Molecule::_compute_fragment_information_subset(Fragment_Information & fragment_information,
+                                               const int * include_atom) const
+{
+  int * fragment_membership = fragment_information.fragment_membership();
+
+  Set_of_Atoms mystack;
+  mystack.resize(_number_elements);
+
+  int nf = 0;
+
+  int istart = 0;
+
+  while (1)
+  {
+    const atom_number_t i = next_available_atom(FRAGMENT_MEMBERSHIP_NOT_SET, _number_elements, fragment_membership, include_atom, istart);
+
+    if (i < 0)
+      break;
+
+    mystack.add(i);
+
+    while (mystack.number_elements() > 0)
+    {
+      const atom_number_t zatom = mystack.pop();
+
+      if (fragment_membership[zatom] >= 0)
+        continue;
+
+      fragment_membership[zatom] = nf;
+
+      const Atom * a = _things[zatom];
+
+      const int acon = a->ncon();
+  
+      for (int i = 0; i < acon; i++)
+      {
+        atom_number_t j = a->other(zatom, i);
+
+        if (0 == include_atom[j])
+          continue;
+
+        if (FRAGMENT_MEMBERSHIP_NOT_SET == fragment_membership[j])
+          mystack.add(j);
+      }
+    }
+
+    nf++;
+  }
+
+  if (0 == nf)
+  {
+    cerr << "Molecule::compute_fragment_information:subset contains no atoms\n";
+    return 0;
+  }
+  assert(nf > 0);
+
+  if (! fragment_information.set_number_fragments(nf))
+    return 0;
+
+  const int nb = nedges();
 
   resizable_array<int> & atoms_in_fragment = fragment_information.atoms_in_fragment();
   resizable_array<int> & bonds_in_fragment = fragment_information.bonds_in_fragment();
 
   for (int i = 0; i < _number_elements; i++)
   {
-    const Atom * a = _things[i];
-
-    int f = fragment_membership[i];
-
-    if (f < 0)     // only if doing a subset
+    if (0 == include_atom[i])
       continue;
 
+    const int f = fragment_membership[i];
     atoms_in_fragment[f]++;
-
-    int acon = a->ncon();
-
-    if (NULL == include_atom)
-      bonds_in_fragment[f] += a->ncon();    // counts the bonds twice
-    else
-    {
-      for (int j = 0; j < acon; j++)
-      {
-        atom_number_t k = a->other (i, j);
-
-        if (0 == include_atom[k])
-          continue;
-  
-        if (k < i)                // here we only count the bonds once
-          bonds_in_fragment[f]++;
-      }
-    }
   }
 
-  if (NULL == include_atom)
+  for (int i = 0; i < nb; ++i)
   {
-    for (int i = 0; i < nf; i++)
-    {
-      bonds_in_fragment[i] = bonds_in_fragment[i] / 2;
-    }
+    const Bond * b = _bond_list[i];
+
+    const atom_number_t a1 = b->a1();
+    const atom_number_t a2 = b->a2();
+
+    const int f1 = fragment_membership[a1];
+    const int f2 = fragment_membership[a2];
+
+    if (f1 == f2)
+      bonds_in_fragment[f1]++;
   }
 
   return nf;

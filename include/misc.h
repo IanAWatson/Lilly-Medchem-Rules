@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef IW_MIST_H
 #define IW_MIST_H 1
 
@@ -23,7 +5,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-using namespace std;
+using std::cerr;
+using std::endl;
 
 #ifdef IWCYGWIN
 #define IWDIRECTORY_SEPARATOR '\\'
@@ -274,8 +257,8 @@ extern double * new_double (int, double = 0.0);
 
 class IWString;
 
-extern ostream & write_space_suppressed_string (const IWString & mname, ostream & os, char = '_');
-extern ostream & write_first_token_of_string (const IWString & mname, ostream & os);
+extern std::ostream & write_space_suppressed_string (const IWString & mname, std::ostream & os, char = '_');
+extern std::ostream & write_first_token_of_string (const IWString & mname, std::ostream & os);
 extern int append_first_token_of_name(const IWString & , IWString &);
 
 /*
@@ -283,7 +266,7 @@ extern int append_first_token_of_name(const IWString & , IWString &);
   an optional name of the array
 */
 
-template <typename T> int iw_write_array (const T *, int n, const char *, ostream &);
+template <typename T> int iw_write_array (const T *, int n, const char *, std::ostream &);
 
 #ifdef IW_WRITE_ARRAY_IMPLEMENTATION
 
@@ -293,7 +276,7 @@ template <typename T> int
 iw_write_array (const T * a,
                 int n,
                 const char * array_name,
-                ostream & output)
+                std::ostream & output)
 {
   for (int i = 0; i < n; i++)
   {

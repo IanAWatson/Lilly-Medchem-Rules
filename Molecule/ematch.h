@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2012  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef E_MATCH_H
 #define E_MATCH_H
 
@@ -53,7 +35,7 @@ class Element_Matcher
     Element_Matcher (const IWString &);
 
     int ok () const;
-    int debug_print (ostream &) const;
+    int debug_print (std::ostream &) const;
 
     void set_element (const Element *);
     int  construct_from_string (const char *, int);
@@ -61,7 +43,7 @@ class Element_Matcher
     int  construct_from_string (const const_IWSubstring &);
     int  construct_from_string (const IWString &);
 
-    int operator_less_less (ostream & os) const;
+    int operator_less_less (std::ostream & os) const;
 
     const Element * element () const { return _e;}
 
@@ -70,8 +52,8 @@ class Element_Matcher
     int matches (const Element *, int = 0);    // = 0 parameter is isotope
 };
 
-extern ostream &
-operator<< (ostream &, const Element_Matcher &);
+extern std::ostream &
+operator<< (std::ostream &, const Element_Matcher &);
 
 class Command_Line;
 
@@ -85,6 +67,6 @@ class Set_of_Element_Matches : public resizable_array_p<Element_Matcher>
     int matches (const Element *, int = 0);    // = 0 parameter is isotope
 };
 
-extern void display_element_matcher_syntax (ostream & os);
+extern void display_element_matcher_syntax (std::ostream & os);
 
 #endif

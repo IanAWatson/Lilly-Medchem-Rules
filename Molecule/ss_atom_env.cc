@@ -1,24 +1,5 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
-
-#include "iw_auto_array.h"
+#include <memory>
 
 /*
   Implementation of the Substructure_Atom_Environment class
@@ -47,27 +28,27 @@ Substructure_Atom_Environment::Substructure_Atom_Environment ()
 int
 Substructure_Atom_Environment::ok () const
 {
-  if (1 == _number_elements && 0 == _operator.number_operators ())
+  if (1 == _number_elements && 0 == _operator.number_operators())
     ;
-  else if (_number_elements == _operator.number_operators ())    // true during building
+  else if (_number_elements == _operator.number_operators())    // true during building
     ;
-  else if (_number_elements != _operator.number_results ())
+  else if (_number_elements != _operator.number_results())
     return 0;
 
-  return _operator.ok ();
+  return _operator.ok();
 }
 
 int
-Substructure_Atom_Environment::debug_print (ostream & os) const
+Substructure_Atom_Environment::debug_print (std::ostream & os) const
 {
   os << "Details on Substructure_Atom_Environment object with " << _number_elements << " components\n";
 
-  _operator.debug_print (os);
+  _operator.debug_print(os);
 
-  if (! ok ())
+  if (! ok())
     os << "Warning, NOT OK\n";
 
-  return os.good ();
+  return os.good();
 }
 
 int
@@ -75,7 +56,7 @@ Substructure_Atom_Environment::involves_aromatic_bond_specifications (int & _nee
 { 
   for (int i = 0; i < _number_elements; i++)
   {
-    if (_things[i]->involves_aromatic_bond_specifications (_need_to_compute_ring_membership))
+    if (_things[i]->involves_aromatic_bond_specifications(_need_to_compute_ring_membership))
       return 1;
   }
 
@@ -87,12 +68,12 @@ Substructure_Atom_Environment::involves_aromatic_bond_specifications (int & _nee
 int
 Substructure_Atom_Environment::create_from_smarts (const Atomic_Smarts_Component & env)
 {
-  assert (env.starts_with ("$(") && env.ends_with (')'));
+  assert (env.starts_with("$(") && env.ends_with(')'));
 
   const_IWSubstring mysmarts = env;      // so we can make changes
 
-  mysmarts.remove_leading_chars (2);
-  mysmarts.chop ();
+  mysmarts.remove_leading_chars(2);
+  mysmarts.chop();
 
 #ifdef DEBUG_SS_ATOM_ENV_CREATE_FROM_SMARTS
   cerr << "Substructure_Atom_Environment::create_from_smarts: parsing " << env << endl;
@@ -100,7 +81,7 @@ Substructure_Atom_Environment::create_from_smarts (const Atomic_Smarts_Component
 
   Substructure_Atom * a = new Substructure_Atom;
 
-  if (! a->parse_smarts_specifier (mysmarts))
+  if (! a->parse_smarts_specifier(mysmarts))
   {
     cerr << "Substructure_Atom_Environment::create_from_smarts: cannot parse '" << env << "'\n";
     delete a;
@@ -109,23 +90,23 @@ Substructure_Atom_Environment::create_from_smarts (const Atomic_Smarts_Component
 
   add (a);
 
-  if (a->number_children ())
+  if (a->number_children())
     _all_components_single_atoms = 0;
 
 // Unfortunately complex initialising the operator. Remember that an 
 // environment component comes here with the operator following it
 
-  _operator.set_unary_operator (_operator.number_results () - 1, env.unary_operator ());
+  _operator.set_unary_operator(_operator.number_results() - 1, env.unary_operator());
 
-  if (IW_LOGEXP_UNDEFINED != env.op ())
-    _operator.add_operator (env.op ());
+  if (IW_LOGEXP_UNDEFINED != env.op())
+    _operator.add_operator(env.op());
 
 #ifdef DEBUG_SS_ATOM_ENV_CREATE_FROM_SMARTS
   cerr << "After parsing smarts\n";
-  debug_print (cerr);
+  debug_print(cerr);
 #endif
 
-  assert (ok ());
+  assert(ok());
 
   return 1;
 }
@@ -138,10 +119,10 @@ Substructure_Atom_Environment::matches (Target_Atom & target_atom,
                                         const int * already_matched)
 {
 #ifdef DEBUG_SS_ATOM_ENV_MATCHES
-  cerr << "Substructure_Atom_Environment::matches: " << _number_elements << " components, trying to match atom " << target_atom.atom_number () << endl;
+  cerr << "Substructure_Atom_Environment::matches: " << _number_elements << " components, trying to match atom " << target_atom.atom_number() << endl;
 #endif
 
-  _operator.reset ();
+  _operator.reset();
 
   int * tmp;
 /*
@@ -152,9 +133,9 @@ Substructure_Atom_Environment::matches (Target_Atom & target_atom,
     tmp = NULL;
   else */
 
-  tmp = new int[atoms_in_target]; iw_auto_array<int> free_tmp(tmp);
+  tmp = new int[atoms_in_target]; std::unique_ptr<int[]> free_tmp(tmp);
 
-  int rc = _matches (target_atom, atoms_in_target, already_matched, tmp);
+  int rc = _matches(target_atom, atoms_in_target, already_matched, tmp);
 
 #ifdef DEBUG_SS_ATOM_ENV_MATCHES
   cerr << "Substructure_Atom_Environment::matches: returning " << rc << endl;
@@ -169,43 +150,43 @@ Substructure_Atom_Environment::_matches (Target_Atom & target_atom,
                                          const int * already_matched_by_query,
                                          int * already_matched)
 {
-  assert (0 == already_matched_by_query[target_atom.atom_number ()]);
+  assert (0 == already_matched_by_query[target_atom.atom_number()]);
 
   for (int i = 0; i < _number_elements; i++)
   {
-    if (! _operator.result_needed (i))
+    if (! _operator.result_needed(i))
       continue;
 
 #ifdef DEBUG_SS_ATOM_ENV_MATCHES
     cerr << "Substructure_Atom_Environment::_matches: trying to match component " << i << endl;
 #endif
 
-    set_vector (already_matched, atoms_in_target, 0);
+    set_vector(already_matched, atoms_in_target, 0);
 
-    if ( _match_component (target_atom, i, already_matched_by_query, already_matched))
+    if ( _match_component(target_atom, i, already_matched_by_query, already_matched))
     {
 #ifdef DEBUG_SS_ATOM_ENV_MATCHES
       cerr << "Component " << i << " matches\n";
 #endif
-      _operator.set_result (i, 1);
+      _operator.set_result(i, 1);
     }
     else
     {
 #ifdef DEBUG_SS_ATOM_ENV_MATCHES
       cerr << "Component " << i << " does not match\n";
 #endif
-      _operator.set_result (i, 0);
+      _operator.set_result(i, 0);
     }
 
 #ifdef DEBUG_SS_ATOM_ENV_MATCHES
-    cerr << "Result for component " << i << " is " << _operator.result (i) << endl;
-    _operator.debug_print (cerr);
+    cerr << "Result for component " << i << " is " << _operator.result(i) << endl;
+    _operator.debug_print(cerr);
 #endif
 
-    _things[i]->recursive_release_hold ();
+    _things[i]->recursive_release_hold();
 
     int rc;
-    if (_operator.evaluate (rc))
+    if (_operator.evaluate(rc))
       return rc;
   }
 
@@ -219,22 +200,22 @@ Substructure_Atom_Environment::_match_component (Target_Atom & target_atom,
                                                  int * already_matched)
 {
 #ifdef DEBUG_SS_ATOM_ENV_MATCHES
-  cerr << "Substructure_Atom_Environment::_match_component: component " << which_component << " trying to match atom " << target_atom.atom_number () << endl;
+  cerr << "Substructure_Atom_Environment::_match_component: component " << which_component << " trying to match atom " << target_atom.atom_number() << endl;
 #endif
 
   Substructure_Atom * root_atom = _things[which_component];
 
-  assert (0 == already_matched[target_atom.atom_number ()]);
+  assert (0 == already_matched[target_atom.atom_number()]);
 
-  if (! root_atom->matches (target_atom, already_matched_by_query))
+  if (! root_atom->matches(target_atom, already_matched_by_query))
     return 0;
 
-  if (0 == root_atom->number_children ())
+  if (0 == root_atom->number_children())
     return 1;
 
   if (environment_only_matches_unmatched_atoms)
   {
-    int na = target_atom.atoms_in_target_molecule ();
+    int na = target_atom.atoms_in_target_molecule();
 
     for (int j = 0; j < na; j++)
     {
@@ -245,28 +226,28 @@ Substructure_Atom_Environment::_match_component (Target_Atom & target_atom,
     }
   }
 
-  root_atom->set_hold (&target_atom, already_matched);
+  root_atom->set_hold(&target_atom, already_matched);
 
   Query_Atoms_Matched matched_atoms;
-  matched_atoms.resize (23);         // just an arbitrary sizing
+  matched_atoms.resize(23);         // just an arbitrary sizing
 
-  root_atom->add_your_children (matched_atoms);
+  root_atom->add_your_children(matched_atoms);
 
   int atom_to_process = 0;
   while (atom_to_process >= 0)
   {
     Substructure_Atom * a = (Substructure_Atom *) matched_atoms[atom_to_process];
 
-    if (! a->move_to_next_match_from_current_anchor (already_matched, matched_atoms))
+    if (! a->move_to_next_match_from_current_anchor(already_matched, matched_atoms))
     {
 #ifdef DEBUG_SS_ATOM_ENV_MATCHES
-      cerr << "Move to next failed for atom " << a->unique_id () << endl;
+      cerr << "Move to next failed for atom " << a->unique_id() << endl;
 #endif
 
-      a->remove_your_children (matched_atoms, already_matched);
-      if (a->or_id () && atom_to_process < matched_atoms.number_elements () - 1 &&
-          a->or_id () == matched_atoms[atom_to_process + 1]->or_id ())
-        matched_atoms.remove_item (atom_to_process);
+      a->remove_your_children(matched_atoms, already_matched);
+      if (a->or_id() && atom_to_process < matched_atoms.number_elements() - 1 &&
+          a->or_id() == matched_atoms[atom_to_process + 1]->or_id())
+        matched_atoms.remove_item(atom_to_process);
       else
         atom_to_process--;
     }
@@ -274,17 +255,17 @@ Substructure_Atom_Environment::_match_component (Target_Atom & target_atom,
     {
 #ifdef DEBUG_SS_ATOM_ENV_MATCHES
       cerr << "Move to next match succeeded " << 
-              a->unique_id () << "(" << a->atom_number_matched () <<
-              "), or = " << a->or_id () <<
-              " atom to process = " << atom_to_process << " matched = " << matched_atoms.number_elements () << endl;
+              a->unique_id() << "(" << a->atom_number_matched() <<
+              "), or = " << a->or_id() <<
+              " atom to process = " << atom_to_process << " matched = " << matched_atoms.number_elements() << endl;
 #endif
-      int orid = a->or_id ();
+      int orid = a->or_id();
       if (orid)
-        remove_atoms_with_same_or (matched_atoms, atom_to_process + 1, orid);
+        remove_atoms_with_same_or(matched_atoms, atom_to_process + 1, orid);
 
-      a->add_your_children (matched_atoms);   // does nothing if already added
+      a->add_your_children(matched_atoms);   // does nothing if already added
 
-      if (atom_to_process == matched_atoms.number_elements () - 1)    // all atoms matched
+      if (atom_to_process == matched_atoms.number_elements() - 1)    // all atoms matched
         return 1;
 
       atom_to_process++;

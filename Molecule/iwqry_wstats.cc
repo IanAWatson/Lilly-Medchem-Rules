@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
 #include <assert.h>
 
@@ -54,6 +36,14 @@ Substructure_Hit_Statistics::Substructure_Hit_Statistics ()
   return;
 }
 
+/*Substructure_Hit_Statistics::Substructure_Hit_Statistics (const IWString & comment) :
+        Substructure_Query (comment)
+{
+  _default_values ();
+
+  return;
+}*/
+
 Substructure_Hit_Statistics::Substructure_Hit_Statistics (const const_IWSubstring & comment) :
         Substructure_Query (comment)
 {
@@ -80,7 +70,7 @@ Substructure_Hit_Statistics::ok () const
 }
 
 int
-Substructure_Hit_Statistics::report (ostream & os, int verbose) const
+Substructure_Hit_Statistics::report (std::ostream & os, int verbose) const
 {
   assert (os.good ());
 
@@ -304,8 +294,8 @@ Substructure_Hit_Statistics::_update_matches (int nmatches,
       cerr << "no match to '" << _comment << "' ";
       for (int i = 0; i < _number_elements; i++)
       {
-        const Single_Substructure_Query * qi = _things[i];
-        assert (qi->ok ());
+//      const Single_Substructure_Query * qi = _things[i];
+//      assert (qi->ok ());
 
         if (_number_elements > 1)
           cerr << "query " << i;

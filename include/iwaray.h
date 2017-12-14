@@ -1,23 +1,7 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef IWARAY_H
 #define IWARAY_H
+
+//#include <tbb/scalable_allocator.h>
 
 #include <iostream>
 #include "iwconfig.h"
@@ -60,15 +44,15 @@ class resizable_array_base
     class resizable_array_iterator<T>;
 
   protected:
+    T * _things;
+    int _number_elements;
     int _elements_allocated;
     int _magic;
-    int _number_elements;
-    T * _things;
   public:
     resizable_array_base        ();
     ~resizable_array_base       ();
 
-    int ok () const;
+    int ok() const;
     int debug_print            (std::ostream &) const;
 
     inline int number_elements  () const { return _number_elements; }
@@ -97,7 +81,9 @@ class resizable_array_base
     int  erase                  (int, int);
     int  remove_first           (const T);
     int  remove_all             (const T);
-    int  remove_items           (const int *, int);
+    int  remove_items           (const int *, int);     // dense array of items to be deleted
+    int  remove_items           (const int *);          // non zero items removed
+    int  remove_two_items       (const T i1, const T i2);     // two specific things to be excised. Must be only one occurrence of each
     int  index                  (const T) const;
     int  rindex                 (const T) const;
     int  contains               (const T) const;
@@ -108,10 +94,19 @@ class resizable_array_base
     T    item                   (int) const;
     T &  operator []            (int) const;
 #endif
+
+#ifdef NDEBUG
+    T    first                  () const { return _things[0];}
+    T    last_item              () const { return _things[_number_elements - 1];}
+#else
+    T    first                  () const;
     T    last_item              () const;
+#endif
     void sort                   ( int  (*) (const T *, const T *));
     template <typename C>
     void iwqsort                (C &);
+    template <typename C>
+    void iwqsort_lambda         (C);
     T    pop                    ();
     void seti                   (int, const T);
     int  insert_at_beginning    (const T item_to_insert);
@@ -127,6 +122,11 @@ class resizable_array_base
     typedef int next_iterator;
 
     int next_begin              () const { return IWARAY_NEXT_ITERATOR_START;}
+
+          T * begin()  const { return _things;}
+    const T * cbegin() const { return _things;}
+          T * end ()   const { return _things + _number_elements;}
+    const T * cend ()  const { return _things + _number_elements;}
 };
 
 template <typename T>
@@ -152,11 +152,16 @@ class resizable_array_p : public resizable_array_base<T *>
 
     void seti                     (int, T *);
 
+    resizable_array_p<T> & operator = (resizable_array_p<T> &&);
+
     int  remove_item              (int);
     T *  remove_no_delete         (int);
     int  remove_no_delete         (T *);
     int  remove                   (T *);
-    int  remove_items             (const int *, int);
+    int  remove_items             (const int *, int);     // dense array of items to be deleted
+    int  remove_items             (const int *);          // non zero items removed
+    template <typename O>
+    int  remove_items_fn          (O op);          // remove all items for which op evaluates as true
 
     void chop                     (int = 1);    // remove from end
 
@@ -167,6 +172,8 @@ class resizable_array_p : public resizable_array_base<T *>
     template <typename F> void each (F &);
     template <typename F> void each (const F &) const;
     template <typename F> void each (const F &);
+
+    template <typename F> void each_lambda (F) const;
 };
 
 /*
@@ -199,11 +206,14 @@ class resizable_array: public resizable_array_base <T>
     int  operator ==          (const resizable_array<T> &) const;
     int  operator ==          (int) const;
     resizable_array<T> & operator = (const resizable_array<T> &);
+    resizable_array<T> & operator = (resizable_array<T> &&);
     int  copy                 (const resizable_array<T> &, int = -1);
     void reverse             ();
     int extend               (int, T = T (0));
     T   max_val              () const;
     T   min_val              () const;
+    template <typename O>
+    int  remove_items_fn     (O op);          // remove all items for which op evaluates as true
 
     int add_non_duplicated_elements (const resizable_array<T> &);
 
@@ -211,6 +221,8 @@ class resizable_array: public resizable_array_base <T>
     template <typename F> void each (const F &);
     template <typename F> void each (F &) const;
     template <typename F> void each (const F &) const;
+
+    template <typename F> void each_lambda (F) const;
 
 //  mimic standard library
 
@@ -299,12 +311,13 @@ class iwaray
 
 #define OK_INDEX(i) ((i) >= 0 && (i) < _number_elements)
 
-#if (IW_IMPLEMENTATIONS_EXPOSED) || defined(RESIZABLE_ARRAY_IMPLEMENTATION)
+#if defined(IW_IMPLEMENTATIONS_EXPOSED) || defined(RESIZABLE_ARRAY_IMPLEMENTATION)
 
 #include <stdlib.h>
 #include <string.h>
 
-using namespace std;
+using std::endl;
+using std::cerr;
 
 template <typename T>
 resizable_array_base<T>::resizable_array_base ()
@@ -378,11 +391,16 @@ resizable_array<T>::resizable_array (const resizable_array<T> & rhs)
 {
   _number_elements = rhs._number_elements;
   _elements_allocated = rhs._number_elements;
-  _things = new T[rhs._number_elements];
-  for (int i = 0; i < _number_elements; i++)
+  if (_number_elements > 0)
   {
-    _things[i] = rhs._things[i];
+    _things = new T[rhs._number_elements];
+    for (int i = 0; i < _number_elements; i++)
+    {
+      _things[i] = rhs._things[i];
+    }
   }
+  else
+    _things = NULL;
 
   return;
 }
@@ -407,9 +425,9 @@ resizable_array_base<T>::~resizable_array_base ()
 template <typename T>
 resizable_array_p<T>::~resizable_array_p ()
 {
-  assert (this->ok ());
+  assert (this->ok());
 
-  this->resize (0);
+  this->resize(0);
 }
 
 template <typename T>
@@ -491,9 +509,9 @@ resizable_array_base<T>::add (T extra)
   if (_number_elements == _elements_allocated)
   {
     if (0 == _number_elements)
-      resize (INITIAL_NON_EMPTY_SIZE);
+      resize(INITIAL_NON_EMPTY_SIZE);
     else
-      resize (_number_elements + _number_elements);
+      resize(_number_elements + _number_elements / 2 + 1);
   }
 
   _things[_number_elements] = extra;
@@ -522,12 +540,14 @@ int
 resizable_array_base<T>::add (const T * extra, int nextra)
 {
   assert (IWARAY_MAGIC_NUMBER == _magic);
-  assert (NULL != extra && nextra > 0);
+  assert (NULL != extra);
+  if (0 == nextra)
+    return 1;
 
   if (_number_elements + nextra > _elements_allocated)
-    resize (_number_elements + nextra);
+    resize(_number_elements + nextra);
 
-  memcpy (_things + _number_elements, extra, nextra * sizeof (T));
+  memcpy(_things + _number_elements, extra, nextra * sizeof(T));
 
 //for (int i = 0; i < nextra; i++)
 //{
@@ -545,7 +565,7 @@ resizable_array_base<T>::add (const T * extra, int nextra)
 
 template <typename T>
 int
-resizable_array_base<T>::ok () const
+resizable_array_base<T>::ok() const
 {
   if (IWARAY_MAGIC_NUMBER != _magic)
     return 0;
@@ -578,7 +598,7 @@ template <typename T>
 int
 resizable_array_base<T>::remove_item (int item_to_remove)
 {
-  assert (ok ());
+  assert (ok());
   assert (item_to_remove >= 0 && item_to_remove < _number_elements);
 
   for (int i = item_to_remove; i < _number_elements - 1; i++)
@@ -622,7 +642,7 @@ resizable_array_p<T>::remove_no_delete (int item_to_remove)
 {
   T * rc = _things[item_to_remove];
 
-  resizable_array_base<T *>::remove_item (item_to_remove);
+  resizable_array_base<T *>::remove_item(item_to_remove);
 
   return rc;
 }
@@ -631,25 +651,25 @@ template <typename T>
 int
 resizable_array_p<T>::remove_item (int item_to_remove)
 {
-  assert (this->ok ());
+  assert (this->ok());
   assert (item_to_remove >= 0 && item_to_remove < _number_elements);
 
   delete _things[item_to_remove];
 
-  return resizable_array_base<T *>::remove_item (item_to_remove);
+  return resizable_array_base<T *>::remove_item(item_to_remove);
 }
 
 template <typename T>
 int
 resizable_array_base<T>::remove_first (const T thing_to_remove)
 {
-  assert (ok ());
+  assert (ok());
 
   for (int i = 0; i < _number_elements; i++)
   {
     if (thing_to_remove == _things[i])
     {
-      (void) remove_item (i);
+      (void) remove_item(i);
       return 1;
     }
   }
@@ -662,13 +682,13 @@ int
 resizable_array_p<T>::remove (T * thing_to_remove)
 {
   assert (NULL != thing_to_remove);
-  assert (this->ok ());
+  assert (this->ok());
 
   for (int i = 0; i < _number_elements; i++)
   {
     if (thing_to_remove == _things[i])
     {
-      (void) remove_item (i);
+      (void) remove_item(i);
       return 1;
     }
   }
@@ -681,13 +701,13 @@ int
 resizable_array_p<T>::remove_no_delete (T * thing_to_remove)
 {
   assert (NULL != thing_to_remove);
-  assert (this->ok ());
+  assert (this->ok());
 
   for (int i = 0; i < _number_elements; i++)
   {
     if (thing_to_remove == _things[i])
     {
-      (void) remove_no_delete (i);
+      (void) remove_no_delete(i);
       return 1;
     }
   }
@@ -700,7 +720,7 @@ template <typename T>
 int
 resizable_array_base<T>::remove_all (const T item_to_remove)
 {
-  assert (ok ());
+  assert (ok());
 
   int j = 0;
   for (int i = 0; i < _number_elements; i++)
@@ -732,7 +752,7 @@ template <typename T>
 void
 resizable_array<T>::chop (int nchop)
 {
-  assert (this->ok ());
+  assert (this->ok());
   assert (nchop > 0);
 
   assert (nchop <= _number_elements);
@@ -746,7 +766,7 @@ template <typename T>
 void
 resizable_array_p<T>::chop (int nchop)
 {
-  assert (this->ok ());
+  assert (this->ok());
   assert (nchop > 0);
 
   assert (nchop <= _number_elements);
@@ -765,7 +785,7 @@ template <typename T>
 int
 resizable_array_base<T>::resize (int new_size)
 {
-  assert (ok ());
+  assert (ok());
   assert (new_size >= 0);
 
   if (0 == new_size)
@@ -829,7 +849,7 @@ template <typename T>
 int
 resizable_array_p<T>::resize_no_delete (int new_size)
 {
-  return resizable_array_base<T *>::resize (new_size);
+  return resizable_array_base<T *>::resize(new_size);
 }
 
 template <typename T>
@@ -847,7 +867,7 @@ resizable_array_p<T>::resize_keep_storage (int new_size)
   }
   else if (new_size > _elements_allocated)
   {
-    resizable_array_base<T *>::resize (new_size);
+    resizable_array_base<T *>::resize(new_size);
   }
 
   return 1;
@@ -874,7 +894,7 @@ template <typename T>
 int
 resizable_array_p<T>::resize (int new_size)
 {
-  assert (this->ok ());
+  assert (this->ok());
   assert (new_size >= 0);
 
 //  First delete any elements which will be lost. Depending on the value
@@ -885,7 +905,7 @@ resizable_array_p<T>::resize (int new_size)
     delete _things[i];
   }
 
-  return resize_no_delete (new_size);
+  return resize_no_delete(new_size);
 }
 
 /*
@@ -897,7 +917,7 @@ template <typename T>
 int
 resizable_array<T>::resize_keep_storage (int new_size)
 {
-  assert (this->ok ());
+  assert (this->ok());
   assert (new_size >= 0);
 
   if (new_size <= _number_elements)  // expected to be the most common case.
@@ -906,20 +926,20 @@ resizable_array<T>::resize_keep_storage (int new_size)
     return 1;
   }
 
-  return this->resize (new_size);
+  return this->resize(new_size);
 }
 
 template <typename T>
 int
-resizable_array_base<T>::debug_print (ostream & os) const
+resizable_array_base<T>::debug_print (std::ostream & os) const
 {
   os << "Resizable array has " << _elements_allocated << " allocated, " <<
         _number_elements << " used\n";
   
-  if (! ok ())
+  if (! ok())
     cerr << "Warning, OK fails, this = " << (void *) this << " magic = " << _magic << endl;
 
-  return ok ();
+  return ok();
 }
 
 #if ! defined(NDEBUG)
@@ -927,7 +947,7 @@ template <typename T>
 T
 resizable_array_base<T>::item (int i) const
 {
-  assert (ok ());
+  assert (ok());
 
   assert (i >= 0 && i < _number_elements);
 
@@ -939,7 +959,7 @@ template <typename T>
 void
 resizable_array_base<T>::seti (int i, const T item)
 {
-  assert (ok ());
+  assert (ok());
 
   assert (i >= 0 && i < _number_elements);
 
@@ -952,7 +972,7 @@ template <typename T>
 void
 resizable_array_p<T>::seti (int i, T * item)
 {
-  assert (this->ok ());
+  assert (this->ok());
 
   assert (i >= 0 && i < _number_elements);
 
@@ -967,7 +987,7 @@ template <typename T>
 int
 resizable_array<T>::set_all (const T fill_value)
 {
-  assert (this->ok ());
+  assert (this->ok());
 
   for (int i = 0; i < _number_elements; i++)
   {
@@ -977,13 +997,13 @@ resizable_array<T>::set_all (const T fill_value)
   return _number_elements;
 }
 
-#define CAST_FOR_QSORT ( int (*) (const void *, const void *) )
+#define CAST_FOR_QSORT ( int (*)(const void *, const void *) )
 
 template <typename T>
 void
-resizable_array_base<T>::sort (int (* comparitor) (const T *, const T *))
+resizable_array_base<T>::sort (int (* comparitor)(const T *, const T *))
 {
-  assert (ok ());
+  assert (ok());
   assert (NULL != comparitor);
 
   if (_number_elements <= 1)
@@ -992,7 +1012,7 @@ resizable_array_base<T>::sort (int (* comparitor) (const T *, const T *))
 // This generates an error, but dammit, I just cannot figure out how to
 // get this right
 
-  qsort ((void *) _things, _number_elements, sizeof (T), CAST_FOR_QSORT comparitor);
+  qsort((void *) _things, _number_elements, sizeof(T), CAST_FOR_QSORT comparitor);
 
   return;
 }
@@ -1002,7 +1022,7 @@ int
 resizable_array_base<T>::insert_before (int where_to_insert,
                                         T item_to_insert)
 {
-  assert (ok ());
+  assert (ok());
 
   assert (where_to_insert >= 0);
   if (_number_elements > 0)
@@ -1013,9 +1033,9 @@ resizable_array_base<T>::insert_before (int where_to_insert,
   if (_number_elements == _elements_allocated)
   {
     if (0 == _number_elements)
-      resize (INITIAL_NON_EMPTY_SIZE);
+      resize(INITIAL_NON_EMPTY_SIZE);
     else
-      resize (_number_elements + _number_elements);
+      resize(_number_elements + _number_elements / 2 + 1);
   }
 
   for (int i = _number_elements; i > where_to_insert; i--)
@@ -1035,7 +1055,7 @@ int
 resizable_array_base<T>::insert_after (int where_to_insert,
                                        T item_to_insert)
 {     
-  assert (ok ());
+  assert (ok());
   if (_number_elements > 0)
   {
     assert (where_to_insert < _number_elements);
@@ -1046,7 +1066,7 @@ resizable_array_base<T>::insert_after (int where_to_insert,
     if (0 == _number_elements)
       resize (INITIAL_NON_EMPTY_SIZE);
     else
-      resize (_number_elements + _number_elements);
+      resize (_number_elements + _number_elements / 2 + 1);
   }
 
   for (int i = _number_elements; i > where_to_insert + 1; i--)
@@ -1065,35 +1085,35 @@ template <typename T>
 int
 resizable_array_base<T>::insert_at_beginning (const T item_to_insert)
 {
-  assert (ok ());
+  assert (ok());
 
   if (0 == _number_elements )
-    return this->add (item_to_insert);
+    return this->add(item_to_insert);
   else
-    return this->insert_before (0, item_to_insert);
+    return this->insert_before(0, item_to_insert);
 }
 
 template <typename T>
 int
 resizable_array_base<T>::insert_in_order (T item_to_insert, 
-                       int (* comparitor) (const T *, const T *))
+                       int (* comparitor)(const T *, const T *))
 {
-  assert (ok ());
+  assert (ok());
 
   if (0 == _number_elements)
-    return this->add (item_to_insert);
+    return add(item_to_insert);
 
   int i;
   for (i = 0; i < _number_elements; i++)
   {
-    if (comparitor (&item_to_insert, &_things[i]) <= 0)
+    if (comparitor(&item_to_insert, &_things[i]) <= 0)
       break;
   }
 
   if (i == _number_elements)
-    return this->add (item_to_insert);
+    return this->add(item_to_insert);
 
-  return this->insert_before (i, item_to_insert);
+  return this->insert_before(i, item_to_insert);
 }
 
 template <typename T>
@@ -1101,7 +1121,7 @@ int
 resizable_array<T>::insert_in_order (const T item_to_insert, int increasing_order)
 {
   if (0 == _number_elements)
-    return this->add (item_to_insert);
+    return this->add(item_to_insert);
 
   if (increasing_order)
   {
@@ -1109,31 +1129,31 @@ resizable_array<T>::insert_in_order (const T item_to_insert, int increasing_orde
       return this->insert_at_beginning(item_to_insert);
 
     if (item_to_insert >= _things[_number_elements - 1])
-      return this->add (item_to_insert);
+      return this->add(item_to_insert);
 
     for (int i = 0; i < _number_elements; i++)
     {
       if (item_to_insert < _things[i])
-        return this->insert_before (i, item_to_insert);
+        return this->insert_before(i, item_to_insert);
     }
 
-    return this->add (item_to_insert);
+    return this->add(item_to_insert);
   }
   else     // decreasing order, largest first.
   {
     if (item_to_insert > _things[0])
-      return this->insert_at_beginning (item_to_insert);
+      return this->insert_at_beginning(item_to_insert);
 
     if (item_to_insert <= _things[_number_elements - 1])
-      return this->add (item_to_insert);
+      return this->add(item_to_insert);
 
     for (int i = 0; i < _number_elements; i++)
     {
       if (item_to_insert > _things[i])
-        return this->insert_before (i, item_to_insert);
+        return this->insert_before(i, item_to_insert);
     }
 
-    return this->add (item_to_insert);
+    return this->add(item_to_insert);
   }
 }
 
@@ -1142,33 +1162,33 @@ int
 resizable_array<T>::insert_in_order_if_not_already_present (const T item_to_insert, int increasing_order)
 {
   if (0 == _number_elements)
-    return this->add (item_to_insert);
+    return this->add(item_to_insert);
 
   if (increasing_order)
   {
     for (int i = 0; i < _number_elements; i++)
     {
       if (item_to_insert < _things[i])
-        return this->insert_before (i, item_to_insert);
+        return this->insert_before(i, item_to_insert);
 
       if (item_to_insert == _things[i])
         return 0;
     }
 
-    return this->add (item_to_insert);
+    return this->add(item_to_insert);
   }
   else     // decreasing order, largest first.
   {
     for (int i = 0; i < _number_elements; i++)
     {
       if (item_to_insert > _things[i])
-        return this->insert_before (i, item_to_insert);
+        return this->insert_before(i, item_to_insert);
 
       if (item_to_insert == _things[i])
         return 0;
     }
 
-    return this->add (item_to_insert);
+    return this->add(item_to_insert);
   }
 
   return 0;     // no path to here
@@ -1178,34 +1198,46 @@ template <typename T>
 T
 resizable_array_base<T>::pop ()
 {
-  assert (ok ());
+  assert (ok());
   assert (_number_elements > 0);
 
   return _things[--_number_elements];
 }
 
+#if ! defined(NDEBUG)
 template <typename T>
 T
 resizable_array_base<T>::last_item () const
 {
-  assert (ok ());
+  assert (ok());
   assert (_number_elements > 0);
 
   return _things[_number_elements - 1];
 }
 
 template <typename T>
+T
+resizable_array_base<T>::first () const
+{
+  assert (ok());
+  assert (_number_elements > 0);
+
+  return _things[0];
+}
+#endif
+
+template <typename T>
 void
 resizable_array_base<T>::operator += (const resizable_array_base<T> & oo)
 {
-  assert (ok ());
+  assert (ok());
 
-  int noo = oo.number_elements ();
+  int noo = oo.number_elements();
   resize (_number_elements + noo);
 
   for (int i = 0; i < noo; i++)
   {
-    this->add (oo.item (i));
+    this->add(oo.item(i));
   }
 
   return;
@@ -1215,7 +1247,7 @@ template <typename T>
 void
 resizable_array_base<T>::operator += (T extra)
 {
-  (void) this->add (extra);
+  (void) this->add(extra);
 
   return;
 }
@@ -1228,10 +1260,10 @@ template <typename T>
 int
 resizable_array_p<T>::transfer_in (resizable_array_p<T> & oo)
 {
-  assert (this->ok ());
+  assert (this->ok());
 
-  int noo = oo.number_elements ();
-  this->resize (_number_elements + noo);
+  int noo = oo.number_elements();
+  this->resize(_number_elements + noo);
 
   int j = _number_elements;
   for (int i = 0; i < noo; i++)
@@ -1241,7 +1273,7 @@ resizable_array_p<T>::transfer_in (resizable_array_p<T> & oo)
 
   _number_elements += noo;
 
-  oo.resize_no_delete (0);
+  oo.resize_no_delete(0);
 
   return _number_elements;
 }
@@ -1256,12 +1288,12 @@ int
 resizable_array_p<T>::transfer_in (resizable_array_p<T> & oo,
                                    int item_to_transfer)
 {
-  assert (this->ok ());
-  assert (oo.ok_index (item_to_transfer));
+  assert (this->ok());
+  assert (oo.ok_index(item_to_transfer));
 
   T * tmp = oo._things[item_to_transfer];
-  this->add (tmp);
-  oo.remove_no_delete (item_to_transfer);
+  this->add(tmp);
+  oo.remove_no_delete(item_to_transfer);
 
   return 1;
 }
@@ -1304,7 +1336,7 @@ template <typename T>
 int
 resizable_array<T>::operator == (const resizable_array<T> & other) const
 {
-  if (other.number_elements () != _number_elements)
+  if (other.number_elements() != _number_elements)
     return 0;
 
   for (int i = 0; i < _number_elements; i++)
@@ -1323,7 +1355,7 @@ resizable_array<T>::operator = (const resizable_array<T> & other)
   int nother = other._number_elements;
 
   if (_elements_allocated < nother)
-    this->resize (nother);
+    this->resize(nother);
 
   for (int i = 0; i < nother; i++)
   {
@@ -1336,6 +1368,46 @@ resizable_array<T>::operator = (const resizable_array<T> & other)
 }
 
 template <typename T>
+resizable_array_p<T> & 
+resizable_array_p<T>::operator = (resizable_array_p<T> && other)
+{   
+  resize(0);
+
+  _things = other._things;
+  _number_elements = other._number_elements;
+  _elements_allocated = other._elements_allocated;
+
+  other._things = NULL;
+  other._number_elements = 0;
+  other._elements_allocated = 0;
+
+//cerr << "resizable_array_p::operator = move\n";
+
+  return *this;
+}
+
+template <typename T>
+resizable_array<T> & 
+resizable_array<T>::operator = (resizable_array<T> && other)
+{   
+//cerr << "resizable_array::operator = rvalue\n";
+  if (NULL != _things)
+    delete [] _things;
+
+//cerr << "operator = && called, my size " << _number_elements << " rhs " << other._number_elements << endl;
+
+  _things = other._things;
+  _elements_allocated = other._elements_allocated;
+  _number_elements = other._number_elements;
+
+  other._elements_allocated = 0;
+  other._number_elements = 0;
+  other._things = NULL;
+
+  return *this;
+}
+
+template <typename T>
 int
 resizable_array<T>::copy (const resizable_array<T> & other, int ncopy)
 {
@@ -1343,12 +1415,12 @@ resizable_array<T>::copy (const resizable_array<T> & other, int ncopy)
     ncopy = other._number_elements;
   else
   {
-    assert (other.ok_index (ncopy));
+    assert (other.ok_index(ncopy));
   }
 
   _number_elements = 0;
   if (_elements_allocated < ncopy)
-    this->resize (ncopy);
+    this->resize(ncopy);
 
   for (int i = 0; i < ncopy; i++)
   {
@@ -1386,7 +1458,7 @@ resizable_array<T>::extend (int new_size, T fill_value)
     return 0;
 
   if (new_size > _elements_allocated)
-    this->resize (new_size);
+    this->resize(new_size);
   
   for (int i = _number_elements; i < new_size; i++)
   {
@@ -1401,7 +1473,7 @@ T
 resizable_array<T>::max_val () const
 {
   if (0 == _number_elements)
-    return T (0);
+    return T(0);
 
   T qmax = _things[0];
   for (int i = 1; i < _number_elements; i++)
@@ -1418,7 +1490,7 @@ T
 resizable_array<T>::min_val () const
 {
   if (0 == _number_elements)
-    return T (0);
+    return T(0);
 
   T qmin = _things[0];
   for (int i = 1; i < _number_elements; i++)
@@ -1434,8 +1506,8 @@ template <typename T>
 int
 resizable_array_base<T>::swap_elements (int i1, int i2)
 {
-  assert (ok_index (i1));
-  assert (ok_index (i2));
+  assert (ok_index(i1));
+  assert (ok_index(i2));
   
   T tmp = _things[i1];
   _things[i1] = _things[i2];
@@ -1462,7 +1534,7 @@ resizable_array<T>::add_non_duplicated_elements (const resizable_array<T> & qq)
     }
     if (0 == foundqi)
     {
-      this->add (qi);
+      this->add(qi);
       rc++;
     }
   }
@@ -1482,18 +1554,18 @@ resizable_array<T>::add_if_not_already_present (const T qq)
 
 // No match found, add qq
 
-  return this->add (qq);
+  return this->add(qq);
 }
 
 /*template <typename T>
 void
 resizable_array_p<T>::each (void (T:: *xx) ())
 {
-  assert (ok ());
+  assert (ok());
 
   for (int i = 0; i < _number_elements; i++)
   {
-    _things[i]->xx ();
+    _things[i]->xx();
   }
 
   return;
@@ -1501,13 +1573,13 @@ resizable_array_p<T>::each (void (T:: *xx) ())
 
 template <typename T>
 void
-resizable_array_base<T>::each (void (* something) (T))
+resizable_array_base<T>::each (void (* something)(T))
 {
-  assert (ok ());
+  assert (ok());
 
   for (int i = 0; i < _number_elements; i++)
   {
-    something (_things[i]);
+    something(_things[i]);
   }
 
   return;
@@ -1517,63 +1589,63 @@ template <typename T>
 int
 operator < (int i, const resizable_array<T> & qq)
 {
-  return i < qq.number_elements ();
+  return i < qq.number_elements();
 }
 
 template <typename T>
 int
 operator <= (int i, const resizable_array<T> & qq)
 {
-  return i <= qq.number_elements ();
+  return i <= qq.number_elements();
 }
 
 template <typename T>
 int
 operator > (int i, const resizable_array<T> & qq)
 {
-  return i > qq.number_elements ();
+  return i > qq.number_elements();
 }
 
 template <typename T>
 int
 operator >= (int i, const resizable_array<T> & qq)
 {
-  return i >= qq.number_elements ();
+  return i >= qq.number_elements();
 }
 
 template <typename T>
 int
 operator < (int i, const resizable_array_p<T> & qq)
 {
-  return i < qq.number_elements ();
+  return i < qq.number_elements();
 }
 
 template <typename T>
 int
 operator <= (int i, const resizable_array_p<T> & qq)
 {
-  return i <= qq.number_elements ();
+  return i <= qq.number_elements();
 }
 
 template <typename T>
 int
 operator > (int i, const resizable_array_p<T> & qq)
 {
-  return i > qq.number_elements ();
+  return i > qq.number_elements();
 }
 
 template <typename T>
 int
 operator >= (int i, const resizable_array_p<T> & qq)
 {
-  return i >= qq.number_elements ();
+  return i >= qq.number_elements();
 }
 
 template <typename T>
 int
 operator == (int i, const resizable_array_p<T> & qq)
 {
-  return i == qq.number_elements ();
+  return i == qq.number_elements();
 }
 
 template <typename T>
@@ -1627,9 +1699,33 @@ resizable_array_base<T>::remove_items (const int * items_to_remove, int nremove)
     cerr << "  " << i << ' ' << items_to_remove[i] << endl;
   }
 
-  abort ();
+  abort();
 
   return 0;
+}
+
+template <typename T>
+int
+resizable_array_base<T>::remove_items (const int * items_to_remove)
+{
+  int rc = 0;
+
+  int tptr = 0;      // where we put items in re-filling the array
+
+  for (int i = 0; i < _number_elements; ++i)
+  {
+    if (! items_to_remove[i])
+    {
+      _things[tptr] = _things[i];
+      tptr++;
+    }
+    else
+      rc++;
+  }
+
+  _number_elements = tptr;
+
+  return rc;
 }
 
 template <typename T>
@@ -1639,10 +1735,10 @@ resizable_array_p<T>::remove_items (const int * items_to_remove, int nremove)
   for (int i = 0; i < nremove; i++)
   {
     int j = items_to_remove[i];
-    if (! this->ok_index (j))
+    if (! this->ok_index(j))
     {
       cerr << "resizable_array_p<T>::remove_items: cannot remove item " << j << endl;
-      abort ();
+      abort();
       return 0;
     }
 
@@ -1650,6 +1746,127 @@ resizable_array_p<T>::remove_items (const int * items_to_remove, int nremove)
   }
 
   return resizable_array_base<T *>::remove_items (items_to_remove, nremove);
+}
+
+template <typename T>
+int
+resizable_array_p<T>::remove_items (const int * items_to_remove)
+{
+  for (int i = 0; i < _number_elements; ++i)
+  {
+    if (items_to_remove[i])
+      delete _things[i];
+  }
+
+  return resizable_array_base<T *>::remove_items(items_to_remove);
+}
+
+template <typename T> template <typename O>
+int
+resizable_array_p<T>::remove_items_fn (O opq)
+{
+  int tptr = 0;
+
+  for (int i = 0; i < _number_elements; ++i)
+  {
+    if (opq(_things[i]))    // being removed
+      delete _things[i];
+    else
+    {
+      if (i != tptr)
+        _things[tptr] = _things[i];
+      tptr++;
+    }
+  }
+
+  if (tptr == _number_elements)
+    return 0;
+
+  const int rc = _number_elements - tptr;
+
+  _number_elements = tptr;
+
+  return rc;
+}
+
+template <typename T> template <typename O>
+int
+resizable_array<T>::remove_items_fn (O opq)
+{
+  int tptr = 0;
+
+  for (int i = 0; i < _number_elements; ++i)
+  {
+    if (opq(_things[i]))    // being removed
+      ;
+    else
+    {
+      if (i > tptr)
+        _things[tptr] = _things[i];
+      tptr++;
+    }
+  }
+
+  if (tptr == _number_elements)
+    return 0;
+
+  const int rc = _number_elements - tptr;
+
+  _number_elements = tptr;
+
+  return rc;
+}
+
+/*
+  this makes the assumption that there is only one occurrence of each in the array.
+*/
+
+template <typename T>
+int
+resizable_array_base<T>::remove_two_items (const T i1, const T i2)
+{
+  int ndx1 = -1;
+  int ndx2 = -1;
+  int nfound = 0;
+
+  for (int i = 0; i < _number_elements; ++i)
+  {
+    if (i1 == _things[i])
+      ndx1 = i;
+    else if (i2 == _things[i])
+      ndx2 = i;
+    else
+      continue;
+
+    nfound++;
+    if (2 == nfound)
+      break;
+  }
+
+  if (2 != nfound)
+    return 0;
+
+  if (ndx1 > ndx2)
+  {
+    int tmp = ndx1;
+    ndx1 = ndx2;
+    ndx2 = tmp;
+  }
+
+//cerr << " found at " << ndx1 << " and " << ndx2 << endl;
+  for (int i = ndx1; i < ndx2; ++i)
+  {
+    _things[i] = _things[i+1];
+  }
+
+  _number_elements -= 2;
+
+  for (int i = ndx2; i < _number_elements; ++i)
+  {
+    _things[i] = _things[i+2];
+  }
+
+  return 1;
 }
 
 template <typename T>
@@ -1663,14 +1880,14 @@ template <typename T>
 int
 operator == (int lhs, const resizable_array<T> & rhs)
 {
-  return lhs == rhs.number_elements ();
+  return lhs == rhs.number_elements();
 }
 
 template <typename T>
 int
 resizable_array_base<T>::make_room_for_extra_items (int e)
 {
-  assert (ok ());
+  assert (ok());
   assert (e >= 0);
 
   if (_number_elements + e <= _elements_allocated)    // already enough room
@@ -1678,7 +1895,7 @@ resizable_array_base<T>::make_room_for_extra_items (int e)
 
   int save_number_elements = _number_elements;
 
-  int rc = resize (_number_elements + e);
+  int rc = resize(_number_elements + e);
 
   _number_elements = save_number_elements;
 
@@ -1701,7 +1918,7 @@ resizable_array<T>::count (const T & needle) const
 
 #endif
 
-#if (IW_IMPLEMENTATIONS_EXPOSED) || defined(EXTENDING_RESIZABLE_ARRAY_IMPLEMENTATION)
+#if defined(IW_IMPLEMENTATIONS_EXPOSED) || defined(EXTENDING_RESIZABLE_ARRAY_IMPLEMENTATION)
 
 #include <assert.h>
 
@@ -1723,11 +1940,11 @@ extending_resizable_array<T>::operator [] (int i)
     return _things[i];
 
   if (i < 10)
-    resizable_array<T>::extend (10, _initialiser);
+    resizable_array<T>::extend(10, _initialiser);
   else if (i < 100)
-    resizable_array<T>::extend (100, _initialiser);
+    resizable_array<T>::extend(100, _initialiser);
   else
-    resizable_array<T>::extend (i + i, _initialiser);
+    resizable_array<T>::extend(i + i, _initialiser);
 
   return _things[i];
 }
@@ -1736,12 +1953,12 @@ template <typename T>
 int
 extending_resizable_array<T>::extend (int new_size)
 {
-  return resizable_array<T>::extend (new_size, _initialiser);
+  return resizable_array<T>::extend(new_size, _initialiser);
 }
 
 #endif
 
-#if (IW_IMPLEMENTATIONS_EXPOSED) || defined(IWARAY_IMPLEMENTATION)
+#if defined(IW_IMPLEMENTATIONS_EXPOSED) || defined(IWARAY_IMPLEMENTATION)
 
 template <typename T>
 iwaray<T>::iwaray ()
@@ -1806,7 +2023,7 @@ iwaray<T>::operator [] (int i)
 
 #endif
 
-#if (IW_IMPLEMENTATIONS_EXPOSED) || defined(IWARAYQ_ASSIGN)
+#if defined(IW_IMPLEMENTATIONS_EXPOSED) || defined(IWARAYQ_ASSIGN)
 
 template <typename T>
 iwaray<T> &
@@ -1822,7 +2039,7 @@ iwaray<T>::operator = (T rhs)
 
 #endif
 
-#if (IW_IMPLEMENTATIONS_EXPOSED) || defined(IWARAY_EACH_IMPLEMENTATION)
+#if defined(IW_IMPLEMENTATIONS_EXPOSED) || defined(IWARAY_EACH_IMPLEMENTATION)
 
 template <typename T> template <typename F>
 void
@@ -1842,7 +2059,7 @@ resizable_array_p<T>::each (const F & f) const
 {
   for (int i = 0; i < _number_elements; i++)
   {
-    f (*(_things[i]));
+    f(*(_things[i]));
   }
 
   return;
@@ -1853,7 +2070,7 @@ resizable_array_p<T>::each (F & f)
 {
   for (int i = 0; i < _number_elements; i++)
   {
-    f (*(_things[i]));
+    f(*(_things[i]));
   }
 
   return;
@@ -1865,7 +2082,7 @@ resizable_array_p<T>::each (const F & f)
 {
   for (int i = 0; i < _number_elements; i++)
   {
-    f (*(_things[i]));
+    f(*(_things[i]));
   }
 
   return;
@@ -1900,6 +2117,30 @@ void
 resizable_array<T>::each (const F & f)
 {
   for (int i = 0; i < _number_elements; i++)
+  {
+    f(_things[i]);
+  }
+
+  return;
+}
+
+template <typename T> template <typename F>
+void
+resizable_array<T>::each_lambda (F f) const
+{
+  for (int i = 0; i < _number_elements; ++i)
+  {
+    f(_things[i]);
+  }
+
+  return;
+}
+
+template <typename T> template <typename F>
+void
+resizable_array_p<T>::each_lambda (F f) const
+{
+  for (int i = 0; i < _number_elements; ++i)
   {
     f(_things[i]);
   }

@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef IW_TARGET_H
 #define IW_TARGET_H
 
@@ -25,10 +7,6 @@
 
 #include "iwmtypes.h"
 #include "molecule.h"
-
-#ifdef VALHALLA
-#include "VDOM_sss_client.h"
-#endif
 
 class Target_Atom;
 
@@ -60,15 +38,13 @@ class Bond_and_Target_Atom
     const Bond  * bond  () const { return _bond;}
     Target_Atom * other () const { return _other;}
 
-#ifdef VALHALLA
-    void set_other_atom_and_bond (Target_Atom * s, const Bond * b) { _other = s; _bond = b;}
-#endif
 
     bond_type_t btype () const { return _bond_types;}
     int nrings ();
     boolean aromatic () const { return _aromatic;}
 };
 
+class Molecule_to_Match;
 
 class Target_Atom
 {
@@ -77,7 +53,8 @@ class Target_Atom
     atom_number_t _my_atom_number;   // to which atom number in _m do I correspond.
     Atom *        _my_atom;          // the actual atom in _m
 
-    Target_Atom * _all_atoms;
+//  Target_Atom * _all_atoms;
+    Molecule_to_Match * _target;    // object that owns this atom
 
     int _ncon;
     Bond_and_Target_Atom * _other;
@@ -104,6 +81,8 @@ class Target_Atom
     int                _chirality_fetched;
     Chiral_Centre *    _chiral_centre;
 
+    int                _all_rings_kekule;
+
     List_of_Ring_Sizes _sssr_ring_sizes;
     List_of_Ring_Sizes _aromatic_ring_sizes;
     List_of_Ring_Sizes _aliphatic_ring_sizes;
@@ -128,15 +107,17 @@ class Target_Atom
     ~Target_Atom ();
 
     int ok () const;
-    int debug_print (ostream &) const;
+    int debug_print (std::ostream &) const;
 
-    void initialise (Molecule *, atom_number_t, Atom *, Target_Atom *);
+    void initialise (Molecule *, atom_number_t, Atom *, Molecule_to_Match *);
     void establish_aromatic_bonds ();
 //  void establish_aromatic_bonds (int, const int * in_fixed_kekule_form);
 
     const Bond_and_Target_Atom & operator [] (int s) const { return _other[s];}
 
     atomic_number_t atomic_number () const { return _element->atomic_number();}
+    int atomic_symbol_hash_value () const { return _element->atomic_symbol_hash_value();}
+    int element_unique_id () const { return _element->unique_id();}
     const Element * element () const { return _element;}
 
     int ncon () const { return _ncon;}
@@ -164,6 +145,9 @@ class Target_Atom
     int vinyl ();
     int aryl ();
     void set_aryl (int s) { _aryl = s;}
+
+    int all_rings_kekule();
+    void set_all_rings_kekule(const int s);
 
 //  If we want to exclude chirality in substructure searches, or
 //  during unique determinations, we can suppress chirality by
@@ -211,15 +195,10 @@ class Target_Atom
 
     void set_atom_number(int s) { _my_atom_number = s;}
 
-#ifdef VALHALLA
-    int resize(int s) { return this->iwaray<Bond_and_Target_Atom>::resize(s);}
-    int number_elements() const { return this->iwaray<Bond_and_Target_Atom>::number_elements();}
+    int  is_spinach ();
 
-//  For the VDOM stuff we use a kludge with the value of ncon2 to keep track of how
-//  many bonds have been added, so we know how to add a bond
+    Target_Atom & atom (int i) const;
 
-    void add_bond (Target_Atom &, const Bond *, int nr);
-#endif
 };
 #define TARGET_IS_RING 0
 #define TARGET_BETWEEN_RING -1
@@ -257,8 +236,6 @@ class Molecule_to_Match
     int _first[HIGHEST_ATOMIC_NUMBER + 1];
     int _last[HIGHEST_ATOMIC_NUMBER + 1];
     int _count[HIGHEST_ATOMIC_NUMBER + 1];
-//  int * _first;
-//  int * _last;
 
 //  Apr 03. Need queries dealing with spinach and atoms between rings. If the atom is in a ring
 //  value will be TARGET_IS_RING. If it is between rings, value will be TARGET_BETWEEN_RING. Otherwise
@@ -272,24 +249,9 @@ class Molecule_to_Match
 
     IW_Bits_Base * _fingerprint;
 
-#ifdef VALHALLA
-
-//  When doing Valhalla searches, we don't want to pay the overhead of discerning
-//  chirality for everything that has chirality. So, if there's chirality in the
-//  molecule, we just record the start of the chirality info in the vdom object.
-//  If we are asked for chirality, we decode it then
-
-    int _number_chiral_centres;
-    const void * _start_of_vdom_chiral_info;
-
-    resizable_array_p<Chiral_Centre> _chiral_centre;
-#endif
 
 //  private functions
 
-#ifdef VALHALLA
-    int _build_chirality_info_from_vdom_data ();
-#endif
 
     int _determine_ring_counts ();
 
@@ -306,7 +268,7 @@ class Molecule_to_Match
     ~Molecule_to_Match ();
 
     int ok () const;
-    int debug_print (ostream &) const;
+    int debug_print (std::ostream &) const;
 
     int initialise_molecule (Molecule * m);
 
@@ -320,6 +282,8 @@ class Molecule_to_Match
 
     int first (atomic_number_t) const;
     int last  (atomic_number_t) const;
+    int first_atomic_symbol_hash_value (int) const;
+    int last_atomic_symbol_hash_value  (int) const;
 
     int atoms_with_atomic_number (atomic_number_t) const;
 
@@ -356,25 +320,13 @@ class Molecule_to_Match
 
     int heteroatom_count () const;
 
+    int net_formal_charge() const { return _m->net_formal_charge();}
+
     void invalidate (const Set_of_Atoms &);   // after getting a match you can invalidate all the matched atoms
 
     int is_spinach (atom_number_t);
     int is_between_rings (atom_number_t);
 
-#ifdef VALHALLA
-
-    int initialise_from_VDOM_sss (const VDOM_Substructure_Search_Conditions & VDOM_sssc,
-                                  const VDOM_SSS *,
-                                  Thing_Holding_Set_of_Bonds & thsob);
-
-    int number_chiral_centres () const { return _number_chiral_centres;};
-
-    const Chiral_Centre * chiral_centre_at_atom(atom_number_t);
-
-//  int * first_array() { return _first;}
-//  int * array_last() { return _last;}
-//  int * array_count() { return _count;}
-#endif
 };
 
 extern void set_aromatic_bonds_lose_kekule_identity (int);
@@ -387,5 +339,6 @@ extern int  aromatic_bonds_lose_kekule_identity ();
 
 extern void set_initialise_element_counts (int);
 extern void set_global_setting_nrings_includes_non_sssr_rings(int s);
+extern void set_global_setting_nbonds_includes_implicit_hydrogens(int s);
 
 #endif

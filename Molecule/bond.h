@@ -1,27 +1,8 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef BOND_H
 #define BOND_H
 
 #include <iostream>
-
-using namespace std;
+#include <functional>
 
 #include "iwmtypes.h"
 
@@ -42,7 +23,7 @@ class Connection
     Connection (atom_number_t, bond_type_t);
     ~Connection ();
 
-    int           debug_print (ostream &);
+    int           debug_print (std::ostream &);
 
     atom_number_t a2 () const { return _a2; }
 
@@ -98,7 +79,7 @@ class Connection
 class Bond: public Connection
 {
   friend
-    ostream & operator << (ostream &, const Bond &);
+    std::ostream & operator << (std::ostream &, const Bond &);
 
   private:
     atom_number_t    _a1;
@@ -134,7 +115,7 @@ class Bond: public Connection
 
     void copy_directionality_specifications (const Bond *);
 
-    int debug_print (ostream &) const;
+    int debug_print (std::ostream &) const;
 
     atom_number_t a1 ()    const { return _a1; }
     atom_number_t a2 ()    const { return _a2; }
@@ -227,6 +208,7 @@ class Bond: public Connection
     int           is_permanent_aromatic () const { return IS_PERMANENT_AROMATIC_BOND (_btype);}
 
     void          append_bond_type (IWString &, atom_number_t afrom, int inc_arom) const;   // used in smiles construction
+    void          append_bond_type_space_for_nothing(IWString & smiles, atom_number_t ato, int include_aromaticity_in_smiles) const;
 
 #ifdef BONDS_KNOW_RING_MEMBERSHIP
     int set_nrings (int);
@@ -241,6 +223,12 @@ class Bond: public Connection
     int            bond_number () const { return _bond_number;}
     void           set_bond_number (int s) { _bond_number = s;}
     void           invalidate_bond_number () { _bond_number = -1;}
+
+    int            either_atom_set_in_array (const int *) const;
+
+    int            either_atom_true (const int *, std::function<int(int, int)>) const;            // an array of integers,
+
+    int            new_atom_numbers (const int * xref);   // makeing a subset, adjust the bonds to reflect the new numbering
 };
 
 #endif

@@ -1,57 +1,33 @@
-/**************************************************************************
-
-    Copyright (C) 2012  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
-#include <stdlib.h>
+#include <iostream>
 #include <memory>
 #include <limits>
 #include <ctype.h>
 
-using namespace std;
+using std::cerr;
+using std::endl;
 
 #include "cmdline.h"
 #include "misc.h"
-#include "iw_auto_array.h"
-
-#ifdef USE_IWMALLOC
-#include "iwmalloc.h"
-#endif
 
 #include "msi_object.h"
 
 #include "toggle_kekule_form.h"
+#include "smiles.h"
 #include "path.h"
 
-Toggle_Kekule_Form::Toggle_Kekule_Form ()
+Toggle_Kekule_Form::Toggle_Kekule_Form()
 {
-  _correct = NULL;
-
   _allow_pyrrole_to_change = 0;
 
   _display_error_messages = 1;
 
+  _unset_unnecessary_implicit_hydrogens_known_values = 0;
+
   return;
 }
 
-Toggle_Kekule_Form::~Toggle_Kekule_Form ()
+Toggle_Kekule_Form::~Toggle_Kekule_Form()
 {
-  if (NULL != _correct)
-    delete [] _correct;
-
   return;
 }
 
@@ -60,29 +36,29 @@ fetch_int (const const_IWSubstring & c, int & zresult)
 {
   zresult = 0;
 
-  for (int i = 0; i < c.nchars (); i++)
+  for (int i = 0; i < c.nchars(); i++)
   {
-    if (! isdigit (c[i]))
+    if (! isdigit(c[i]))
       return i;
 
     zresult = 10 * zresult + c[i] - '0';
   }
 
-  return c.nchars ();
+  return c.nchars();
 }
 
 int
-Toggle_Kekule_Form::debug_print (ostream & os) const
+Toggle_Kekule_Form::debug_print (std::ostream & os) const
 {
-  cerr << "Toggle_Kekule_Form with " << _bond.number_elements () << " bonds\n";
-  for (int i = 0; i < _bond.number_elements (); i++)
+  cerr << "Toggle_Kekule_Form with " << _bond.number_elements() << " bonds\n";
+  for (int i = 0; i < _bond.number_elements(); i++)
   {
     const Bond * b = _bond[i];
 
-    cerr << "Between matched atoms " << b->a1 () << " and " << b->a2 () << " type ";
-    if (b->is_single_bond ())
+    cerr << "Between matched atoms " << b->a1() << " and " << b->a2() << " type ";
+    if (b->is_single_bond())
       cerr << "single";
-    else if (b->is_double_bond ())
+    else if (b->is_double_bond())
       cerr << "double";
     else
       cerr << "what kind of bond is this " << *b;
@@ -90,15 +66,15 @@ Toggle_Kekule_Form::debug_print (ostream & os) const
     cerr << endl;
   }
 
-  return os.good ();
+  return os.good();
 }
 
 const Bond *
 Toggle_Kekule_Form::contains_bond (atom_number_t a1, atom_number_t a2) const
 {
-  for (int i = 0; i < _bond.number_elements (); i++)
+  for (int i = 0; i < _bond.number_elements(); i++)
   {
-    if (_bond[i]->involves (a1, a2))
+    if (_bond[i]->involves(a1, a2))
       return _bond[i];
   }
 
@@ -113,17 +89,17 @@ int
 Toggle_Kekule_Form::will_change_ring (const Ring * r,
                                       const Set_of_Atoms & embedding) const
 {
-  int nb = _bond.number_elements ();
+  int nb = _bond.number_elements();
 
   for (int i = 0; i < nb; i++)
   {
-    int i1 = _bond[i]->a1 ();
-    int i2 = _bond[i]->a2 ();
+    int i1 = _bond[i]->a1();
+    int i2 = _bond[i]->a2();
 
     atom_number_t a1 = embedding[i1];
     atom_number_t a2 = embedding[i2];
 
-    if (r->contains_bond (a1, a2))
+    if (r->contains_bond(a1, a2))
       return 1;
   }
   
@@ -137,11 +113,11 @@ Toggle_Kekule_Form::construct_from_command_line (Command_Line & cl,
 {
   const_IWSubstring cv;
   int i = 0;
-  while (cl.value (c, cv, i++))
+  while (cl.value(c, cv, i++))
   {
     int a1;
-    int nchars = fetch_int (cv, a1);
-    if (0 == nchars || cv.nchars () == nchars)
+    int nchars = fetch_int(cv, a1);
+    if (0 == nchars || cv.nchars() == nchars)
     {
       cerr << "Toggle_Kekule_Form::construct_from_command_line: invalid a1 '" << cv << "'\n";
       return 0;
@@ -161,8 +137,8 @@ Toggle_Kekule_Form::construct_from_command_line (Command_Line & cl,
     cv += nchars + 1;
 
     int a2;
-    nchars = fetch_int (cv, a2);
-    if (0 == nchars || nchars != cv.nchars ())
+    nchars = fetch_int(cv, a2);
+    if (0 == nchars || nchars != cv.nchars())
     {
       cerr << "Toggle_Kekule_Form::construct_from_command_line: invalid a1 '" << cv << "'\n";
       return 0;
@@ -174,12 +150,10 @@ Toggle_Kekule_Form::construct_from_command_line (Command_Line & cl,
       return 0;
     }
 
-    Bond * b = new Bond (a1, a2, bt);
+    Bond * b = new Bond(a1, a2, bt);
 
-    _bond.add (b);
+    _bond.add(b);
   }
-
-  _correct = new int[_bond.number_elements ()];
 
   return 1;
 }
@@ -188,18 +162,18 @@ int
 Toggle_Kekule_Form::ok_embedding (const Set_of_Atoms & embedding) const
 {
   int rc = 1;
-  for (int i = 0; i < _bond.number_elements (); i++)
+  for (int i = 0; i < _bond.number_elements(); i++)
   {
     const Bond * b = _bond[i];
-    if (b->a1 () >= embedding.number_elements ())
+    if (b->a1() >= embedding.number_elements())
     {
-      cerr << "Toggle_Kekule_Form::ok_embedding: bond " << i << " atom " << b->a1 () << " invalid\n";
+      cerr << "Toggle_Kekule_Form::ok_embedding: bond " << i << " atom " << b->a1() << " invalid\n";
       rc = 0;
     }
 
-    if (b->a2 () >= embedding.number_elements ())
+    if (b->a2() >= embedding.number_elements())
     {
-      cerr << "Toggle_Kekule_Form::ok_embedding: bond " << i << " atom " << b->a2 () << " invalid\n";
+      cerr << "Toggle_Kekule_Form::ok_embedding: bond " << i << " atom " << b->a2() << " invalid\n";
       rc = 0;
     }
   }
@@ -210,28 +184,32 @@ Toggle_Kekule_Form::ok_embedding (const Set_of_Atoms & embedding) const
   return rc;
 }
 
+//#define DEBUG_BOND_IS_CORRECT
+
 int
 Toggle_Kekule_Form::_bond_is_correct (const Molecule & m,
                                       const Set_of_Atoms & embedding,
                                       const Bond * b) const
 {
-  atom_number_t a1 = embedding[b->a1 ()];
-  atom_number_t a2 = embedding[b->a2 ()];
+  atom_number_t a1 = embedding[b->a1()];
+  atom_number_t a2 = embedding[b->a2()];
 
-  const Bond * existing_bond = m.bond_between_atoms (a1, a2);
+  const Bond * existing_bond = m.bond_between_atoms(a1, a2);
   assert (NULL != existing_bond);
 
-//#define DEBUG_BOND_IS_CORRECT
 #ifdef DEBUG_BOND_IS_CORRECT
-  cerr << "Matched atoms " << b->a1 () << " and " << b->a2 () << ", atoms " << a1 << " and " << a2 << endl;
+  cerr << "Matched atoms " << b->a1() << " and " << b->a2() << ", atoms " << a1 << " and " << a2 << endl;
   cerr << "Checking bond    " << (*b) << endl;
   cerr << "against existing " << (*existing_bond) << endl;
+  Molecule mcopy(m);
+  write_isotopically_labelled_smiles(mcopy, false, cerr);
+  cerr << endl;
 #endif
 
-  if (b->is_single_bond () && existing_bond->is_single_bond ())
+  if (b->is_single_bond() && existing_bond->is_single_bond())
     return 1;
 
-  if (b->is_double_bond () && existing_bond->is_double_bond ())
+  if (b->is_double_bond() && existing_bond->is_double_bond())
     return 1;
 
   return 0;
@@ -239,19 +217,22 @@ Toggle_Kekule_Form::_bond_is_correct (const Molecule & m,
 
 int
 Toggle_Kekule_Form::_all_bonds_correct (const Molecule & m,
-                                        const Set_of_Atoms & embedding)
+                                        const Set_of_Atoms & embedding,
+                                        Toggle_Kekule_Form_Temporary_Arrays & tkfta) const
 {
-  int nb = _bond.number_elements ();
+  int nb = _bond.number_elements();
 
   int rc = 1;
 
+  int * correct = tkfta.correct();
+
   for (int i = 0; i < nb; i++)
   {
-    if (_bond_is_correct (m, embedding, _bond[i]))
-      _correct[i] = 1;
+    if (_bond_is_correct(m, embedding, _bond[i]))
+      correct[i] = 1;
     else
     {
-      _correct[i] = 0;
+      correct[i] = 0;
       rc = 0;
     }
   }
@@ -267,17 +248,17 @@ int
 Toggle_Kekule_Form::_all_bonds_aromatic (Molecule & m,
                                         const Set_of_Atoms & embedding) const
 {
-  int nb = _bond.number_elements ();
+  int nb = _bond.number_elements();
   for (int i = 0; i < nb; i++)
   {
     const Bond * b = _bond[i];
-    atom_number_t a1 = embedding[b->a1 ()];
-    atom_number_t a2 = embedding[b->a2 ()];
+    const atom_number_t a1 = embedding[b->a1()];
+    const atom_number_t a2 = embedding[b->a2()];
 
-    if (! m.in_same_aromatic_ring (a1, a2))
+    if (! m.in_same_aromatic_ring(a1, a2))
     {
       cerr << "Matched atoms " << a1 << " and " << a2 << " not in the same aromatic ring\n";
-      cerr << "Bond " << i << " item " << b->a1 () << " and item " << b->a2 () << " in " << embedding << endl;
+      cerr << "Bond " << i << " item " << b->a1() << " and item " << b->a2() << " in " << embedding << endl;
       return 0;
     }
   }
@@ -288,12 +269,12 @@ Toggle_Kekule_Form::_all_bonds_aromatic (Molecule & m,
 int
 Toggle_Kekule_Form::_ring_is_involved (const Ring * r) const
 {
-  int nb = _bond.number_elements ();
+  int nb = _bond.number_elements();
   for (int i = 0; i < nb; i++)
   {
     const Bond * b = _bond[i];
 
-    if (r->contains_bond (b->a1 (), b->a2 ()))
+    if (r->contains_bond(b->a1(), b->a2()))
       return 1;
   }
 
@@ -307,9 +288,9 @@ Toggle_Kekule_Form::_do_not_process_rings_containing (Molecule & m,
 {
   tkfta.set_atom_can_change(zatom, 0);
 
-  int * can_change_bond = tkfta.can_change_bond ();
+  int * can_change_bond = tkfta.can_change_bond();
 
-  const int nr = m.nrings ();
+  const int nr = m.nrings();
 
   const int matoms = m.natoms();
 
@@ -318,14 +299,14 @@ Toggle_Kekule_Form::_do_not_process_rings_containing (Molecule & m,
     if (! tkfta.ring_can_toggle(i))
       continue;
 
-    const Ring * ri = m.ringi (i);
+    const Ring * ri = m.ringi(i);
 
-    if (! ri->contains (zatom))
+    if (! ri->contains(zatom))
       continue;
 
     int ring_size = ri->number_elements();
 
-    tkfta.set_ring_can_toggle (i, 0);
+    tkfta.set_ring_can_toggle(i, 0);
 
     atom_number_t prev = ri->item(0);
 
@@ -363,31 +344,31 @@ Toggle_Kekule_Form::_no_changes_to_atom (Molecule & m,
 {
 //#define DEBUG_NO_CHANGES_TO_ATOM
 #ifdef DEBUG_NO_CHANGES_TO_ATOM
-  cerr << "Atom " << zatom << " '" << m.smarts_equivalent_for_atom (zatom) << "' cannot change\n";
+  cerr << "Atom " << zatom << " '" << m.smarts_equivalent_for_atom(zatom) << "' cannot change\n";
 #endif
 
-  tkfta.set_atom_can_change (zatom, 0);
+  tkfta.set_atom_can_change(zatom, 0);
 
-  int * can_change_bond = tkfta.can_change_bond ();
-  Atom * const * atom = tkfta.atom ();
+  int * can_change_bond = tkfta.can_change_bond();
+  Atom * const * atom = tkfta.atom();
 
-  int matoms = m.natoms ();
+  int matoms = m.natoms();
 
   const Atom * a = atom[zatom];
 
-  int acon = a->ncon ();
+  int acon = a->ncon();
   for (int i = 0; i < acon; i++)
   {
-    atom_number_t j = a->other (zatom, i);
+    atom_number_t j = a->other(zatom, i);
 
     can_change_bond[zatom * matoms + j] = can_change_bond[j * matoms + zatom] = 0;
 //  cerr << "No changes to bond between " << zatom << " and " << j << endl;
   }
 
-  tkfta.set_atom_can_change (zatom, 0);
+  tkfta.set_atom_can_change(zatom, 0);
 
-//if (m.is_ring_atom (zatom))
-//  _do_not_process_rings_containing (m, zatom, tkfta);
+//if (m.is_ring_atom(zatom))
+//  _do_not_process_rings_containing(m, zatom, tkfta);
 
   return;
 }
@@ -397,43 +378,60 @@ Toggle_Kekule_Form::process (Molecule & m,
                              const Set_of_Atoms & embedding,
                              int & changed)
 {
-  int nb = _bond.number_elements ();
+  int nb = _bond.number_elements();
   if (0 == nb)
   {
     cerr << "Toggle_Kekule_Form::process: no bonds specified\n";
     return 0;
   }
 
-  if (! ok_embedding (embedding))
+//#define DEBUG_DO_TOGGLE_KEKULE_FORM
+
+  if (! ok_embedding(embedding))
   {
     cerr << "Toggle_Kekule_Form::process: invalid embedding " << embedding << endl;
     return 0;
   }
 
-  if (_all_bonds_correct (m, embedding))
+#ifdef DEBUG_DO_TOGGLE_KEKULE_FORM
+  set_include_atom_map_with_smiles(0);
+  m.invalidate_smiles();
+  cerr << "Begin Toggle_Kekule_Form::process " << m.smiles() << endl;
+#endif
+
+  Toggle_Kekule_Form_Temporary_Arrays tkfta(m);
+
+  if (_all_bonds_correct(m, embedding, tkfta))
   {
+#ifdef DEBUG_DO_TOGGLE_KEKULE_FORM
+    cerr << "All bonds correct, no action\n";
+#endif
     changed = 0;
     return 1;
   }
 
 // Looks like we are going to have to change the molecule
 
-  m.compute_aromaticity ();
-  if (! _all_bonds_aromatic (m, embedding))
+#ifdef DEBUG_DO_TOGGLE_KEKULE_FORM
+  cerr << "Toggle_Kekule_Form continuing " << m.smiles() << endl;
+#endif
+  if (! _all_bonds_aromatic(m, embedding))
   {
-    cerr << "Toggle_Kekule_Form::process:not all bonds aromatic '" << m.name () << "'\n";
+    cerr << "Toggle_Kekule_Form::process:not all bonds aromatic '" << m.name() << "'\n";
     return 0;
   }
+
+  if (_unset_unnecessary_implicit_hydrogens_known_values)
+    m.unset_unnecessary_implicit_hydrogens_known_values();
 
 // All the methods need a means of determining whether or not the
 // bond between any two atoms can be changed.
 
-  Toggle_Kekule_Form_Temporary_Arrays tkfta (m);
-
-  _do_chemistry (m, tkfta);
+  _do_chemistry(m, tkfta);
 
 #ifdef DEBUG_DO_TOGGLE_KEKULE_FORM
   cerr << "Aft4er _do_chemistry\n";
+  cerr << "Toggle_Kekule_Form after _do_chemistry " << m.smiles() << " line " << __LINE__ << endl;
   for (int i = 0; i < m.natoms(); i++)
   {
     for (int j = i + 1; j < m.natoms(); j++)
@@ -444,18 +442,21 @@ Toggle_Kekule_Form::process (Molecule & m,
       if (! m.in_same_ring(i, j))
         continue;
 
-//    if (can_change_bond[i * matoms + j])
-        cerr << "Can change bond between atoms " << i << " and " << j << " value " << tkfta.can_change_bond()[i*m.natoms()+j] << endl;
+      cerr << "Can change bond between atoms " << i << " and " << j << " value " << tkfta.can_change_bond()[i*m.natoms()+j] << endl;
     }
   }
 #endif
 
-  int rc = _process (m, embedding, tkfta);
+  int rc = _process(m, embedding, tkfta);
+
+#ifdef DEBUG_DO_TOGGLE_KEKULE_FORM
+  cerr << "Toggle_Kekule_Form::process:returning " << rc << ' ' << m.smiles() << endl;
+#endif
 
   if (rc)
   {
     changed = 1;
-    m.invalidate_smiles ();
+    m.invalidate_smiles();
   }
 
   return rc;
@@ -473,14 +474,14 @@ multiple_bond_outside_ring (Molecule & m,
                             int id,
                             const int * process_these)
 {
-  int acon = a->ncon ();
+  int acon = a->ncon();
   for (int j = 0; j < acon; j++)
   {
-    const Bond * b = a->item (j);
-    if (b->is_single_bond ())
+    const Bond * b = a->item(j);
+    if (b->is_single_bond())
       continue;
 
-    atom_number_t k = b->other (i);
+    atom_number_t k = b->other(i);
 
     if (id != process_these[k])
       return true;
@@ -494,21 +495,21 @@ multiple_bond_outside_aromatic_ring (Molecule & m,
                                      atom_number_t i, 
                                      const Atom * a)
 {
-  int acon = a->ncon ();
+  int acon = a->ncon();
   for (int j = 0; j < acon; j++)
   {
-    const Bond * b = a->item (j);
-    if (b->is_single_bond ())
+    const Bond * b = a->item(j);
+    if (b->is_single_bond())
       continue;
 
 //  Got a double bond
 
-    atom_number_t k = b->other (i);
+    atom_number_t k = b->other(i);
 
-    if (m.is_non_ring_atom (k))    // to a non ring atom
+    if (m.is_non_ring_atom(k))    // to a non ring atom
       return true;
 
-    if (m.is_aromatic (k))    // either in the ring our part of fused system
+    if (m.is_aromatic(k))    // either in the ring our part of fused system
       continue;
 
     return true;     // a non-aromatic ring atom
@@ -528,36 +529,36 @@ grow_ring_system (Molecule & m,
 {
   int rc = 1;
 
-  r->set_vector (tkfta.process_these (), id);
+  r->set_vector(tkfta.process_these(), id);
 
-  int frn = r->fused_ring_neighbours ();
+  int frn = r->fused_ring_neighbours();
 
 #ifdef DEBUG_GROW_RING_SYSTEM
-  cerr << "grow_ring_system: rid " << id  << ", ring number " << r->ring_number () << ", " << frn << " fused neighbours\n";
+  cerr << "grow_ring_system: rid " << id  << ", ring number " << r->ring_number() << ", " << frn << " fused neighbours\n";
 #endif
 
   for (int j = 0; j < frn; j++)
   {
-    const Ring * rj = r->fused_neighbour (j);
+    const Ring * rj = r->fused_neighbour(j);
 
-    int rjn = rj->ring_number ();
+    int rjn = rj->ring_number();
 
 #ifdef DEBUG_GROW_RING_SYSTEM
-    cerr << "ring " << r->ring_number () << " joined to ring " << rjn << endl;
-    assert (rjn >= 0 && rjn < m.nrings ());
+    cerr << "ring " << r->ring_number() << " joined to ring " << rjn << endl;
+    assert (rjn >= 0 && rjn < m.nrings());
 #endif
 
     if (ring_already_done[rjn])
       continue;
 
-    if (! rj->is_aromatic ())
+    if (! rj->is_aromatic())
       continue;
 
-    if (! tkfta.ring_can_toggle (rjn))
+    if (! tkfta.ring_can_toggle(rjn))
       continue;
 
     ring_already_done[rjn] = 1;
-    rc += grow_ring_system (m, rj, id, tkfta, ring_already_done);
+    rc += grow_ring_system(m, rj, id, tkfta, ring_already_done);
   }
 
 #ifdef DEBUG_GROW_RING_SYSTEM
@@ -572,13 +573,14 @@ Toggle_Kekule_Form::_process (Molecule & m,
                               const Set_of_Atoms & embedding,
                               Toggle_Kekule_Form_Temporary_Arrays & tkfta)
 {
-  int matoms = m.natoms ();
+  int matoms = m.natoms();
 
-  int * can_change_bond = tkfta.can_change_bond ();
+  int * can_change_bond = tkfta.can_change_bond();
 
-//#define DEBUG_DO_TOGGLE_KEKULE_FORM
+  const int * correct = tkfta.correct();
+
 #ifdef DEBUG_DO_TOGGLE_KEKULE_FORM
-  cerr << "Start of _process\n";
+  cerr << "Start of _process, matched atoms " << embedding << endl;
   for (int i = 0; i < matoms; i++)
   {
     for (int j = i + 1; j < matoms; j++)
@@ -595,34 +597,36 @@ Toggle_Kekule_Form::_process (Molecule & m,
   }
 #endif
 
-  int nb = _bond.number_elements ();
+  int nb = _bond.number_elements();
   for (int i = 0; i < nb; i++)
   {
     const Bond * b = _bond[i];
 
-    if (0 == can_change_bond[b->a1() * matoms + b->a2()])   // we cannot do anything
+    atom_number_t a1 = embedding[b->a1()];
+    atom_number_t a2 = embedding[b->a2()];
+
+//  cerr << "Checking bond between " << b->a1() << " and " << b->a2() << " CC " << can_change_bond[a1 * matoms + a2] << " can change " << can_change_bond[a1*matoms+a2] << endl;
+
+    if (0 == can_change_bond[a1 * matoms + a2])   // we cannot do anything
       return 0;
 
-    atom_number_t a1 = embedding[b->a1 ()];
-    atom_number_t a2 = embedding[b->a2 ()];
-
-    if (_correct[i])
+    if (correct[i])
       can_change_bond[a1 * matoms + a2] = can_change_bond[a2 * matoms + a1] = 0;
   }
 
-  int * process_these = tkfta.process_these ();
+  int * process_these = tkfta.process_these();
 
 // figure out which rings are involved
 
-  int nr = m.nrings ();
+  int nr = m.nrings();
 
   if (1 == nr)
   {
-    const Ring * r = m.ringi (0);
+    const Ring * r = m.ringi(0);
 
-    r->set_vector (process_these, 0);
+    r->set_vector(process_these, 0);
 
-    return _process_single_ring (m, embedding, 0, tkfta);
+    return _process_single_ring(m, embedding, 0, tkfta);
   }
 
 // We may have fused rings
@@ -630,15 +634,15 @@ Toggle_Kekule_Form::_process (Molecule & m,
 
   resizable_array<int> isolated_rings, fused_rings;
 
-  isolated_rings.resize (nr);
-  fused_rings.resize (nr);
+  isolated_rings.resize(nr);
+  fused_rings.resize(nr);
 
-  int * ring_already_done = new_int (nr); iw_auto_array<int> free_ring_already_done (ring_already_done);
+  int * ring_already_done = new_int(nr); std::unique_ptr<int[]> free_ring_already_done(ring_already_done);
 
 #ifdef DEBUG_GROW_RING_SYSTEM
   for (int i = 0; i < nr; i++)
   {
-    cerr << "Ring " << i << " can toggle? " << tkfta.ring_can_toggle (i) << endl;
+    cerr << "Ring " << i << " can toggle? " << tkfta.ring_can_toggle(i) << endl;
   }
 #endif
 
@@ -647,67 +651,78 @@ Toggle_Kekule_Form::_process (Molecule & m,
     if (ring_already_done[i])      // part of a fused system done before
       continue;
 
-    if (! tkfta.ring_can_toggle (i))
+    if (! tkfta.ring_can_toggle(i))
       continue;
 
-    const Ring * r = m.ringi (i);
+    const Ring * r = m.ringi(i);
 
-    if (r->is_non_aromatic ())     // very important!
+    if (r->is_non_aromatic())     // very important!
       continue;
 
-    if (! will_change_ring (r, embedding))    // none of the bonds we insist upon are in the ring
+    if (! will_change_ring(r, embedding))    // none of the bonds we insist upon are in the ring
       continue;
 
     int rid = i + 1;     // make sure not zero (since +0 == -0)
 
-    if (! r->is_fused ())
+    if (! r->is_fused())
     {
-      r->set_vector (process_these, rid);
+      r->set_vector(process_these, rid);
 
-      isolated_rings.add (rid);
+      isolated_rings.add(rid);
     }
-    else if (1 == grow_ring_system (m, r, rid, tkfta, ring_already_done))
+    else if (1 == grow_ring_system(m, r, rid, tkfta, ring_already_done))
     {
-      isolated_rings.add (rid);
+      isolated_rings.add(rid);
     }
     else 
-      fused_rings.add (rid);
+      fused_rings.add(rid);
 
     ring_already_done[i] = 1;    // probably not necessary
   }
 
 #ifdef DEBUG_GROW_RING_SYSTEM
-  cerr << isolated_rings.number_elements () << " isolated and " << fused_rings.number_elements () << " fused rings\n";
-#endif
-
-#ifdef DEBUG_DO_TOGGLE_KEKULE_FORM
-  cerr << "Processing " << isolated_rings.number_elements () << " isolated rings\n";
+  cerr << isolated_rings.number_elements() << " isolated and " << fused_rings.number_elements() << " fused rings\n";
 #endif
 
   int rc = 1;
-  for (int i = 0; i < isolated_rings.number_elements (); i++)
+  for (int i = 0; i < isolated_rings.number_elements(); i++)
   {
     int rid = isolated_rings[i];
-    if (! _process_single_ring (m, embedding, rid, tkfta))
+    if (! _process_single_ring(m, embedding, rid, tkfta))
     {
       rc = 0;
       if (_display_error_messages)
-        cerr << "Toggle_Kekule_Form::_process: cannot change isolated rid " << rid << ", molecule '" << m.name () << "'\n";
+        cerr << "Toggle_Kekule_Form::_process: cannot change isolated rid " << rid << ", molecule '" << m.name() << "'\n";
     }
   }
 
 #ifdef DEBUG_DO_TOGGLE_KEKULE_FORM
-  cerr << "Processing " << fused_rings.number_elements () << " fused ring sets\n";
+  cerr << "Processing " << fused_rings.number_elements() << " fused ring sets\n";
 #endif
 
-  for (int i = 0; i < fused_rings.number_elements (); i++)
+  for (int i = 0; i < fused_rings.number_elements(); i++)
   {
     int rid = fused_rings[i];
-    if (! _process_ring_system (m, embedding, rid, tkfta))
+    if (! _process_ring_system(m, embedding, rid, tkfta))
     {
       rc = 0;
       if (_display_error_messages)
-        cerr << "Toggle_Kekule_Form::_process: cannot change fused rid " << rid << ", molecule '" << m.name () << "'\n";
+      {
+        cerr << "Toggle_Kekule_Form::_process: cannot change fused rid " << rid << ", molecule '" << m.name() << "'\n";
+        if (2 == _display_error_messages)
+        {
+          cerr << "Starting atoms";
+          for (int j = 0; j < embedding.number_elements(); ++j)
+          {
+            cerr << ' ' << embedding[j] << ' ' << m.smarts_equivalent_for_atom(embedding[j]);
+          }
+          cerr << endl;
+          for (int j = 0; j < _bond.number_elements(); ++j)
+          {
+            cerr << " btw " << _bond[j]->a1() << " and " << _bond[j]->a2() << " type " << _bond[j]->btype() << endl;
+          }
+        }
+      }
     }
   }
 
@@ -719,9 +734,9 @@ Toggle_Kekule_Form::_do_chemistry_aromatic_ring (Molecule & m,
                                                  const Ring & r,
                                                  Toggle_Kekule_Form_Temporary_Arrays & tkfta) const
 {
-  Atom * const * atom = tkfta.atom ();
+  Atom * const * atom = tkfta.atom();
 
-  int ring_size = r.number_elements ();
+  int ring_size = r.number_elements();
 
   for (int i = 0; i < ring_size; i++)
   {
@@ -729,14 +744,14 @@ Toggle_Kekule_Form::_do_chemistry_aromatic_ring (Molecule & m,
 
     Atom * a = atom[j];
     
-    atomic_number_t z = a->atomic_number ();
+    atomic_number_t z = a->atomic_number();
 
-    int acon = a->ncon ();
+    int acon = a->ncon();
 
     if (6 == z && 2 == acon)     // these will vary
       continue;
 
-    int nb = a->nbonds ();
+    int nb = a->nbonds();
 
     if (7 == z && 2 == acon && 3 == nb)    // like pyridine
       continue;
@@ -744,25 +759,28 @@ Toggle_Kekule_Form::_do_chemistry_aromatic_ring (Molecule & m,
     if (7 == z && 2 == acon && 2 == nb)    // like in N1C=CC=C1, pyrrole
     {
       if (! _allow_pyrrole_to_change)
-        _no_changes_to_atom (m, j, tkfta);
+        _no_changes_to_atom(m, j, tkfta);
       continue;
     }
 
     if (7 == z && 3 == acon && 3 == nb)    // methyl-pyrrole
     {
-      _no_changes_to_atom (m, j, tkfta);
+      _no_changes_to_atom(m, j, tkfta);
       continue;
     }
+
+    if (16 == z && 3 == acon && 4 == nb)   // S1(=NC=NC(=N1)C)C PBCHM18711375
+      continue;
 
     if (8 == z || 16 == z)
     {
-      _no_changes_to_atom (m, j, tkfta);
+      _no_changes_to_atom(m, j, tkfta);
       continue;
     }
 
-    if (6 == z && 3 == acon && 4 == nb && multiple_bond_outside_aromatic_ring (m, j, a))
+    if (6 == z && 3 == acon && 4 == nb && multiple_bond_outside_aromatic_ring(m, j, a))
     {
-      _no_changes_to_atom (m, j, tkfta);
+      _no_changes_to_atom(m, j, tkfta);
       continue;
     }
   }
@@ -774,16 +792,16 @@ void
 Toggle_Kekule_Form::_do_chemistry (Molecule & m,
                                    Toggle_Kekule_Form_Temporary_Arrays & tkfta) const
 {
-  int nr = m.nrings ();
+  int nr = m.nrings();
 
   for (int i = 0; i < nr; i++)
   {
-    const Ring * ri = m.ringi (i);
+    const Ring * ri = m.ringi(i);
 
-    if (ri->is_aromatic ())
-      _do_chemistry_aromatic_ring (m, *ri, tkfta);
+    if (ri->is_aromatic())
+      _do_chemistry_aromatic_ring(m, *ri, tkfta);
     else
-      tkfta.set_ring_can_toggle (i, 0);
+      tkfta.set_ring_can_toggle(i, 0);
   }
 
   return;
@@ -794,11 +812,11 @@ Toggle_Kekule_Form::_do_chemistry (Molecule & m,
 static atom_number_t
 next_atom_in_ring (const Atom * a,
                    int rid,
-                    const int * process_these,
-                    atom_number_t aprev,
-                    atom_number_t astart2)
+                   const int * process_these,
+                   const atom_number_t aprev,
+                   const atom_number_t astart2)
 {
-  int acon = a->ncon ();
+  int acon = a->ncon();
 
 #ifdef DEBUG_NEXT_ATOM_IN_RING
   cerr << "Looking for next atom in ring from " << astart2 << ", id = " << rid << endl;
@@ -806,7 +824,7 @@ next_atom_in_ring (const Atom * a,
 
   for (int i = 0; i < acon; i++)
   {
-    atom_number_t j = a->other (astart2, i);
+    atom_number_t j = a->other(astart2, i);
 
     if (j == aprev)    // need to move around the ring
       continue;
@@ -815,7 +833,7 @@ next_atom_in_ring (const Atom * a,
       return j;
   }
 
-  assert (NULL == "Did not find next atom in ring for Kekule Toggle");
+  cerr << "Did not find next atom in ring for Kekule Toggle\n";
 
   return INVALID_ATOM_NUMBER;
 }
@@ -823,13 +841,14 @@ next_atom_in_ring (const Atom * a,
 void
 Toggle_Kekule_Form::_set_all_bonds_to_single (Molecule & m,
                                               int id,
+                                              Set_of_Atoms & bonds_to_be_restored,
                                               Toggle_Kekule_Form_Temporary_Arrays & tkfta) const
 {
-  const int * process_these = tkfta.process_these ();
-  const int * can_change_bond = tkfta.can_change_bond ();
-  Atom * const * atom = tkfta.atom ();
+  const int * process_these = tkfta.process_these();
+  const int * can_change_bond = tkfta.can_change_bond();
+  Atom * const * atom = tkfta.atom();
 
-  int matoms = m.natoms ();
+  int matoms = m.natoms();
 
   for (int i = 0; i < matoms; i++)
   {
@@ -838,18 +857,12 @@ Toggle_Kekule_Form::_set_all_bonds_to_single (Molecule & m,
 
     Atom * a = atom[i];
 
-    int acon = a->ncon ();
-
-    if (acon == a->nbonds ())      // atom already has single bonds.
-      continue;
+    int acon = a->ncon();
 
     for (int j = 0; j < acon; j++)
     {
-      const Bond * b = a->item (j);
-      if (b->is_single_bond ())
-        continue;
-
-      atom_number_t k = b->other (i);
+      const Bond * b = a->item(j);
+      atom_number_t k = b->other(i);
 
       if (k < i)
         continue;
@@ -861,9 +874,36 @@ Toggle_Kekule_Form::_set_all_bonds_to_single (Molecule & m,
       if (0 == can_change_bond[i * matoms + k])
         continue;
 
-      m.set_bond_type_between_atoms (i, k, SINGLE_BOND);
+      bonds_to_be_restored.add(i);
+      bonds_to_be_restored.add(k);
+
+      if (b->is_single_bond())
+        bonds_to_be_restored.add(1);
+      else
+      {
+
+        m.set_bond_type_between_atoms(i, k, SINGLE_BOND);
+        bonds_to_be_restored.add(2);
+      }
     }
   }
+}
+
+int
+Toggle_Kekule_Form::_restore_previous_bonding (Molecule & m,
+                                               const Set_of_Atoms & bonds_to_be_restored) const
+{
+  const int n = bonds_to_be_restored.number_elements();
+
+  for (int i = 0; i < n; i += 3)
+  {
+    if (1 == bonds_to_be_restored[i+2])
+      m.set_bond_type_between_atoms(bonds_to_be_restored[i], bonds_to_be_restored[i+1], SINGLE_BOND);
+    else
+      m.set_bond_type_between_atoms(bonds_to_be_restored[i], bonds_to_be_restored[i+1], DOUBLE_BOND);
+  }
+
+  return 1;
 }
 
 int
@@ -872,30 +912,31 @@ Toggle_Kekule_Form::_set_our_bonds (Molecule & m,
                                     int id,
                                     Toggle_Kekule_Form_Temporary_Arrays & tkfta) const
 {
-  const int * process_these = tkfta.process_these ();
-  int * can_change_bond = tkfta.can_change_bond ();
-  int * has_double_bond = tkfta.has_double_bond ();
+  const int * process_these = tkfta.process_these();
+  int * can_change_bond = tkfta.can_change_bond();
+  int * has_double_bond = tkfta.has_double_bond();
+  const int * correct = tkfta.correct();
 
-  int matoms = m.natoms ();
+  int matoms = m.natoms();
 
-  for (int i = 0; i < _bond.number_elements (); i++)
+  for (int i = 0; i < _bond.number_elements(); i++)
   {
-    if (_correct[i])
+    if (correct[i])
       continue;
 
     const Bond * b = _bond[i];
 
-    atom_number_t a1 = embedding[b->a1 ()];
-    atom_number_t a2 = embedding[b->a2 ()];
+    atom_number_t a1 = embedding[b->a1()];
+    atom_number_t a2 = embedding[b->a2()];
 
     if (id != process_these[a1] || id != process_these[a2])
       continue;
 
     can_change_bond[a1 * matoms + a2] = can_change_bond[a2 * matoms + a1] = 0;
 
-    if (b->is_double_bond ())
+    if (b->is_double_bond())
     {
-      m.set_bond_type_between_atoms (a1, a2, DOUBLE_BOND);
+      m.set_bond_type_between_atoms(a1, a2, DOUBLE_BOND);
       has_double_bond[a1] = 2;
       has_double_bond[a2] = 2;
     }
@@ -910,12 +951,26 @@ Toggle_Kekule_Form::_process_single_ring (Molecule & m,
                                           int rid,
                                           Toggle_Kekule_Form_Temporary_Arrays & tkfta)
 {
+  const atom_number_t astart1 = embedding[_bond[0]->a1()];
+  const atom_number_t astart2 = embedding[_bond[0]->a2()];
+
+  const int matoms = m.natoms();
+
+#ifdef DEBUG_KEKULE_PROCESS_SINGLE_RING
+  cerr << "Toggle_Kekule_Form::_process_single_ring:atoms " << astart1 << " and " << astart2 << endl;
+  for (int i = 0; i < matoms; ++i)
+  {
+    cerr << i << " " << m.smarts_equivalent_for_atom(i) << " process_these " << tkfta.process_these()[i] << " can change " << tkfta.atom_can_change(i) << endl;
+  }
+#endif
+
+  if (! tkfta.atom_can_change(astart1) || ! tkfta.atom_can_change(astart2))
+    return 0;
+
   const int * process_these = tkfta.process_these();
-  Atom * const * atom = tkfta.atom ();
+  Atom * const * atom = tkfta.atom();
 
   resizable_array_p<Bond> existing_bonds;
-
-  int matoms = m.natoms();
 
   for (int i = 0; i < matoms; i++)
   {
@@ -924,7 +979,7 @@ Toggle_Kekule_Form::_process_single_ring (Molecule & m,
 
     const Atom * ai = atom[i];
 
-    int acon = ai->ncon();
+    const int acon = ai->ncon();
 
     for (int j = 0; j < acon; j++)
     {
@@ -936,9 +991,9 @@ Toggle_Kekule_Form::_process_single_ring (Molecule & m,
         continue;
 
       if (b->is_single_bond())
-        existing_bonds.add(new Bond (i, k, SINGLE_BOND));
+        existing_bonds.add(new Bond(i, k, SINGLE_BOND));
       else
-        existing_bonds.add(new Bond (i, k, DOUBLE_BOND));
+        existing_bonds.add(new Bond(i, k, DOUBLE_BOND));
     }
   }
 
@@ -961,55 +1016,61 @@ Toggle_Kekule_Form::_process_single_ring2 (Molecule & m,
                                            int rid,
                                            Toggle_Kekule_Form_Temporary_Arrays & tkfta)
 {
-  atom_number_t astart1 = embedding[_bond[0]->a1 ()];
-  atom_number_t astart2 = embedding[_bond[0]->a2 ()];
+  Set_of_Atoms bonds_to_be_restored;
 
-  if (! tkfta.atom_can_change(astart1) || ! tkfta.atom_can_change(astart2))
-    return 0;
+  _set_all_bonds_to_single(m, rid, bonds_to_be_restored, tkfta);
 
-  _set_all_bonds_to_single (m, rid, tkfta);
+  _set_our_bonds(m, embedding, rid, tkfta);
 
-  _set_our_bonds (m, embedding, rid, tkfta);
-
-  int matoms = m.natoms ();
+  int matoms = m.natoms();
 
   assert (rid >= 0);
 
-  int * can_change_bond = tkfta.can_change_bond ();
-  int * process_these = tkfta.process_these ();
-  Atom * const * atom = tkfta.atom ();
+  int * can_change_bond = tkfta.can_change_bond();
+  int * process_these = tkfta.process_these();
+  Atom * const * atom = tkfta.atom();
 
 // We need to keep track of our starting point (astart1) and the atom being
 // processed (astart2)
 
-  bond_type_t previous_bond = _bond[0]->btype ();
+  bond_type_t previous_bond = _bond[0]->btype();
+
+  const atom_number_t astart1 = embedding[_bond[0]->a1()];
+  atom_number_t astart2 = embedding[_bond[0]->a2()];
 
 //#define DEBUG_TOGGLE_KEKULE_PROCESS_SINGLE_RING
 #ifdef DEBUG_TOGGLE_KEKULE_PROCESS_SINGLE_RING
-  cerr << "Starting smiles '" << m.smiles () << "'\n";
+  cerr << "Starting smiles " << m.smiles() << "\n";
   cerr << "Start with atoms " << astart1 << " and " << astart2 << endl;
   cerr << "Initial bond is " << previous_bond << endl;
 #endif
 
   atom_number_t aprev = astart1;
+
   while (1)
   {
-    atom_number_t anext = next_atom_in_ring (atom[astart2], rid, process_these, aprev, astart2);
+    atom_number_t anext = next_atom_in_ring(atom[astart2], rid, process_these, aprev, astart2);
+
+#ifdef DEBUG_TOGGLE_KEKULE_PROCESS_SINGLE_RING
+    cerr << "Prev " << aprev << ", from atom " << astart2 << " advance to " << anext << ", previous_bond " << previous_bond << " hcount(next) " << m.hcount(anext) << " '" << m.smiles() << "'\n";
+#endif
 
     if (DOUBLE_BOND == previous_bond)    // cannot have consecutive double bonds
       previous_bond = SINGLE_BOND;
     else if (! can_change_bond[astart2 * matoms + anext])    //
-      previous_bond = BOND_TYPE_ONLY (m.bond_between_atoms (astart2, anext)->btype ());
-    else if (0 == m.hcount(anext))   // no room for a double bond
-      previous_bond = BOND_TYPE_ONLY (m.bond_between_atoms (astart2, anext)->btype ());
+      previous_bond = BOND_TYPE_ONLY(m.bond_between_atoms(astart2, anext)->btype());
+    else if (6 == atom[anext]->atomic_number() && 0 == m.hcount(anext))   // no room for a double bond
+      previous_bond = BOND_TYPE_ONLY(m.bond_between_atoms(astart2, anext)->btype());
+    else if (7 == atom[anext]->atomic_number() && 0 == atom[anext]->formal_charge() && 0 == m.hcount(anext))
+      previous_bond = BOND_TYPE_ONLY(m.bond_between_atoms(astart2, anext)->btype());
     else
     {
-      m.set_bond_type_between_atoms (astart2, anext, DOUBLE_BOND);
+      m.set_bond_type_between_atoms(astart2, anext, DOUBLE_BOND);
       previous_bond = DOUBLE_BOND;
     }
 
 #ifdef DEBUG_TOGGLE_KEKULE_PROCESS_SINGLE_RING
-    cerr << "Atom pair is " << astart2 << " to " << anext << " set to " << previous_bond << " smiles '" << m.smiles () << "'\n";
+    cerr << "Atom pair is " << astart2 << " to " << anext << " set to " << previous_bond << " smiles " << m.smiles() << "\n";
 #endif
 
     if (astart1 == anext)     // we have looped back to the beginning
@@ -1020,10 +1081,19 @@ Toggle_Kekule_Form::_process_single_ring2 (Molecule & m,
   }
 
 #ifdef DEBUG_TOGGLE_KEKULE_PROCESS_SINGLE_RING
-  cerr << "Final smiles '" << m.smiles () << "'\n";
+  cerr << "Final smiles " << m.smiles() << "\n";
 #endif
 
-  return _all_atoms_aromatic (m, rid, _display_error_messages, tkfta);
+  if ( _all_atoms_aromatic(m, rid, _display_error_messages, tkfta))
+    return 1;
+
+#ifdef DEBUG_TOGGLE_KEKULE_PROCESS_SINGLE_RING
+  cerr << "Toggled ring form not aromatic, " << m.smiles() << " reverting\n";
+#endif
+
+  (void) _restore_previous_bonding(m, bonds_to_be_restored);
+
+  return 0;    // indicates no change
 }
 
 int
@@ -1032,27 +1102,27 @@ Toggle_Kekule_Form::_get_ring_system_atoms (resizable_array<int> & atoms_to_proc
                        atom_number_t zatom,
                        Toggle_Kekule_Form_Temporary_Arrays & tkfta) const
 {
-  const Atom * a = tkfta.atom ()[zatom];
-  int * process_these = tkfta.process_these ();
+  const Atom * a = tkfta.atom()[zatom];
+  int * process_these = tkfta.process_these();
 
   int rc = 0;
 
-  int acon = a->ncon ();
+  int acon = a->ncon();
 
   for (int i = 0; i < acon; i++)
   {
-    atom_number_t j = a->other (zatom, i);
+    atom_number_t j = a->other(zatom, i);
 
     if (rid != process_these[j])
       continue;
 
-    atoms_to_process.add (j);
+    atoms_to_process.add(j);
     process_these[j] = -rid;
 
     rc++;
 
 //  cerr << "From atom " << zatom << " go to atom " << j << endl;
-    rc += _get_ring_system_atoms (atoms_to_process, rid, j, tkfta);
+    rc += _get_ring_system_atoms(atoms_to_process, rid, j, tkfta);
   } 
 
   return rc;
@@ -1066,27 +1136,29 @@ Toggle_Kekule_Form::_process_ring_system (Molecule & m,
 {
 //_do_chemistry (m, rid, tkfta);
 
-  _set_all_bonds_to_single (m, rid, tkfta);
+  Set_of_Atoms bonds_to_be_restored;
 
-  _set_our_bonds (m, embedding, rid, tkfta);
+  _set_all_bonds_to_single(m, rid, bonds_to_be_restored, tkfta);
 
-  int * process_these = tkfta.process_these ();
+  _set_our_bonds(m, embedding, rid, tkfta);
+
+  int * process_these = tkfta.process_these();
 
 // Find a starting point with a known bond
 
   atom_number_t astart1 = INVALID_ATOM_NUMBER;
   atom_number_t astart2 = INVALID_ATOM_NUMBER;
 
-  for (int i = 0; i < _bond.number_elements (); i++)
+  for (int i = 0; i < _bond.number_elements(); i++)
   {
-    atom_number_t a1 = embedding[_bond[i]->a1 ()];
+    atom_number_t a1 = embedding[_bond[i]->a1()];
     if (rid != process_these[a1])
       continue;
 
     if (! tkfta.atom_can_change(a1))
       return 0;
 
-    atom_number_t a2 = embedding[_bond[i]->a2 ()];
+    atom_number_t a2 = embedding[_bond[i]->a2()];
     if (rid != process_these[a2])
       continue;
 
@@ -1100,32 +1172,45 @@ Toggle_Kekule_Form::_process_ring_system (Molecule & m,
 
   assert (INVALID_ATOM_NUMBER != astart1);
 
+//#define DEBUG_PROCESS_RING_SYSTEM
 #ifdef DEBUG_PROCESS_RING_SYSTEM
   cerr << "Starting with atoms " << astart1 << " and " << astart2 << endl;
 #endif
 
   resizable_array<atom_number_t> atoms_to_process;
 
-  int matoms = m.natoms ();
+  int matoms = m.natoms();
 
-  atoms_to_process.resize (matoms);
+  atoms_to_process.resize(matoms);
 
-  atoms_to_process.add (astart1);
+  atoms_to_process.add(astart1);
   process_these[astart1] = -rid;
-  atoms_to_process.add (astart2);
+  atoms_to_process.add(astart2);
   process_these[astart2] = -rid;
 
-  _get_ring_system_atoms (atoms_to_process, rid, astart1, tkfta);
+#ifdef DEBUG_PROCESS_RING_SYSTEM
+  for (int i = 0; i < matoms; ++i)
+  {
+    cerr << process_these[i] << endl;
+  }
+#endif
+
+  _get_ring_system_atoms(atoms_to_process, rid, astart1, tkfta);
 
   for (int i = 0; i < matoms; i++)   // turn back to positive numbers
   {
     if (-rid == process_these[i])
       process_these[i] = rid;
+
+//  cerr << " atom " << i << m.smarts_equivalent_for_atom(i) << " process_these " << process_these[i] << endl;
   }
 
-  int rc = _process_ring_system (m, atoms_to_process, rid, 0, tkfta);
+  if (_process_ring_system(m, atoms_to_process, rid, 0, INVALID_ATOM_NUMBER, tkfta))
+    return 1;
 
-  return rc;
+  _restore_previous_bonding(m, bonds_to_be_restored);
+
+  return 0;          // indicates no change
 }
 
 int
@@ -1133,36 +1218,52 @@ Toggle_Kekule_Form::_process_ring_system (Molecule & m,
                                           resizable_array<int> & atoms_to_process,
                                           int rid,
                                           int zitem,
+                                          const atom_number_t prev,
                                           Toggle_Kekule_Form_Temporary_Arrays & tkfta) const
 {
   atom_number_t curr = atoms_to_process[zitem];
 
-  int * process_these = tkfta.process_these ();
-  int * has_double_bond = tkfta.has_double_bond ();
-  Atom * const * atom = tkfta.atom ();
+  int * process_these = tkfta.process_these();
+  int * has_double_bond = tkfta.has_double_bond();
+  Atom * const * atom = tkfta.atom();
 
 #ifdef DEBUG_PROCESS_RING_SYSTEM
-  cerr << "Processing ring system " << rid << endl;
-  for (int i = 0; i < m.natoms (); i++)
+  if (0 == zitem)
   {
-    if (rid == process_these[i])
-      cerr << "Processing atom " << i << " " << m.smarts_equivalent_for_atom (i) << endl;
+    cerr << "Processing ring system " << rid << endl;
+    for (int i = 0; i < m.natoms(); i++)
+    {
+      if (rid == process_these[i])
+        cerr << "Processing atom " << i << " " << m.smarts_equivalent_for_atom(i) << endl;
+    }
   }
+
+  cerr << "atoms_to_process";
+  for (int i = 0; i < atoms_to_process.number_elements(); ++i)
+  {
+    cerr << ' ' << atoms_to_process[i];
+  }
+  cerr << endl;
 #endif
 
   process_these[curr] = -rid;     // so we don't double back on ourselves
 
   const Atom * acurr = atom[curr];
 
-  int acon = acurr->ncon ();
+  int acon = acurr->ncon();
 
 // First decide whether or not this atom can get a double bond within the ring
 
   int tochange;
 
-  if (! tkfta.atom_can_change (curr))
+#ifdef DEBUG_PROCESS_RING_SYSTEM
+  cerr << "Line " << __LINE__ << " smiles " << m.smiles() << endl;
+  cerr << curr << " atom_can_change " << tkfta.atom_can_change(curr) << " bonds " << acurr->nbonds() << " con " << acon << endl;
+#endif
+
+  if (! tkfta.atom_can_change(curr))
     tochange = 0;
-  else if (acurr->nbonds () > acon)     // what about *=N(=O)-*
+  else if (acurr->nbonds() > acon)     // what about *=N(=O)-*
     tochange = 0;
   else
     tochange = 1;
@@ -1171,47 +1272,59 @@ Toggle_Kekule_Form::_process_ring_system (Molecule & m,
 // Seems as if all these checks can be replace by the unsaturation test above
   else if (has_double_bond[curr])     // already has a double bond - what about *=N(=O)-* groups?
     tochange = 0;
-  else if (6 == z && acurr->nbonds () > acon)      // carbon's can have only 1 double bond
+  else if (6 == z && acurr->nbonds() > acon)      // carbon's can have only 1 double bond
     tochange = 0;
-  else if (7 == z && 2 == acon && acurr->nbonds () > acon)    // like pyridine
+  else if (7 == z && 2 == acon && acurr->nbonds() > acon)    // like pyridine
     tochange = 0;
-  else if (7 == z && 3 == acon && 5 == acurr->nbonds ())
+  else if (7 == z && 3 == acon && 5 == acurr->nbonds())
     tochange = 0;
 #endif
 
 #ifdef DEBUG_PROCESS_RING_SYSTEM
-  cerr << "Atom " << curr << " '" << m.smarts_equivalent_for_atom (curr) << " tochange? " << tochange << endl;
+  cerr << "Atom " << curr << " " << m.smarts_equivalent_for_atom(curr) << " tochange? " << tochange << endl;
 #endif
 
   if (! tochange)
   {
     int rc;
-    if (zitem == atoms_to_process.number_elements () - 1)    // no more to test
-      rc = _all_atoms_aromatic (m, -rid, 0, tkfta);
+    if (zitem == atoms_to_process.number_elements() - 1)    // no more to test
+      rc = _all_atoms_aromatic(m, -rid, 0, tkfta);
     else
-      rc = _process_ring_system (m, atoms_to_process, rid, zitem+1, tkfta);
+      rc = _process_ring_system(m, atoms_to_process, rid, zitem+1, curr, tkfta);
 
     process_these[curr] = rid;
 
     return rc;
   }
 
-  int matoms = m.natoms ();
+  const int matoms = m.natoms();
 
 // Somewhere there must be a connection where a double bond makes sense
 
-  const int * can_change_bond = tkfta.can_change_bond ();
+  const int * can_change_bond = tkfta.can_change_bond();
+
+//cerr << "atom " << curr <<  "RID " << rid << endl;
 
   for (int i = 0; i < acon; i++)
   {
-    const Bond * existing_bond = acurr->item (i);
+    const Bond * existing_bond = acurr->item(i);
 
-    if (existing_bond->is_double_bond ())     // we are hoping to place a double bond
+#ifdef DEBUG_PROCESS_RING_SYSTEM
+    const atom_number_t qq = existing_bond->other(curr);
+    cerr << "    bond to " << qq << " process_these " << process_these[qq] << " can_change_bond " << can_change_bond[curr*matoms+qq] << " has_double_bond " << has_double_bond[qq] << endl;
+#endif
+
+    if (existing_bond->is_double_bond())     // we are hoping to place a double bond
       continue;
 
-    atom_number_t j = existing_bond->other (curr);
+    const atom_number_t j = existing_bond->other(curr);
 
-    if (rid != process_these[j])
+    if (prev == j)
+      continue;
+
+    if (rid == process_these[j] || -rid == process_these[j])
+      ;
+    else
       continue;
 
     if (0 == can_change_bond[curr * matoms + j])
@@ -1220,31 +1333,52 @@ Toggle_Kekule_Form::_process_ring_system (Molecule & m,
     if (has_double_bond[j])
       continue;
 
-    m.set_bond_type_between_atoms (curr, j, DOUBLE_BOND);
+    m.set_bond_type_between_atoms(curr, j, DOUBLE_BOND);
     has_double_bond[curr] = 1;
     has_double_bond[j] = 1;
 
 #ifdef DEBUG_PROCESS_RING_SYSTEM
-    cerr << "Set double bond between atoms " << curr << " and " << j << " '" << m.smiles () << "'\n";
+    cerr << "Set double bond between atoms " << curr << " and " << j << " " << m.smiles() << "\n";
 #endif
 
     int rc;
 
-    if (zitem == atoms_to_process.number_elements () - 1)
-      rc = _all_atoms_aromatic (m, -rid, 0, tkfta);
+    if (zitem == atoms_to_process.number_elements() - 1)
+      rc = _all_atoms_aromatic(m, -rid, 0, tkfta);
     else
-      rc = _process_ring_system (m, atoms_to_process, rid, zitem + 1, tkfta);
+      rc = _process_ring_system(m, atoms_to_process, rid, zitem + 1, curr, tkfta);
 
     if (0 == rc)    // placing the double bond here didn't work, back to single bond
     {
 #ifdef DEBUG_PROCESS_RING_SYSTEM
       cerr << "Reset bond between " << curr << " and " << j << " back to single\n";
 #endif
-      m.set_bond_type_between_atoms (curr, j, SINGLE_BOND);
+      m.set_bond_type_between_atoms(curr, j, SINGLE_BOND);
       has_double_bond[curr] = 0;
       has_double_bond[j] = 0;
     }
 
+    if (rc)
+      return rc;
+  }
+
+  if (zitem == (atoms_to_process.number_elements()-1))    // maybe we have found a pyrrole
+  {
+    if (_all_atoms_aromatic(m, -rid, 0, tkfta))
+      return 1;
+    else
+      return 0;
+  }
+
+// If the atom might be a pyrrole nitrogen or furan, even though we did not place a double
+// bond, that mayu be just fine
+
+  const atomic_number_t zcurr = m.atomic_number(curr);
+
+  if (2 == m.ncon(curr) && 2 == m.nbonds(curr) && (7 == zcurr || 8 == zcurr))
+  {
+    int rc = _process_ring_system(m, atoms_to_process, rid, zitem + 1, curr, tkfta);
+    process_these[curr] = rid;
     if (rc)
       return rc;
   }
@@ -1265,16 +1399,16 @@ Toggle_Kekule_Form::_all_atoms_aromatic (Molecule & m,
                                          int display_error_message,
                                          Toggle_Kekule_Form_Temporary_Arrays & tkfta) const
 {
-  const int * process_these = tkfta.process_these ();
-  aromaticity_type_t * arom = tkfta.arom ();
+  const int * process_these = tkfta.process_these();
+  aromaticity_type_t * arom = tkfta.arom();
 
-  m.invalidate_smiles ();
+  m.invalidate_smiles();
 
-  m.aromaticity (arom);
+  m.aromaticity(arom);
 
   int rc = 1;
 
-  int matoms = m.natoms ();
+  int matoms = m.natoms();
 
   for (int i = 0; i < matoms; i++)
   {
@@ -1284,13 +1418,13 @@ Toggle_Kekule_Form::_all_atoms_aromatic (Molecule & m,
     if (! arom[i])
     {
       if (display_error_message)
-        cerr << "Toggle_Kekule_Form::_process_single_ring: atom " << i << " not aromatic (" << m.atomic_symbol (i) << ' ' << m.ncon (i) << " connections)\n";
+        cerr << "Toggle_Kekule_Form::_all_atoms_aromatic: atom " << i << " not aromatic (" << m.smarts_equivalent_for_atom(i) << ")\n";
       rc = 0;
     }
   }
 
   if (0 == rc && display_error_message)
-    cerr << "Smiles is '" << m.smiles () << "'\n";
+    cerr << "Smiles is " << m.smiles() << "\n";
 
   return rc;
 }
@@ -1303,32 +1437,27 @@ Toggle_Kekule_Form::add_bond (int a1,
   assert (a1 >= 0 && a2 >= 0 && a1 != a2);
 
   Bond * b;
-  if (IS_SINGLE_BOND (bt))
-    b = new Bond (a1, a2, SINGLE_BOND);
-  else if (IS_DOUBLE_BOND (bt))
-    b = new Bond (a1, a2, DOUBLE_BOND);
-  else if (IS_TRIPLE_BOND (bt))
-    b = new Bond (a1, a2, TRIPLE_BOND);
+  if (IS_SINGLE_BOND(bt))
+    b = new Bond(a1, a2, SINGLE_BOND);
+  else if (IS_DOUBLE_BOND(bt))
+    b = new Bond(a1, a2, DOUBLE_BOND);
+  else if (IS_TRIPLE_BOND(bt))
+    b = new Bond(a1, a2, TRIPLE_BOND);
   else
   {
     cerr << "Toggle_Kekule_Form::add_bond:unrecognised bond type " << bt << endl;
     return 0;
   }
 
-  return add_bond (b);
+  return add_bond(b);
 }
 
 int
 Toggle_Kekule_Form::add_bond (Bond * b)
 {
-  _bond.add (b);
+  _bond.add(b);
 
-  if (NULL != _correct)
-    delete [] _correct;
-
-  _correct = new int[_bond.number_elements ()];
-
-//cerr << "_correct allocated to " << _bond.number_elements () << " items\n";
+//cerr << "_correct allocated to " << _bond.number_elements() << " items\n";
 
   return 1;
 }
@@ -1336,22 +1465,22 @@ Toggle_Kekule_Form::add_bond (Bond * b)
 int
 Toggle_Kekule_Form::add_bond_from_msi_attribute (const msi_attribute & msi)
 {
-  if (3 != msi.number_int_values ())
+  if (3 != msi.number_int_values())
   {
     cerr << "Toggle_Kekule_Form::add_bond_from_msi_attribute:invalid specification '" << msi << "'\n";
     return 0;
   }
 
-  int a1 = msi.int_multi_value (0);
-  int a2 = msi.int_multi_value (1);
+  int a1 = msi.int_multi_value(0);
+  int a2 = msi.int_multi_value(1);
 
   if (a1 < 0 || a2 < 0 || a1 == a2)
   {
-    cerr << "Toggle_Kekule_Form::add_bond_from_msi_attribute:invalid atom specification '" << msi << "'\n";
+    cerr << "Toggle_Kekule_Form::add_bond_from_msi_attribute:invalid atom specification '" << msi << "' atoms " << a1 << " and " << a2 << endl;
     return 0;
   }
 
-  int b = msi.int_multi_value (2);
+  int b = msi.int_multi_value(2);
   bond_type_t bt;
 
   if (1 == b)
@@ -1364,43 +1493,46 @@ Toggle_Kekule_Form::add_bond_from_msi_attribute (const msi_attribute & msi)
     return 0;
   }
 
-  return add_bond (new Bond (a1, a2, bt));
+  return add_bond(new Bond(a1, a2, bt));
 }
 
 Toggle_Kekule_Form_Temporary_Arrays::Toggle_Kekule_Form_Temporary_Arrays (Molecule & m)
 {
-  int matoms = m.natoms ();
+  int matoms = m.natoms();
 
-  _can_change_bond = new_int (matoms * matoms, 1);
+  _can_change_bond = new_int(matoms * matoms, 1);
 
-  _process_these = new_int (matoms, numeric_limits<int>::min());
+  _process_these = new_int(matoms, std::numeric_limits<int>::min());
 
   _arom = new aromaticity_type_t[matoms];
 
-  m.aromaticity (_arom);
+  m.aromaticity(_arom);
 
   _atom = new Atom *[matoms];
 
-  m.atoms ( (const Atom **) _atom);
+  m.atoms( (const Atom **) _atom);
 
-  _has_double_bond = new_int (matoms, 0);
+  _has_double_bond = new_int(matoms, 0);
 
-  _ring_can_vary = new_int (m.nrings (), 1);
+  _ring_can_vary = new_int(m.nrings(), 1);
 
-  _atom_can_change = new_int (matoms, 1);
+  _atom_can_change = new_int(matoms, 1);
+
+  _correct = new_int(matoms);
 
   return;
 }
 
-Toggle_Kekule_Form_Temporary_Arrays::~Toggle_Kekule_Form_Temporary_Arrays ()
+Toggle_Kekule_Form_Temporary_Arrays::~Toggle_Kekule_Form_Temporary_Arrays()
 {
-  delete _can_change_bond;
-  delete _process_these;
-  delete _arom;
-  delete _atom;
-  delete _has_double_bond;
-  delete _ring_can_vary;
-  delete _atom_can_change;
+  delete [] _can_change_bond;
+  delete [] _process_these;
+  delete [] _arom;
+  delete [] _atom;
+  delete [] _has_double_bond;
+  delete [] _ring_can_vary;
+  delete [] _atom_can_change;
+  delete [] _correct;
   
   return;
 }
@@ -1423,18 +1555,18 @@ btype_back_to_mdl_form (bond_type_t b)
 }
 
 int
-Toggle_Kekule_Form::write_msi (ostream & os,
+Toggle_Kekule_Form::write_msi (std::ostream & os,
                                const IWString & ind,
                                const char * attribute_name) const
 {
-  for (int i = 0; i < _bond.number_elements (); i++)
+  for (int i = 0; i < _bond.number_elements(); i++)
   {
     const Bond * b = _bond[i];
 
-    os << ind << "(A I " << attribute_name << " (" << b->a1 () << ' ' << b->a2 () << ' ' << btype_back_to_mdl_form (b->btype ()) << "))\n";
+    os << ind << "(A I " << attribute_name << " (" << b->a1() << ' ' << b->a2() << ' ' << btype_back_to_mdl_form(b->btype()) << "))\n";
   }
 
-  return os.good ();
+  return os.good();
 }
 
 /*
@@ -1473,15 +1605,7 @@ Toggle_Kekule_Form::process (Molecule & m,
 
   _bond.add(dummy);
 
-  if (NULL != _correct)
-    delete [] _correct;
-
-  _correct = new_int (1); 
-
   int rc = process(m, s, changed);
-
-  delete [] _correct;
-  _correct = NULL;
 
   _bond.resize_keep_storage(0);
 

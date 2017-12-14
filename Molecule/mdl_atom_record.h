@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef MDL_ATOM_RECORD_H
 #define MDL_ATOM_RECORD_H
 
@@ -68,7 +50,7 @@ class MDL_Bond_Record
     atom_number_t _a1;
     atom_number_t _a2;
     int _bond_type_read_in;
-    int _directionality;
+//  int _directionality;
     int _bond_stereo;
     int _bond_topology;
     int _reacting_center_status;
@@ -76,14 +58,16 @@ class MDL_Bond_Record
   public:
     MDL_Bond_Record();
 
-    int build (const const_IWSubstring &, int natoms);
+    int build (const const_IWSubstring &, int natoms, const MDL_File_Supporting_Material &);
 
     atom_number_t a1() const { return _a1;}
     atom_number_t a2() const { return _a2;}
 
     int bond_type_read_in() const { return _bond_type_read_in;}
 
-    int directionality() const { return _directionality;}
+//  int directionality() const { return _directionality;}
+
+    int bond_stereo() const { return _bond_stereo;}
 
     int bond_topology() const { return _bond_topology;}
 

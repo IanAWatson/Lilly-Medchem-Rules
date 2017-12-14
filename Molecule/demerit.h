@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef IW_DEMERIT_H
 #define IW_DEMERIT_H
 
@@ -23,6 +5,19 @@
 #include "iwstring.h"
 
 #define DEFAULT_REJECTION_THRESHOLD 100
+
+class Demerit_and_Reason
+{
+  private:
+    const int _demerit;
+    const IWString _reason;
+
+  public:
+    Demerit_and_Reason(const int d, const const_IWSubstring & r) : _demerit(d), _reason(r) {};
+
+    int demerit() const { return _demerit;}
+    const IWString & reason() const { return _reason;}
+};
 
 /*
   The variable _rejected keep track of whether or not a molecule
@@ -32,42 +27,65 @@
 class Demerit
 {
   private:
+    resizable_array_p<Demerit_and_Reason> _demerit;
     int _score;
-    int _number_different_demerits_applied;
-    IWString _types;
+
+    int _append_demerit_value_with_reason;
+
+//  We can optionally hold demerit values associated with each atom.
+//  can be something we allocate, or something given to us
+
+    int * _atomic_demerit;
+    int _need_to_delete_atomic_demerit;    // will be true if we allocated it
 
 //  private functions
 
-    void _increment (int);
-//  void _add_hit_type (const char *);
-//  void _add_hit_type (const IWString &);
-    void _add_hit_type (int, const const_IWSubstring &);
+    int _add_demerit(const int, const const_IWSubstring &);
+    void _increment(int, const const_IWSubstring &);
+//  void _add_hit_type(const char *);
+//  void _add_hit_type(const IWString &);
+    void _add_hit_type(int, const const_IWSubstring &);
 
   public:
-    Demerit ();
+    Demerit();
+    ~Demerit();
 
-    int ok () const;
-    int debug_print (ostream &) const;
+    int ok() const;
+    int debug_print(std::ostream &) const;
 
-    int score () const { return _score;};
-    int number_different_demerits_applied () const { return _number_different_demerits_applied;}
+    void set_append_demerit_value_with_reason(const int s) { _append_demerit_value_with_reason = s;}
 
-    const IWString & types () const { return _types;}
+    int initialise_atomic_demerits(const int matoms);
+    int set_atomic_demerit_array(int *);
 
-//  int extra (int, const char *);
-//  int extra (int, const IWString &);
-    int extra (int, const const_IWSubstring);
-    int reject (const const_IWSubstring);
-//  int reject (const char *);
-//  int reject (const IWString &);
-    int rejected () const;
-    int rejected_by_single_rule () const { return 1 == _number_different_demerits_applied;}
+    int * atomic_demerit() const { return _atomic_demerit;}
 
-    int write_in_tdt_form (ostream &) const;
+    int score() const { return _score;};
+    int number_different_demerits_applied() const { return _demerit.number_elements();}
+
+//  int max_demerit_encountered() const { return _max_demerit_encountered;}
+//  const IWString & max_demerit_reason() const { return _max_demerit_reason;}
+
+//  const IWString & types() const { return _types;}
+
+//  int extra(int, const char *);
+//  int extra(int, const IWString &);
+    int extra(int, const const_IWSubstring);
+    int reject(const const_IWSubstring);
+//  int reject(const char *);
+//  int reject(const IWString &);
+    int rejected() const;
+    int rejected_by_single_rule() const { return 1 == _demerit.number_elements();}
+
+    void do_sort();
+
+    int write_in_tdt_form(std::ostream &) const;
+
+    const resizable_array_p<Demerit_and_Reason> & demerits() const { return _demerit;}
 };
 
-extern void set_rejection_threshold (int);
-extern int  rejection_threshold ();
+extern void set_rejection_threshold(int);
+extern int  rejection_threshold();
 
 /*
   Sept 2004. Dan Robertson needs to get all reasons separated with
@@ -75,7 +93,7 @@ extern int  rejection_threshold ();
   _TYPE variable differently
 */
 
-extern void set_demerit_reason_contains_individual_demerits (int);
-extern void set_store_demerit_reasons_like_tsubstructure (int);
+extern void set_demerit_reason_contains_individual_demerits(int);
+extern void set_store_demerit_reasons_like_tsubstructure(int);
 
 #endif

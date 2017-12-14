@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef IW_ELEMENT_TRANS_H
 #define IW_ELEMENT_TRANS_H
 
@@ -50,7 +32,7 @@ class Element_Transformation
     Element_Transformation ();
 
     int ok () const;
-    int debug_print (ostream &) const;
+    int debug_print (std::ostream &) const;
 
 //  int build (const char *);
     int build (const IWString &);
@@ -66,7 +48,7 @@ class Element_Transformations : public resizable_array_p<Element_Transformation>
   public:
 
     int ok () const;
-    int debug_print (ostream &) const;
+    int debug_print (std::ostream &) const;
 
     int active () const { return _number_elements;}
 
@@ -81,7 +63,7 @@ class Element_Transformations : public resizable_array_p<Element_Transformation>
 
 class Command_Line;
 
-extern int display_standard_etrans_options (ostream &, char = 't');
+extern int display_standard_etrans_options (std::ostream &, char = 't');
 
 extern int process_element_transformations (Command_Line &,
                                             Element_Transformations &,

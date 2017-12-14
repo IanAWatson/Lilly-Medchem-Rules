@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2012  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
 
 #if defined (IWSGI) || (__GNUC_MINOR__ == 95)
@@ -30,6 +12,7 @@
 #include "output.h"
 #include "molecule.h"
 #include "smiles.h"
+#include "mdl.h"
 
 void
 Molecule_Output_Object::_default_values()
@@ -86,7 +69,7 @@ Molecule_Output_Object::ok() const
 }
 
 int
-Molecule_Output_Object::debug_print (ostream & os) const
+Molecule_Output_Object::debug_print (std::ostream & os) const
 {
   assert (os.good());
 
@@ -96,7 +79,7 @@ Molecule_Output_Object::debug_print (ostream & os) const
     os << "Output types are";
     for (int i = 0; i < _output_types.number_elements(); i++)
     {
-      os << " " << suffix_for_file_type (_output_types[i]);
+      os << " " << suffix_for_file_type(_output_types[i]);
     }
     os << endl;
   }
@@ -135,7 +118,7 @@ int
 Molecule_Output_Object::good() const
 {
   if (_use_stdout)
-    return cout.good();
+    return std::cout.good();
 
   if (0 == _number_elements)
   {
@@ -207,7 +190,7 @@ Molecule_Output_Object::new_stem (const const_IWSubstring & nstem,
   assert (ok());
   assert (nstem.length());
 
-  resize (0);
+  resize(0);
 
 #ifdef DEBUG_NEW_STEM
   cerr << "Molecule_Output_Object::new_stem: setting stem to '" << nstem << "' molecules per file = " << _molecules_per_file << " ntypes = " << _output_types.number_elements() << endl;
@@ -241,7 +224,7 @@ Molecule_Output_Object::new_stem (const const_IWSubstring & nstem,
     return 1;
   }
 
-  resize (nt);
+  resize(nt);
 
   if (0 == nt)
   {
@@ -249,7 +232,7 @@ Molecule_Output_Object::new_stem (const const_IWSubstring & nstem,
     return 0;
   }
 
-  return _open_new_stems (nstem, keep_suffix);
+  return _open_new_stems(nstem, keep_suffix);
 }
 
 int
@@ -264,7 +247,7 @@ Molecule_Output_Object::write (Molecule & m)
 
     _molecules_written++;
 
-    if (! m.write_molecule (cout, _output_types[0]))
+    if (! m.write_molecule(std::cout, _output_types[0]))
       return 0;
 
     if (0 == _number_elements)    // just stdout
@@ -277,19 +260,22 @@ Molecule_Output_Object::write (Molecule & m)
     return 0;
   }
 
+  int need_new_stem = 0;
+  if (_name_token_for_fname >= 0)
+    need_new_stem = 1;
+  else if (0 == _molecules_per_file)   // no limit
+    ;
+  else if (0 == _molecules_written % _molecules_per_file)
+    need_new_stem = 1;
 
-  if (0 == _molecules_per_file)    // no limit on molecules per file
-    ;
-  else if (0 != _molecules_written % _molecules_per_file)    // not changing the output stem just now
-    ;
-  else
+  if (need_new_stem)
   {
-    IWString save_stem (_stem);
-    IWString nstem;
+    IWString nstem;       // a new file name stem if needed
+    IWString save_stem;    // restore if needed
 
     if (_name_token_for_fname >= 0)
     {
-      if (! m.name().word (_name_token_for_fname, nstem))
+      if (! m.name().word(_name_token_for_fname, nstem))
       {
         cerr << "Molecule_Output_Object::_write: cannot access " << _name_token_for_fname << " token in '" << m.name() << "'\n";
         return 0;
@@ -297,23 +283,26 @@ Molecule_Output_Object::write (Molecule & m)
     }
     else
     {
+      save_stem  = _stem;
+
       nstem = _stem;
       nstem << _files_created;
     }
 
-//  cerr << "Opening new stem '" << nstem << "'\n";
-
-    if (! _open_new_stems (nstem))
+    if (! _open_new_stems(nstem))
       return 0;
 
-    _stem = save_stem;
+    if (save_stem.length())
+      _stem = save_stem;
   }
+
+//cerr << "Setup to write " << _number_elements << " instances of '" << m.name() << " to '" << _stem << "'\n";
 
   int rc = 1;
 
   for (int i = 0; i < _number_elements; i++)
   {
-    if (! _things[i]->write_molecule (&m))
+    if (! _things[i]->write_molecule(&m))
       rc = 0;
   }
 
@@ -325,7 +314,7 @@ Molecule_Output_Object::write (Molecule & m)
 int
 Molecule_Output_Object::write (Molecule * m)
 {
-  return write (*m);
+  return write(*m);
 }
 
 int
@@ -333,7 +322,7 @@ Molecule_Output_Object::_open_new_stems (const const_IWSubstring & nstem,
                                 int keep_suffix)
 {
   if (_number_elements)
-    resize_keep_storage (0);
+    resize_keep_storage(0);
 
 //cerr << "Opening stem '" << nstem << "'\n";
 
@@ -344,20 +333,20 @@ Molecule_Output_Object::_open_new_stems (const const_IWSubstring & nstem,
     IWString tmp;
     int output_type = _output_types[i];
 
-    if (! create_file_with_appropriate_name (nstem, tmp, output_type, keep_suffix))
+    if (! create_file_with_appropriate_name(nstem, tmp, output_type, keep_suffix))
     {
       cerr << "Cannot process file type " << output_type << endl;
       return 0;
     }
 
-    ofstream_and_type * n = new ofstream_and_type (output_type, tmp);
+    ofstream_and_type * n = new ofstream_and_type(output_type, tmp);
     if (! n->good())
     {
       cerr << "Molecule_Output_Object::new_stem: cannot open '" << tmp << "'\n";
       delete n;
     }
     else
-      add (n);
+      add(n);
 
 #ifdef DEBUG_NEW_STEM
     cerr << "Opened file '" << tmp << endl;
@@ -378,7 +367,7 @@ Molecule_Output_Object::_write_single_file_per_molecule (Molecule & m)
 
   if (_name_token_for_fname >= 0)
   {
-    if (! m.name().word (_name_token_for_fname, name_stem))
+    if (! m.name().word(_name_token_for_fname, name_stem))
     {
       cerr << "Molecule_Output_Object::_write_single_file_per_molecule: cannot access " << _name_token_for_fname << " token in '" << m.name() << "'\n";
       return 0;
@@ -400,9 +389,9 @@ Molecule_Output_Object::_write_single_file_per_molecule (Molecule & m)
 
     int output_type = _output_types[i];
 
-    fname << '.' << suffix_for_file_type (output_type);
+    fname << '.' << suffix_for_file_type(output_type);
 
-    ofstream output (fname.null_terminated_chars(), ios::out);
+    ofstream output(fname.null_terminated_chars(), ios::out);
 
     if (! output.good())
     {
@@ -413,7 +402,7 @@ Molecule_Output_Object::_write_single_file_per_molecule (Molecule & m)
 
   for (int i = 0; i < _output_types.number_elements(); i++)
   {
-    if (! m.write_molecule (output, output_type))
+    if (! m.write_molecule(output, output_type))
       return 0;
 
     rc++;
@@ -432,8 +421,8 @@ Molecule_Output_Object::_suffix_already_used (const char * suffix)
 {
   for (int i = 0; i < _output_types.number_elements(); i++)
   {
-    const char * si = suffix_for_file_type (_output_types[i]);
-    if (0 == ::strcmp (suffix, si))
+    const char * si = suffix_for_file_type(_output_types[i]);
+    if (0 == ::strcmp(suffix, si))
     {
       return 1;
     }
@@ -443,43 +432,44 @@ Molecule_Output_Object::_suffix_already_used (const char * suffix)
 }
 
 int
-Molecule_Output_Object::_add_output_type (int otype, const const_IWSubstring & c)
+Molecule_Output_Object::_add_output_type (int otype, const const_IWSubstring & c,
+                                          MDL_File_Supporting_Material & mdlfos)
 {
   if (IWMTYPE_CHM == otype)    // need to add two different types
   {
-    if (! _add_output_type (IWMTYPE_PSF, c))
+    if (! _add_output_type(IWMTYPE_PSF, c, mdlfos))
       return 0;
-    if (! _add_output_type (IWMTYPE_CRD, c))
+    if (! _add_output_type(IWMTYPE_CRD, c, mdlfos))
       return 0;
 
     return 1;
   }
 
-  if (_output_types.contains (otype))
+  if (_output_types.contains(otype))
   {
     cerr << "Molecule_Output_Object::determine_output_types: duplicate output type '" <<
             c << "' ignored\n";
     return 1;    // not fatal, just ignore these
   }
 
-  const char * suffix = suffix_for_file_type (otype);
-  if (_suffix_already_used (suffix))
+  const char * suffix = suffix_for_file_type(otype);
+  if (_suffix_already_used(suffix))
   {
     cerr << "Molecule_Output_Object::determine_output_types: suffix '" << suffix << "' already specified\n";
     return 0;
   }
 
-  _output_types.add (otype);
+  _output_types.add(otype);
   if (SDF == otype)
   {
-    set_write_mdl_charges_as_m_chg (1);
+    mdlfos.set_write_mdl_charges_as_m_chg(1);
   }
 
   return 1;
 }
 
 static int
-display_output_help_screen (ostream & os, char opt)
+display_output_help_screen (std::ostream & os, char opt)
 {
   os << "The following qualifiers are recognised by the -" << opt << " flag\n";
 
@@ -500,11 +490,9 @@ display_output_help_screen (ostream & os, char opt)
   os << " -" << opt << " mdlWincch   write stereo flags (1,2) without special consideration for\n";
   os << "                explicit Hydrogens - may give incorrect values\n";
   os << " -" << opt << " mdlMEND     always add the M  END record to MDL files\n";
-  os << " -" << opt << " pdbso       write the atoms in PDB files in sequence (fragment) order\n";
-  os << " -" << opt << " pdbnws      label atoms in pdb files by number within sequence\n";
-  os << " -" << opt << " pdbec       label atoms in pdb files by element C1 C2 C3 N1 O1 O2 C4\n";
-  os << " -" << opt << " pdbsname    use stored atom names when writing PDB files\n";
-  os << " -" << opt << " <type>      specify one or more output types\n";
+  os << " -" << opt << " RxSymbol    when writing R1 elements to MDL files, do NOT translate to R# form\n";
+  os << " -" << opt << " smi3d       append coordinates after smiles\n";
+  os << " -" << opt << " <type>      specify one or more output types (smi,usmi,nausmi,rsmi,sdf,tdt,mol2,pdb,msi,marvin)\n";
 
   return os.good();
 }
@@ -515,29 +503,31 @@ Molecule_Output_Object::determine_output_types (const Command_Line & cl,
 {
   assert (0 == _output_types.number_elements());
 
-  _output_types.resize (cl.option_count (opt));
+  MDL_File_Supporting_Material * mdlfos = global_default_MDL_File_Supporting_Material();
+
+  _output_types.resize(cl.option_count(opt));
 
   int i = 0;
   const_IWSubstring c;
-  while (cl.value (opt, c, i++))
+  while (cl.value(opt, c, i++))
   {
     if ("flush" == c)
     {
-      set_flush_files_after_writing_each_molecule (1);
+      set_flush_files_after_writing_each_molecule(1);
       continue;
     }
 
     if ("info" == c)
     {
-      set_write_extra_text_info (1);
+      set_write_extra_text_info(1);
       continue;
     }
 
-    if (c.starts_with ("MULT=") || c.starts_with ("mult="))
+    if (c.starts_with("MULT=") || c.starts_with("mult="))
     {
-      c.remove_leading_chars (5);
+      c.remove_leading_chars(5);
 
-      if (! c.numeric_value (_molecules_per_file) || _molecules_per_file < 1)
+      if (! c.numeric_value(_molecules_per_file) || _molecules_per_file < 1)
       {
         cerr << "Invalid molecules per file specification '" << c << "'\n";
         return 0;
@@ -546,16 +536,16 @@ Molecule_Output_Object::determine_output_types (const Command_Line & cl,
       continue;
     }
 
-    if (c.starts_with ("MULT") || c.starts_with ("mult"))
+    if (c.starts_with("MULT") || c.starts_with("mult"))
     {
       _molecules_per_file = 1;
       continue;
     }
 
-    if (c.starts_with ("TOKEN=") || c.starts_with ("token="))
+    if (c.starts_with("TOKEN=") || c.starts_with("token="))
     {
-      c.remove_leading_chars (6);
-      if (! c.numeric_value (_name_token_for_fname) || _name_token_for_fname < 1)
+      c.remove_leading_chars(6);
+      if (! c.numeric_value(_name_token_for_fname) || _name_token_for_fname < 1)
       {
         cerr << "The TOKEN= qualifier must be followed by a valid word number\n";
         return 0;
@@ -565,127 +555,114 @@ Molecule_Output_Object::determine_output_types (const Command_Line & cl,
       continue;
     }
 
-    if (c.starts_with ("STEM=") || c.starts_with ("stem="))
+    if (c.starts_with("STEM=") || c.starts_with("stem="))
     {
-      c.remove_leading_chars (5);
+      c.remove_leading_chars(5);
       _stem = c;
       continue;
     }
 
     if ("NOCT" == c)
     {
-      set_include_cis_trans_in_smiles (0);
+      set_include_cis_trans_in_smiles(0);
       continue;
     }
 
     if ("ISIS" == c)
     {
-      _output_types.add_if_not_already_present (SDF);
-      set_write_isis_standard (1);
-      set_write_mdl_charges_as_m_chg (1);
+      _output_types.add_if_not_already_present(SDF);
+      mdlfos->set_write_isis_standard(1);
+      mdlfos->set_write_mdl_charges_as_m_chg(1);
       continue;
     }
 
     if ("AROM" == c)
     {
-      set_mdl_write_aromatic_bonds (1);
+      mdlfos->set_mdl_write_aromatic_bonds(1);
       continue;
     }
 
     if ("V30" == c)
     {
-      set_write_v30_mdl_files (1);
-      _output_types.add (SDF);
+      mdlfos->set_write_v30_mdl_files(1);
+      _output_types.add_if_not_already_present(SDF);
       continue;
     }
 
     if ("mdlWisonum" == c)
     {
-      set_mdl_write_isotopes_as_numbers_rather_than_differences_from_normal (1);
+      mdlfos->set_write_isotopes_as_numbers_rather_than_differences_from_normal(1);
       continue;
     }
 
     if ("mdlWisoMnum" == c)
     {
-      set_mdl_write_M_isotopes_as_numbers_rather_than_differences_from_normal (1);
+      mdlfos->set_write_M_isotopes_as_numbers_rather_than_differences_from_normal(1);
       continue;
     }
 
     if ("mdlWincch" == c)
     {
-      set_mdl_write_h_correct_chiral_centres (0);
+      mdlfos->set_mdl_write_h_correct_chiral_centres(0);
       continue;
     }
 
     if ("mdlMEND" == c)
     {
-      set_write_mdl_m_end_record(2);   // the 2 indicates high priority, over-rides defaults
+      mdlfos->set_write_mdl_m_end_record(2);   // the 2 indicates high priority, over-rides defaults
+      continue;
+    }
+
+    if ("RxSymbol" == c)
+    {
+      mdlfos->set_write_Rn_groups_as_element(1);
       continue;
     }
 
     if ("nochiral" == c)
     {
-      set_include_chiral_info_in_smiles (0);
-      set_include_chiral_info_in_mdl_outputs (0);
+      set_include_chiral_info_in_smiles(0);
+      mdlfos->set_include_chiral_info_in_mdl_outputs(0);
       continue;
     }
 
     if ("nochiralflag" == c)
     {
-      set_write_mdl_chiral_flags (0);
+      mdlfos->set_write_mdl_chiral_flags(0);
       continue;
     }
 
     if ("DOS" == c)
     {
-      set_write_DOS_records (1);
+      set_write_DOS_records(1);
       continue;
     }
 
-/*  if ("pdbso" == c || "pdbfo" == c)
+    if ("smi3d" == c)
     {
-      set_write_pdb_files_in_fragment_order(1);
+      set_append_coordinates_after_each_atom(1);
       continue;
     }
-
-    if ("pdbec" == c)
-    {
-      set_pdb_number_by_element_count(1);
-      continue;
-    }
-
-    if ("pdbnws" == c)
-    {
-      set_pdb_number_within_sequence(1);
-      continue;
-    }
-
-    if ("pdbsname" == c)
-    {
-      set_store_pdb_atom_information(1);
-      set_use_stored_atom_information_when_writing_pdb_files(1);
-      continue;
-    }*/
 
     if ("help" == c)
     {
-      display_output_help_screen (cerr, opt);
-      exit (1);
+      display_output_help_screen(cerr, opt);
+      exit(1);
     }
 
-    int tmp = string_to_file_type (c);
+    int tmp = string_to_file_type(c);
     if (0 == tmp)
     {
       cerr << "Molecule_Output_Object::determine_output_types:Unrecognised output type '" << c << "'\n";
       return 0;
     }
 
-    if (! _add_output_type (tmp, c))
+    if (! _add_output_type(tmp, c, *mdlfos))
       return 0;
   }
 
   if (0 == _output_types.number_elements())
-    _output_types.add (SMI);
+    _output_types.add(SMI);
 
   if (_name_token_for_fname >= 0 && _molecules_per_file <= 0)
     _molecules_per_file = 1;
@@ -702,26 +679,26 @@ Molecule_Output_Object::add_output_type (int ot)
     return 0;
   }
 
-  if (_output_types.contains (ot))
+  if (_output_types.contains(ot))
   {
     cerr << "Molecule_Output_Object::add_output_type:type " << ot << " already specified. Ignored\n";
     return 0;
   }
 
-  const char * suffix = suffix_for_file_type (ot);
+  const char * suffix = suffix_for_file_type(ot);
   if (NULL == suffix)
   {
     cerr << "Molecule_Output_Object::add_output_type: unrecognised type " << ot << endl;
     return 0;
   }
 
-  if (_suffix_already_used (suffix))
+  if (_suffix_already_used(suffix))
   {
     cerr << "Molecule_Output_Object::add_output_type: suffix '" << suffix << "' already specified\n";
     return 0;
   }
 
-  _output_types.add (ot);
+  _output_types.add(ot);
 
   return _output_types.number_elements();
 }
@@ -740,7 +717,7 @@ Molecule_Output_Object::would_use_name (const char * name) const
     IWString tmp;
 
     int output_type = _output_types[i];
-    if (! create_file_with_appropriate_name (name, tmp, output_type))
+    if (! create_file_with_appropriate_name(name, tmp, output_type))
     {
       cerr << "Cannot process file type " << output_type << endl;
       return 0;
@@ -769,7 +746,7 @@ Molecule_Output_Object::would_use_name (const const_IWSubstring & proposed_stem,
     IWString tmp;
 
     int output_type = _output_types[i];
-    if (! create_file_with_appropriate_name (proposed_stem, tmp, output_type))
+    if (! create_file_with_appropriate_name(proposed_stem, tmp, output_type))
     {
       cerr << "Cannot process file type " << output_type << endl;
       return 0;
@@ -795,14 +772,14 @@ Molecule_Output_Object::would_overwrite_input_files (const Command_Line & cl,
   for (int i = 0; i < cl.number_elements(); i++)
   {
     const char * fname = cl[i];
-    if (would_use_name (proposed_stem, fname))
+    if (would_use_name(proposed_stem, fname))
       return 1;
   }
 
   return 0;
 }
 
-ostream &
+std::ostream &
 Molecule_Output_Object::stream_for_type (int ftype) const
 {
   for (int i = 0; i < _number_elements; i++)
@@ -812,5 +789,5 @@ Molecule_Output_Object::stream_for_type (int ftype) const
   }
 
   cerr << "Molecule_Output_Object::stream_for_type:no stream for type " << ftype << endl;
-  return cout;
+  return std::cout;
 }

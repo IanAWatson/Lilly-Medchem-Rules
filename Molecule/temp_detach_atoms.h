@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef TMP_DETACH_ATOMS
 #define TMP_DETACH_ATOMS
 
@@ -53,6 +35,11 @@ class Temp_Detach_Atoms
     int _need_to_reattach;
 
     int * _connection;
+
+//  If the atom helps define a chiral centre, then we must make a copy of that chiral centre
+//  so we can re-create it when re-attaching. No need to worry with non isotopic Hydrogen atoms
+
+    resizable_array<Chiral_Centre *> _chiral_centre;
 
     bond_type_t _bt;
 

@@ -1,26 +1,9 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef IW_ARCHIVE1_H
 #define IW_ARCHIVE1_H
 
 #include <iostream>
-using namespace std;
+using std::cerr;
+using std::endl;
 
 class msi_object;
 class const_IWSubstring;
@@ -45,13 +28,13 @@ class iwarchive : public resizable_array<T>
     iwarchive (const iwarchive<T> &);
 
     int ok () const;
-    int debug_print (ostream & = cerr) const;
+    int debug_print (std::ostream & = cerr) const;
 
     int set_match_any (int i);
     int match_any () const { return _match_any;};
 
     int add_values_from_msi_object (const msi_object *, const char *);
-    int write_msi (ostream &, const char *, int) const;
+    int write_msi (std::ostream &, const char *, int) const;
 
     int add (T);      // we need to override the default add ()
 
@@ -65,8 +48,8 @@ class iwarchive : public resizable_array<T>
     int specification_from_string (const const_IWSubstring &);
 };
 
-template <typename T>  ostream &
-      operator << (ostream &, const iwarchive<T> &);
+template <typename T>  std::ostream &
+      operator << (std::ostream &, const iwarchive<T> &);
 
 #if (IW_IMPLEMENTATIONS_EXPOSED) || defined(IWARCHIVE_IMPLEMENTATION)
 
@@ -96,7 +79,7 @@ iwarchive<T>::ok () const
 
 template <typename T>
 int
-iwarchive<T>::debug_print (ostream & os) const
+iwarchive<T>::debug_print (std::ostream & os) const
 {
   os << "iwarchive<T>::debug_print:\n";
   if (! ok ())
@@ -244,7 +227,7 @@ iwarchive<T>::add_values_from_msi_object (const msi_object * msi,
 
 template <typename T>
 int
-iwarchive<T>::write_msi (ostream & os,
+iwarchive<T>::write_msi (std::ostream & os,
                          const char * attribute_name,
                          int indentation) const
 {
@@ -268,8 +251,8 @@ iwarchive<T>::write_msi (ostream & os,
 #if (IW_IMPLEMENTATIONS_EXPOSED) || defined(IWARCHIVE_OP_IMPLEMENTATION)
 
 template <class T>
-ostream &
-operator << (ostream & os, const iwarchive<T> & qq)
+std::ostream &
+operator << (std::ostream & os, const iwarchive<T> & qq)
 {
   os << "iwarchive: ";
   if (qq.match_any ())

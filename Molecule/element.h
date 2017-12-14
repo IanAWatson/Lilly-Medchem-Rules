@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 /*
   Elements are mostly defined by their atomic numbers.
 */
@@ -23,9 +5,9 @@
 #ifndef ELEMENT_H
 #define ELEMENT_H
 
-// Rutherfordium
+// Make sure you adjust the alphabetic_element_symbol_order array in molecule.cc when adding new elements
 
-#define HIGHEST_ATOMIC_NUMBER 112
+#define HIGHEST_ATOMIC_NUMBER 118
 
 #define REASONABLE_ATOMIC_NUMBER(z) ((z) >= 0 && (z) <= HIGHEST_ATOMIC_NUMBER)
 
@@ -33,8 +15,6 @@ class IWString;
 class const_IWSubstring;
 
 #include <iostream>
-
-using namespace std;
 
 #include "iwstring.h"
 
@@ -79,6 +59,15 @@ class Element {
 
     int _permanent_aromatic;
 
+//  June 2016. Need some quick means of uniquely identifying elements.
+
+    int _unique_id;
+
+// October 2016. When we are dealing with atoms as peptides, handy to know
+// if a peptide is a natural one or not.
+
+    int _natural_peptide;
+
 //  private functions
 
     void _non_periodic_table_element_constructor (const char * s, int nchars);
@@ -96,7 +85,7 @@ class Element {
     ~Element ();
 
     int ok () const;      // audit function
-    int debug_print (ostream &) const;
+    int debug_print (std::ostream &) const;
 
     atomic_number_t atomic_number () const;
 
@@ -110,6 +99,9 @@ class Element {
     void set_aromatic_symbol (const char * s) { _aromatic_symbol = s;}
 
     int atomic_symbol_hash_value () const { return _atomic_symbol_hash_value;}
+
+    int unique_id() const { return _unique_id;}
+    void set_unique_id(int s) { _unique_id = s;}   // should never be set by the user
 
     int read_ptable_record (const const_IWSubstring &);
 
@@ -155,9 +147,12 @@ class Element {
 
     int permanent_aromatic () const { return _permanent_aromatic;}
     void set_permanent_aromatic (int s) { _permanent_aromatic = s;}
+
+    int natural_peptide() const { return _natural_peptide;}
+    void set_natural_peptide(const int s) { _natural_peptide = s;}
 };
 
-extern void  debug_print_all_elements (ostream &);
+extern void  debug_print_all_elements (std::ostream &);
 
 /*
   All the get_element_from_symbol variants convert the first char to uppercase
@@ -199,7 +194,7 @@ extern int process_elements    (const Command_Line &, int = 0, char = 'E');
 
 extern void set_include_isotopes_in_smiles (int);
 
-extern int display_standard_element_options (ostream &);
+extern int display_standard_element_options (std::ostream &);
 
 /*
   Daylight insists that explicit Hydrogens have square brackets. We
@@ -208,7 +203,7 @@ extern int display_standard_element_options (ostream &);
 
 extern void set_explicit_hydrogens_need_square_brackets_in_smiles (int);
 
-extern int print_element_hash_table (ostream & os);
+extern int print_element_hash_table (std::ostream & os);
 
 extern void set_atomic_symbols_can_have_arbitrary_length (int s);
 extern int  atomic_symbols_can_have_arbitrary_length ();

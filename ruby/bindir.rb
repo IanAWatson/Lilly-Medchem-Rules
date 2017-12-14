@@ -1,15 +1,15 @@
 class Bindir
   include Enumerable
 
-  def initialize (home)
+  def initialize(home)
     @uname = `uname`.chomp!
     @version = `uname -r`.chomp!
     @bindir = Array.new
 
-    set_home (home)
+    set_home(home)
   end
 
-  def add_dir (dir)
+  def add_dir(dir)
 
     return 0 unless FileTest.directory?(dir)
 
@@ -27,11 +27,6 @@ class Bindir
     rc += add_dir("#{home}/bin")
 
     rc += add_dir("#{home}/bin/#{@uname}/")
-
-    if @version =~ /smp$/
-      version = @version.gsub(/smp$/, "")
-      rc += add_dir("#{home}/bin/#{@uname}-#{@version}/")
-    end
 
     rc += add_dir("#{home}/bin/#{@uname}-#{@version}/")
 

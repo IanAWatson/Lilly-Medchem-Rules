@@ -1,28 +1,59 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
+#include <iostream>
 
 /*
   hash functions for hash maps
 */
 
 #include "iw_stl_hash_map.h"
+
+
+#ifdef OLD_VERSION
+#include "primes.h"
+size_t
+IWStringHash::operator () (const IWString & s) const
+{
+  int lens = s.length ();
+
+  size_t rc = 7927 * lens;
+
+  const unsigned int * q = (const unsigned int *) s.rawchars ();    // beware alignment
+  int nw = lens >> 2;      // divide by four - beware word sizes 32/64
+
+  if (lens <= 4)
+  {
+    for (int i = 0; i < s.length (); i++)
+    {
+      rc += primes[i] * s[i];
+    }
+  }
+  else if (lens < 100)
+  {
+    for (int i = 0; i < nw; i++)
+    {
+      rc += primes[i] * q[i];
+    }
+
+    rc += s.last_item () * 3907;
+  }
+  else if (lens < 500)
+  {
+    nw--;
+    for (int i = 0; i < nw; i += 4)
+    {
+      rc +=  primes[i] * q[i];
+    }
+
+    rc += s.last_item () * s.length () + q[17];
+  }
+  else
+  {
+    rc += 3917 * q[0] + 467 * s[lens >> 1] + s.last_item ();
+  }
+
+  return rc;
+}
+#endif
 
 /*
   This seems to be the fastest one I've found so far
@@ -42,6 +73,7 @@ IWStringHash::operator () (const IWString & s) const
 
   for (int i = 0; i < n; i++)
   {
+//  rc = q[i] + (rc << 6) + (rc << 16) - rc;
     rc = ((rc << 5) + rc) + q[i];
   }
 

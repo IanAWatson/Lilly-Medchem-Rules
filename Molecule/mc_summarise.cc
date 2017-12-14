@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 /*
   Examine the output of tp1_pipe.sh and create a formatted report
 */
@@ -55,15 +37,18 @@ static IWString prepend_string;
 
 static int prepend_d = 1;
 
-static IW_STL_Hash_Map_int reason;
+static IW_STL_Hash_Map_int reason_bad;
+static IW_STL_Hash_Map_int reason_survivor;
 
 static int accumulate_reasons = 0;
 
 static extending_resizable_array<int> demerits_per_molecule;
 
-static char separator = ' ';
+static char output_separator = ' ';
 
 static int latex_table = 0;
+
+static int asciidoc_table = 0;
 
 static int gsub_spaces_in_reason_to_underscore = 0;
 
@@ -71,6 +56,10 @@ static int bad0_demerit = 200;
 static int bad12_demerit = 100;
 
 static int produce_demerit_scaling_file = 0;
+
+static int suppress_normal_output = 0;
+
+static int process_rejection_files = 1;
 
 static void
 usage (int rc)
@@ -86,18 +75,22 @@ usage (int rc)
   cerr << " -u             change spaces in reason fields to underscores\n";
   cerr << " -t             give report of which reasons hit\n";
   cerr << " -T <fname>     write report on rejection reasons to <fname>\n";
+  cerr << " -b             in the -T file, produce two column format rejections | demerits\n";
   cerr << " -X             produce table in LaTex format\n";
+  cerr << " -A             produce table in AsciiDoc format\n";
+  cerr << " -m <n>         in the table file, discard any reason with <n> or fewer examples\n";
   cerr << " -c             produce a demerit based scale factor file\n";
   cerr << " -f <n>         numeric demerit value for rejections (default 100)\n";
+  cerr << " -k             only process the survivors file (do not process bad0, bad1...)\n";
   cerr << " -v             verbose output\n";
 
   exit (rc);
 }
 
 static int
-write_demerit_value (const const_IWSubstring & id,
-                     int demerit,
-                     IWString_and_File_Descriptor & output)
+write_demerit_value(const const_IWSubstring & id,
+                    const int demerit,
+                    IWString_and_File_Descriptor & output)
 {
   molecules_written++;
 
@@ -106,7 +99,10 @@ write_demerit_value (const const_IWSubstring & id,
   else if (demerit > 0)
     demerited_molecules++;
 
-  output << id << separator;
+  if (suppress_normal_output)
+    return 1;
+
+  output << id << output_separator;
 
   if (prepend_string.length())
     output << prepend_string;
@@ -132,9 +128,9 @@ write_demerit_value (const const_IWSubstring & id,
 static IW_Regular_Expression d_parentheses ("^D\\([0-9]+\\)$");
 
 static int
-process_from_iwdemerit (const const_IWSubstring & buffer,
-                        int must_have_demerit,
-                        IWString_and_File_Descriptor & output)
+process_from_iwdemerit(const const_IWSubstring & buffer,
+                       int must_have_demerit,
+                       IWString_and_File_Descriptor & output)
 {
   int i = 0;
 
@@ -189,7 +185,8 @@ process_from_iwdemerit (const const_IWSubstring & buffer,
     if (include_zero_demerit_molecules)
     {
       write_demerit_value (id, 0, output);
-      output << '\n';
+      if (! suppress_normal_output)
+        output << '\n';
     }
 
     return output.good ();
@@ -213,10 +210,15 @@ process_from_iwdemerit (const const_IWSubstring & buffer,
     {
       myreason.strip_leading_blanks();
 
-      output << separator << myreason;
+      if (! suppress_normal_output)
+        output << output_separator << myreason;
 
-      if (accumulate_reasons)
-        reason[myreason]++;
+      if (! accumulate_reasons)
+        ;
+      else if (d >= 100)
+        reason_bad[myreason]++;
+      else
+        reason_survivor[myreason]++;
 
       demerit_reasons_this_molecule++;
     }
@@ -224,9 +226,10 @@ process_from_iwdemerit (const const_IWSubstring & buffer,
     demerits_per_molecule[demerit_reasons_this_molecule]++;
   }
 
-  output << '\n';
+  if (! suppress_normal_output)
+    output << '\n';
 
-  output.write_if_buffer_holds_more_than(32768);
+  output.write_if_buffer_holds_more_than(23768);
 
   return output.good ();
 }
@@ -255,6 +258,7 @@ static IW_Regular_Expression open_paren ("^\\([0-9]+$");
 
 static int
 process_bad12 (const const_IWSubstring & buffer,
+               IW_STL_Hash_Map_int & reason,
                IWString_and_File_Descriptor & output)
 {
   int i = 0;
@@ -317,13 +321,15 @@ process_bad12 (const const_IWSubstring & buffer,
       myreason.append_with_spacer (token);
     }
 
-    output << separator << myreason;
+    if (! suppress_normal_output)
+      output << output_separator << myreason;
 
     if (accumulate_reasons)
       reason[myreason]++;
   }
 
-  output << '\n';
+  if (! suppress_normal_output)
+    output << '\n';
 
   output.write_if_buffer_holds_more_than(32768);
 
@@ -332,12 +338,13 @@ process_bad12 (const const_IWSubstring & buffer,
 
 static int
 process_bad12 (iwstring_data_source & input,
+               IW_STL_Hash_Map_int & reason,
                IWString_and_File_Descriptor & output)
 {
   const_IWSubstring buffer;
   while (input.next_record (buffer))
   {
-    if (! process_bad12 (buffer, output))
+    if (! process_bad12 (buffer, reason, output))
     {
       cerr << "Invalid bad12 record '" << buffer << "'\n";
       return 0;
@@ -349,6 +356,7 @@ process_bad12 (iwstring_data_source & input,
 
 static int
 process_bad12 (const IWString & fname,
+               IW_STL_Hash_Map_int & reason,
                IWString_and_File_Descriptor & output)
 {
   iwstring_data_source input (fname);
@@ -359,11 +367,12 @@ process_bad12 (const IWString & fname,
     return 0;
   }
 
-  return process_bad12 (input, output);
+  return process_bad12 (input, reason, output);
 }
 
 static int
 process_bad1 (const IWString & bad_stem,
+              IW_STL_Hash_Map_int & reason,
               IWString_and_File_Descriptor & output)
 {
   IWString fname;
@@ -371,11 +380,12 @@ process_bad1 (const IWString & bad_stem,
   fname = bad_stem;
   fname << "1.smi";
 
-  return process_bad12 (fname, output);
+  return process_bad12 (fname, reason, output);
 }
 
 static int
 process_bad2 (const IWString & bad_stem,
+              IW_STL_Hash_Map_int & reason,
               IWString_and_File_Descriptor & output)
 {
   IWString fname;
@@ -383,7 +393,7 @@ process_bad2 (const IWString & bad_stem,
   fname = bad_stem;
   fname << "2.smi";
 
-  return process_bad12 (fname, output);
+  return process_bad12 (fname, reason, output);
 }
 
 static int
@@ -416,6 +426,7 @@ process_from_iwdemerit (const IWString & bad_stem,
 
 static int
 process_bad0 (const const_IWSubstring & buffer,
+              IW_STL_Hash_Map_int & reason,
               IWString_and_File_Descriptor & output)
 {
   int i = 0;
@@ -459,13 +470,15 @@ process_bad0 (const const_IWSubstring & buffer,
     if (gsub_spaces_in_reason_to_underscore)
       myreason.gsub (' ', '_');
 
-    output << separator << myreason;
+    if (! suppress_normal_output)
+      output << output_separator << myreason;
 
     if (accumulate_reasons)
       reason[myreason]++;
   }
 
-  output << '\n';
+  if (! suppress_normal_output)
+    output << '\n';
 
   output.write_if_buffer_holds_more_than(32768);
 
@@ -474,12 +487,13 @@ process_bad0 (const const_IWSubstring & buffer,
 
 static int
 process_bad0 (iwstring_data_source & input, 
+              IW_STL_Hash_Map_int & reason,
               IWString_and_File_Descriptor & output)
 {
   const_IWSubstring buffer;
   while (input.next_record (buffer))
   {
-    if (! process_bad0 (buffer, output))
+    if (! process_bad0 (buffer, reason, output))
     {
       cerr << "Invalid bad0 record '" << buffer << "'\n";
       return 0;
@@ -491,6 +505,7 @@ process_bad0 (iwstring_data_source & input,
 
 static int
 process_bad01 (const IWString & fname,
+               IW_STL_Hash_Map_int & reason,
                IWString_and_File_Descriptor & output)
 {
   iwstring_data_source input (fname);
@@ -501,11 +516,12 @@ process_bad01 (const IWString & fname,
     return 0;
   }
 
-  return process_bad0 (input, output);
+  return process_bad0 (input, reason, output);
 }
 
 static int
 process_bad0 (const IWString & bad_stem,
+              IW_STL_Hash_Map_int & reason,
               IWString_and_File_Descriptor & output)
 {
   IWString fname;
@@ -513,7 +529,7 @@ process_bad0 (const IWString & bad_stem,
   fname = bad_stem;
   fname << "0.smi";
 
-  return process_bad01 (fname, output);
+  return process_bad01 (fname, reason, output);
 }
 
 static int
@@ -545,9 +561,12 @@ process_single_run (const char * okfile,
                     int ndx,
                     IWString_and_File_Descriptor & output)
 {
-  process_bad0 (bad_stem, output);
-  process_bad1 (bad_stem, output);
-  process_bad2 (bad_stem, output);
+  if (process_rejection_files)
+  {
+    process_bad0 (bad_stem, reason_bad, output);
+    process_bad1 (bad_stem, reason_bad, output);
+    process_bad2 (bad_stem, reason_bad, output);
+  }
   process_from_iwdemerit (bad_stem, output, 1);
   process_from_iwdemerit (okfile, 0, output);
 
@@ -567,6 +586,7 @@ class Reason_and_Count
     int count () const { return _count;}
 
     template <typename T> int latex_table (T &) const;
+    template <typename T> int asciidoc_table (T & os) const;
 };
 
 template <typename T>
@@ -598,6 +618,15 @@ Reason_and_Count::latex_table (T & os) const
   return 1;
 }
 
+template <typename T>
+int
+Reason_and_Count::asciidoc_table (T & os) const
+{
+  os << '|' << _count << " | " << _reason;
+
+  return 1;
+}
+
 class Reason_and_Count_Comparator
 {
   private:
@@ -617,13 +646,23 @@ Reason_and_Count_Comparator::operator () (const Reason_and_Count * rc1,
   return 0;
 }
 
-template <typename T>
-int
-write_reasons (const IW_STL_Hash_Map_int & reason,
-               T & output)
+static int
+last_item_meeting_support_requirement (const resizable_array_p<Reason_and_Count> & r,
+                                       const int min_reasons_needed_for_output)
 {
-  resizable_array_p<Reason_and_Count> r;
+  for (int i = r.number_elements() - 1; i >= 0; --i)
+  {
+    if (r[i]->count() >= min_reasons_needed_for_output)
+      return i;
+  }
 
+  return -1;
+}
+
+static void
+sorted_list_of_reasons (const IW_STL_Hash_Map_int & reason,
+                        resizable_array_p<Reason_and_Count> & r)
+{
   int n = reason.size();
 
   r.resize(n);
@@ -638,7 +677,109 @@ write_reasons (const IW_STL_Hash_Map_int & reason,
 
   r.iwqsort(rcc);
 
-  if (latex_table)
+  return;
+}
+
+template <typename T>
+void
+write_rejection_reason (const resizable_array_p<Reason_and_Count> & r,
+                        const int ndx,
+                        T & output)
+{
+  if (ndx < r.number_elements())
+  {
+    if (latex_table)
+      r[ndx]->latex_table(output);
+    else if (asciidoc_table)
+      r[ndx]->asciidoc_table(output);
+    else
+      output << *(r[ndx]);
+  }
+  else
+  {
+    if (latex_table)
+      output << " & &";
+    else if (asciidoc_table)
+      output << "|.|.";
+  }
+
+  return;
+}
+
+/*
+  WRite a multi column file containing rejection reasons, and demerit reasons
+*/
+
+template <typename T>
+int
+write_reasons (const IW_STL_Hash_Map_int & reason_bad,
+               const IW_STL_Hash_Map_int & reason_survivor,
+               const int min_reasons_needed_for_output,
+               T & output)
+{
+  resizable_array_p<Reason_and_Count> rej, dem;
+  sorted_list_of_reasons(reason_bad, rej);
+  sorted_list_of_reasons(reason_survivor, dem);
+
+  int dstop = last_item_meeting_support_requirement(dem, min_reasons_needed_for_output);
+  int rstop = last_item_meeting_support_requirement(rej, min_reasons_needed_for_output);
+
+  if (dstop < 0 && rstop < 0)
+    return 1;
+
+  if (asciidoc_table)
+  {
+    output << "[width=\"30%\", options=\"header\"]\n";
+    output << "|===============\n";
+    output << "|N |Rejected |N |Demerits\n";
+  }
+  else if (latex_table)
+  {
+    output << "\\begin{center}\n";
+    output << "\\begin{tabular}{r c r c}\n";
+    output << "Molecules & Reason Rej & Molecules & Reason Demerit \\\\\n";
+    output << "\\hline\n";
+  }
+
+  int istop = dstop;
+  if (istop < rstop)
+    istop = rstop;
+
+  for (int i = 0; i < istop; ++i)
+  {
+    write_rejection_reason(rej, i, output);
+    write_rejection_reason(dem, i, output);
+    output << '\n';
+  }
+
+  if (asciidoc_table)
+    output << "|===============\n";
+  else if (latex_table)
+  {
+    output << "\\hline\n";
+    output << "\\end{tabular}\n";
+    output << "\\end{center}\n";
+  }
+
+  return 1;
+}
+
+template <typename T>
+int
+write_reasons (const IW_STL_Hash_Map_int & reason,
+               const int min_reasons_needed_for_output,
+               T & output)
+{
+  resizable_array_p<Reason_and_Count> r;
+
+  sorted_list_of_reasons(reason, r);
+
+  if (asciidoc_table)
+  {
+    output << "[width=\"30%\"]\n";
+    output << "|===============\n";
+  }
+  else if (latex_table)
   {
     output << "\\begin{center}\n";
     output << "\\begin{tabular}{r l}\n";
@@ -646,24 +787,33 @@ write_reasons (const IW_STL_Hash_Map_int & reason,
     output << "\\hline\n";
   }
 
-  for (int i = 0; i < n; i++)
+  for (int i = 0; i < r.number_elements(); i++)
   {
     const Reason_and_Count * ri = r[i];
 
+    if (ri->count() < min_reasons_needed_for_output)
+      break;
+
     if (latex_table)
       ri->latex_table(output);
+    else if (asciidoc_table)
+      ri->asciidoc_table(output);
     else
-      output << (*ri) << '\n';
+      output << (*ri);
 
+    output << '\n';
   }
 
-  if (latex_table)
+  if (asciidoc_table)
+  {
+    output << "|===============\n";
+  }
+  else if (latex_table)
   {
     output << "\\hline\n";
     output << "\\end{tabular}\n";
     output << "\\end{center}\n";
   }
-
 
   return 1;
 }
@@ -671,7 +821,7 @@ write_reasons (const IW_STL_Hash_Map_int & reason,
 static int
 tp1_summarise (int argc, char ** argv)
 {
-  Command_Line cl (argc, argv, "vB:S:rhzDs:tT:uj:f:XP:c");
+  Command_Line cl (argc, argv, "vB:S:rhzDs:tT:uj:f:XAP:cnkbm:");
 
   if (cl.unrecognised_options_encountered ())
   {
@@ -769,6 +919,22 @@ tp1_summarise (int argc, char ** argv)
       cerr << "Will produce a file where demerit values have been converted to scaling factors\n";
   }
 
+  if (cl.option_present('n'))
+  {
+    suppress_normal_output = 1;
+
+    if (verbose)
+      cerr << "Will suppress normal output\n";
+  }
+
+  if (cl.option_present('k'))
+  { 
+    process_rejection_files = 0;
+
+    if (verbose)
+      cerr << "Will only process survivor files (not bad0, bad1...)\n";
+  }
+
 // Initial implementation used -j, but it should be -f to be compatible with
 // what is used in iwdemerit
 
@@ -797,16 +963,16 @@ tp1_summarise (int argc, char ** argv)
 
   if (cl.option_present ('s'))
   {
-    const_IWSubstring s;
+    IWString s;
     cl.value ('s', s);
 
-    if (1 != s.length ())
+    if (! char_name_to_char(s))
     {
-      cerr << "Sorry, the inter-field separator can be only one character\n";
-      return 4;
+      cerr << "Unrecognised output separator '" << s << "'\n";
+      return 1;
     }
 
-    separator = s[0];
+    output_separator = s[0];
   }
 
   if (0 == cl.number_elements ())
@@ -818,7 +984,13 @@ tp1_summarise (int argc, char ** argv)
   IWString_and_File_Descriptor output(1);
 
   if (include_header_record)
-    output << "Name demerit\n";
+  {
+    output << "Name" << output_separator;
+    if (produce_demerit_scaling_file)
+      output << "scale\n";
+    else
+      output << "demerit\n";
+  }
 
   int rc = 0;
 
@@ -855,15 +1027,40 @@ tp1_summarise (int argc, char ** argv)
     latex_table = 1;
   }
 
+  if (cl.option_present('A'))
+  {
+    asciidoc_table = 1;
+  }
+
   if (accumulate_reasons)
   {
-    cerr << "Encountered " << reason.size () << " different reasons\n";
+    cerr << "Encountered " << (reason_bad.size() + reason_survivor.size()) << " different reasons\n";
+
+    int min_reasons_needed_for_output = 0;
+
+    if (cl.option_present('m'))
+    {
+      if (! cl.value('m', min_reasons_needed_for_output) || min_reasons_needed_for_output < 0)
+      {
+        cerr << "The minimum reasons for output (-m) option must be a whole +ve number\n";
+        usage(1);
+      }
+
+      if (verbose)
+        cerr << "Will not write any rejection/demerit reason to the -T file with fewer than " << min_reasons_needed_for_output << endl;
+    }
 
     if (NULL == fname_for_reason_summary)
     {
-      for (IW_STL_Hash_Map_int::const_iterator i = reason.begin (); i != reason.end (); ++i)
+      for (IW_STL_Hash_Map_int::const_iterator i = reason_bad.begin (); i != reason_bad.end (); ++i)
       {
-        cerr << (*i).second << " occurrences of '" << (*i).first << "'\n";
+        if (i->second > min_reasons_needed_for_output)
+          cerr << (*i).second << " occurrences of '" << (*i).first << "'\n";
+      }
+      for (IW_STL_Hash_Map_int::const_iterator i = reason_survivor.begin (); i != reason_survivor.end (); ++i)
+      {
+        if (i->second > min_reasons_needed_for_output)
+          cerr << (*i).second << " occurrences of '" << (*i).first << "'\n";
       }
     }
     else
@@ -874,11 +1071,16 @@ tp1_summarise (int argc, char ** argv)
         cerr << "Cannot open reason summary file '" << fname_for_reason_summary<< "'\n";
         return 5;
       }
-      write_reasons (reason, tfile);
-//    for (IW_STL_Hash_Map_int::const_iterator i = reason.begin (); i != reason.end (); ++i)
-//    {
-//      tfile << (*i).second << " occurrences of '" << (*i).first << "'\n";
-//     }
+
+      if (cl.option_present('b'))
+        write_reasons(reason_bad, reason_survivor, min_reasons_needed_for_output, tfile);
+      else
+      {
+        if (verbose)
+          cerr << reason_bad.size() << " reasons associated with rejected molecules, " << reason_survivor.size() << " with survivors\n";
+        write_reasons (reason_bad, min_reasons_needed_for_output, tfile);
+        write_reasons (reason_survivor, min_reasons_needed_for_output, tfile);
+      }
     }
   }
 

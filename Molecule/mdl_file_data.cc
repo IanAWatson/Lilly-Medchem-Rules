@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
 
 #include "misc.h"
@@ -181,7 +163,7 @@ MDL_File_Data::MDL_File_Data()
 {
 #ifdef USE_IWMALLOC
   cerr << "Checking MDL_File_Data\n";
-  iwmalloc_check_all_malloced (stderr);
+  iwmalloc_check_all_malloced(stderr);
 #endif
 
   return;
@@ -225,7 +207,7 @@ MDL_File_Data::_do_copy (const MDL_File_Data & rhs)
 
 MDL_File_Data::MDL_File_Data(const MDL_File_Data & rhs)
 {
-  _do_copy (rhs);
+  _do_copy(rhs);
 
   return;
 }
@@ -233,6 +215,17 @@ MDL_File_Data::MDL_File_Data(const MDL_File_Data & rhs)
 MDL_File_Data::~MDL_File_Data()
 {
   return;
+}
+
+MDL_File_Data &
+MDL_File_Data::operator= (MDL_File_Data && rhs)
+{
+  _third_line_of_input_sdf_file = std::move(rhs._third_line_of_input_sdf_file);
+  _mdl_atom = std::move(rhs._mdl_atom);
+  _mdl_bond = std::move(rhs._mdl_bond);
+  _link_atom = std::move(rhs._link_atom);
+
+  return *this;
 }
 
 int
@@ -331,11 +324,11 @@ MDL_File_Data::build (Molecule & m)
 int
 MDL_Atom_Data::build_atom_list(const const_IWSubstring & buffer)
 {
-  return _atom_list.create_from_ALS_record (buffer);
+  return _atom_list.create_from_ALS_record(buffer);
 }
 
 int
-MDL_Atom_Data::initialise_atom_list_from_symbol (const const_IWSubstring & token)
+MDL_Atom_Data::initialise_atom_list_from_symbol(const const_IWSubstring & token)
 {
   _initial_atomic_symbol = "L";
 
@@ -345,13 +338,16 @@ MDL_Atom_Data::initialise_atom_list_from_symbol (const const_IWSubstring & token
 int
 MDL_Atom_Data::convert_a_or_q_atoms_to_atom_list (const IWString & s)
 {
-  if (1 != s.length())
-    return 0;
+//cerr << "MDL_Atom_Data::convert_a_or_q_atoms_to_atom_list:string is '" << s << "'\n";
 
   if ('A' == s)
     _atom_list.initialise_from_mdl_A_symbol();
   else if ('Q' == s)
     _atom_list.initialise_from_mdl_Q_symbol();
+  else if ("AH" == s)
+    _atom_list.initialise_from_mdl_AH_symbol();
+  else if ("QH" == s)
+    _atom_list.initialise_from_mdl_QH_symbol();
 
   return 1;
 }
@@ -367,7 +363,7 @@ MDL_Atom_Data::convert_not_atom_lists_to_organic_lists ()
 
 int
 MDL_Atom_Data::write_M_ALS(atom_number_t zatom,
-                           ostream & output) const
+                           std::ostream & output) const
 {
   return _atom_list.write_M_ALS(zatom, output);
 }
@@ -440,3 +436,67 @@ MDL_File_Data::swap_atoms (atom_number_t a1, atom_number_t a2)
 
   return 0;
 }
+
+void
+MDL_File_Data::discard_atom_map ()
+{
+  const auto n = _mdl_atom.number_elements();
+
+  for (int i = 0; i < n; ++i)
+  {
+    _mdl_atom[i]->set_atom_map(0);
+  }
+
+  return;
+}
+const MDL_Bond_Data *
+MDL_File_Data::mdl_bond_data(int i) const
+{
+  if (! _mdl_bond.ok_index(i))
+    return nullptr;
+  else
+    return _mdl_bond[i];
+}
+
+MDL_Bond_Data *
+MDL_File_Data::mdl_bond_data(int i)
+{ 
+  if (! _mdl_bond.ok_index(i))
+    return nullptr;
+  else
+   return _mdl_bond[i];
+}
+
+const MDL_Bond_Data *
+MDL_File_Data::mdl_bond(int i) const
+{
+  if (! _mdl_bond.ok_index(i))
+    return nullptr;
+  else
+    return _mdl_bond[i];
+}
+
+MDL_Bond_Data *
+MDL_File_Data::mdl_bond(int i)
+{
+  if (! _mdl_bond.ok_index(i))
+    return nullptr;
+  else
+   return _mdl_bond[i];
+}
+
+#ifdef IMPLEMENT_THIS_SOMETIME
+int
+MDL_File_Data::add (const Element * e)
+{
+  MDL_Atom_Data * t = new MDL_Atom_Data();
+
+  t->set_atom_number(_mdl_atom.number_elements());
+
+  t->set_symbol
+
+  _mdl_atom.add(t);
+
+  return 1;
+}
+#endif

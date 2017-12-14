@@ -1,27 +1,9 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
-#include <stdlib.h>
+#include <iostream>
 #include <memory>
-using namespace std;
+using std::cerr;
+using std::endl;
 
 #include "misc.h"
-#include "iw_auto_array.h"
 
 #define RESIZABLE_ARRAY_IMPLEMENTATION
 #include "iwstring_data_source.h"
@@ -37,7 +19,7 @@ namespace substructure_demerits
 static int verbose = 0;
 
 void
-set_verbose (int s)
+set_verbose(int s)
 {
   verbose = s;
 }
@@ -45,12 +27,57 @@ set_verbose (int s)
 static int keep_going_after_rejection = 0;
 
 void
-set_keep_going_after_rejection (int s)
+set_keep_going_after_rejection(int s)
 {
   keep_going_after_rejection = s;
 }
 
 static Charge_Assigner _charge_assigner;
+
+int
+initialise_charge_assigner(const char * s)
+{
+  return _charge_assigner.build(s);
+}
+
+static int too_many_rings_cutoff = 6;
+
+void
+set_substructure_demerits_too_many_rings(int s)
+{
+  too_many_rings_cutoff = s;
+
+  return;
+}
+
+static int ring_size_too_large = 7;
+
+void
+set_substructure_demerits_ring_size_too_large(int s)
+{
+  ring_size_too_large = s;
+
+  return;
+}
+
+static int all_demerits_same_numeric_value = -1;
+
+static int
+demerit_or_default_if_specified(int d)
+{
+  if (all_demerits_same_numeric_value >= 0)
+    return all_demerits_same_numeric_value;
+
+  return d;
+}
+
+void
+set_all_numeric_demerit_values(int s)
+{
+  all_demerits_same_numeric_value = s;
+
+  return;
+}
 
 /*
   We need to initialise the charge assigner from the command line, but this file
@@ -60,13 +87,13 @@ static Charge_Assigner _charge_assigner;
 */
 
 extern Charge_Assigner &
-charge_assigner ()
+charge_assigner()
 {
   return _charge_assigner;
 }
 
 static int
-identify_largest_fragment (int matoms,
+identify_largest_fragment(int matoms,
                            int nf,
                            const int * fragment_membership)
 {
@@ -91,25 +118,25 @@ static int apply_positive_charge_demerit = 1;
 static int apply_negative_charge_demerit = 1;
 
 static int
-too_many_charges (Molecule & m, Demerit & demerit)
+too_many_charges(Molecule & m, Demerit & demerit)
 {
   if (0 == apply_positive_charge_demerit && 0 == apply_negative_charge_demerit)
     return 0;
 
-  int matoms = m.natoms ();
+  int matoms = m.natoms();
 
-  formal_charge_t * f = new formal_charge_t[matoms]; iw_auto_array<formal_charge_t> free_f (f);
+  formal_charge_t * f = new formal_charge_t[matoms]; std::unique_ptr<formal_charge_t[]> free_f(f);
 
   set_vector(f, matoms, static_cast<formal_charge_t>(0));
 
   _charge_assigner.set_apply_charges_to_molecule(0);
 
-  if (0 == _charge_assigner.process (m, f))
+  if (0 == _charge_assigner.process(m, f))
     return 0;
 
-  int * fragment_membership = new int[matoms]; iw_auto_array<int> free_fragment_membership(fragment_membership);
+  int * fragment_membership = new int[matoms]; std::unique_ptr<int[]> free_fragment_membership(fragment_membership);
 
-  int nf = m.fragment_membership (fragment_membership);
+  int nf = m.fragment_membership(fragment_membership);
 
   int largest_fragment;
 
@@ -137,17 +164,19 @@ too_many_charges (Molecule & m, Demerit & demerit)
 
 //cerr << m.name() << " nneg " << nneg << " npos " << npos << endl;
 
+  int d = demerit_or_default_if_specified(50);
+
   if (nneg > 1)
-    demerit.extra ((nneg - 1) * 50, "negative");
+    demerit.extra((nneg - 1) * d, "negative");
 
   if (npos > 1)
-    demerit.extra ((npos - 1) * 50, "positive");
+    demerit.extra((npos - 1) * d, "positive");
 
-  return demerit.rejected ();
+  return demerit.rejected();
 }
 
 static int
-compute_max_nrings (Molecule & m,
+compute_max_nrings(Molecule & m,
                     const Ring & r)
 {
   int rc = 0;
@@ -168,7 +197,7 @@ compute_max_nrings (Molecule & m,
 static int complex_fused_rings_count = 0;
 
 static int
-complex_fused_rings (Molecule & m)
+complex_fused_rings(Molecule & m)
 {
   int nr = m.nrings();
 
@@ -177,7 +206,7 @@ complex_fused_rings (Molecule & m)
 
   (void) m.ring_membership();
 
-  int * ring_already_done = new_int(nr); iw_auto_array<int> free_ring_already_done(ring_already_done);
+  int * ring_already_done = new_int(nr); std::unique_ptr<int[]> free_ring_already_done(ring_already_done);
 
   iwmax<int> max_nrings_for_a_bond(0);
   iwmin<int> min_fused_neighbours(nr);
@@ -228,7 +257,7 @@ complex_fused_rings (Molecule & m)
 }
 
 static int
-complex_fused_rings (Molecule & m,
+complex_fused_rings(Molecule & m,
                      Demerit & demerit)
 {
   if (complex_fused_rings(m))
@@ -242,7 +271,7 @@ complex_fused_rings (Molecule & m,
 }
 
 static int
-identify_largest_saturated_carbon_section (Molecule & m,
+identify_largest_saturated_carbon_section(Molecule & m,
                                            const atomic_number_t * z,
                                            const int * ncon,
                                            const int * attached_heteroatom_count,
@@ -254,11 +283,11 @@ identify_largest_saturated_carbon_section (Molecule & m,
 
   already_done[zatom] = flag;
 
-  const Atom * a = m.atomi (zatom);
+  const Atom * a = m.atomi(zatom);
 
   for (int i = 0; i < ncon[zatom]; i++)
   {
-    atom_number_t j = a->other (zatom, i);
+    atom_number_t j = a->other(zatom, i);
 
     if (already_done[j])
       continue;
@@ -269,10 +298,10 @@ identify_largest_saturated_carbon_section (Molecule & m,
     if (6 != z[j])
       continue;
 
-    if (ncon[j] < m.nbonds (j))
+    if (ncon[j] < m.nbonds(j))
       continue;
 
-    rc += identify_largest_saturated_carbon_section (m, z, ncon, attached_heteroatom_count, j, flag, already_done);
+    rc += identify_largest_saturated_carbon_section(m, z, ncon, attached_heteroatom_count, j, flag, already_done);
   }
 
   return rc;
@@ -282,29 +311,29 @@ static int satcg_count = 0;
 static int apply_satcg = 0;   // turn off until we get this debugged
 
 static int
-large_saturated_carbon_sections_including_rings (Molecule & m,
+large_saturated_carbon_sections_including_rings(Molecule & m,
                              Demerit & demerit,
                              const atomic_number_t * z,
                              const int * ncon,
                              const int * ring_membership)
 {
-  int matoms = m.natoms ();
+  int matoms = m.natoms();
 
-  int * attached_heteroatom_count = new_int (matoms); iw_auto_array<int> free_attached_heteroatom_count (attached_heteroatom_count);
+  int * attached_heteroatom_count = new_int(matoms); std::unique_ptr<int[]> free_attached_heteroatom_count(attached_heteroatom_count);
 
   for (int i = 0; i < matoms; i++)
   {
-    const Atom * ai = m.atomi (i);
+    const Atom * ai = m.atomi(i);
 
     for (int j = 0; j < ncon[i]; j++)
     {
-      atom_number_t k = ai->other (i, j);
+      atom_number_t k = ai->other(i, j);
 
       if (6 != z[k])
         attached_heteroatom_count[i] = 1;
-      else if (m.is_aromatic (k))
+      else if (m.is_aromatic(k))
         attached_heteroatom_count[i] = 1;
-      else if (m.multiple_bond_to_heteroatom (k))
+      else if (m.multiple_bond_to_heteroatom(k))
         attached_heteroatom_count[i] = 1;
 
       if (attached_heteroatom_count[i])
@@ -312,7 +341,7 @@ large_saturated_carbon_sections_including_rings (Molecule & m,
     }
   }
 
-  int * tmp = new_int (matoms); iw_auto_array<int> free_tmp (tmp);
+  int * tmp = new_int(matoms); std::unique_ptr<int[]> free_tmp(tmp);
 
   for (int i = 0; i < matoms; i++)
   {
@@ -325,12 +354,12 @@ large_saturated_carbon_sections_including_rings (Molecule & m,
     if (6 != z[i])
       continue;
 
-    if (ncon[i] < m.nbonds (i))
+    if (ncon[i] < m.nbonds(i))
       continue;
 
     int flag = i + 1;    // a unique identifier for this grouping
 
-    int carbon_atoms_in_group = identify_largest_saturated_carbon_section (m, z, ncon, attached_heteroatom_count, i, flag, tmp);
+    int carbon_atoms_in_group = identify_largest_saturated_carbon_section(m, z, ncon, attached_heteroatom_count, i, flag, tmp);
 
     if (carbon_atoms_in_group < 7)
       continue;
@@ -377,7 +406,7 @@ large_saturated_carbon_sections_including_rings (Molecule & m,
 
     if (non_ring_atoms_in_grouping >= 5)
     {
-      demerit.reject ("SATCG");
+      demerit.reject("SATCG");
       satcg_count++;
       return 1;
     }
@@ -387,24 +416,24 @@ large_saturated_carbon_sections_including_rings (Molecule & m,
 }
 
 static int
-bonded_to_heteroatom_outside_ring (Molecule & m,
+bonded_to_heteroatom_outside_ring(Molecule & m,
                                    const Ring & r,
                                    const Ring_Atom_Iterator & rai,
                                    const atomic_number_t * z)
 {
-  atom_number_t zatom = rai.current ();
+  atom_number_t zatom = rai.current();
 
-  const Atom * a = m.atomi (zatom);
+  const Atom * a = m.atomi(zatom);
 
-  int acon = a->ncon ();
+  int acon = a->ncon();
 
   int rc = 0;
 
   for (int i = 0; i < acon; i++)
   {
-    atom_number_t j = a->other (zatom, i);
+    atom_number_t j = a->other(zatom, i);
 
-    if (rai.is_next_or_previous (j))
+    if (rai.is_next_or_previous(j))
       continue;
 
     if (6 != z[j])
@@ -415,44 +444,42 @@ bonded_to_heteroatom_outside_ring (Molecule & m,
 }
 
 static int
-is_rejectable_c7_ring (Molecule & m,
-                       const Ring & ri,
-                       const atomic_number_t * z,
-                       const int * ncon)
+is_rejectable_large_ring(Molecule & m,
+                          const Ring & ri,
+                          const atomic_number_t * z,
+                          const int * ncon)
 {
   int heteroatoms_encountered = 0;
   int fused_ring_atoms_encountered = 0;
   int heteroatom_outside_ring = 0;
 
-  int ring_size = ri.number_elements ();
-
-  for (Ring_Atom_Iterator i (ri); i != ri.end (); i++)
+  for (Ring_Atom_Iterator i(ri); i != ri.end(); i++)
   {
-    atom_number_t j = i.current ();
+    atom_number_t j = i.current();
 
     if (6 != z[j])
 //    heteroatoms_encountered++;    relaxed form, not used
       return 0;
 
-    const Atom * aj = m.atomi (j);
+    const Atom * aj = m.atomi(j);
 
-    if (aj->unsaturated ())    // what about -C(=*)- too rare to worry about
+    if (aj->unsaturated())    // what about -C(=*)- too rare to worry about
       return 0;
 
     if (2 == ncon[j])
       continue;
 
-    if (m.nrings (j) > 1)
+    if (m.nrings(j) > 1)
       fused_ring_atoms_encountered++;
 
-    if (bonded_to_heteroatom_outside_ring (m, ri, i, z))
+    if (bonded_to_heteroatom_outside_ring(m, ri, i, z))
       heteroatom_outside_ring++;
   }
 
   if (heteroatoms_encountered > 1)
     return 0;
 
-  if (ring_size - fused_ring_atoms_encountered < 6)   // at least 6 non-fused ring atoms
+  if (ri.number_elements() - fused_ring_atoms_encountered < 6)   // at least 6 non-fused ring atoms
     return 0;
 
   if (heteroatom_outside_ring > 1)
@@ -468,7 +495,7 @@ static int c7ring_count = 0;
 static int apply_c7ring = 1;
 
 static int
-determine_c7_ring (Molecule & m,
+determine_c7_ring(Molecule & m,
                    Demerit & demerit,
                    const atomic_number_t * z,
                    const int * ncon)
@@ -476,21 +503,21 @@ determine_c7_ring (Molecule & m,
   if (! apply_c7ring)
     return 0;
 
-  int nr = m.nrings ();
+  int nr = m.nrings();
 
   for (int i = 0; i < nr; i++)
   {
-    const Ring * ri = m.ringi (i);
+    const Ring * ri = m.ringi(i);
 
-    int ring_size = ri->number_elements ();
+    int ring_size = ri->number_elements();
 
-    if (ring_size < 7)
+    if (ring_size < ring_size_too_large)           // 7 by default
       continue;
 
-    if (! is_rejectable_c7_ring (m, *ri, z, ncon))
+    if (! is_rejectable_large_ring(m, *ri, z, ncon))
       continue;
 
-    demerit.reject ("C7ring");
+    demerit.reject("LargeCarbocycle");
     c7ring_count++;
     return 1;
   }
@@ -506,7 +533,7 @@ determine_c7_ring (Molecule & m,
 */
 
 static int
-grow_chain (Molecule & m,
+grow_chain(Molecule & m,
             atom_number_t zatom,
             const atomic_number_t * mz, const int * ncon,
             int * already_done)
@@ -514,7 +541,7 @@ grow_chain (Molecule & m,
   int rc = 0;
   while (1)
   {
-    assert (0 == already_done[zatom]);
+    assert(0 == already_done[zatom]);
 
     already_done[zatom]++;
     rc++;
@@ -522,13 +549,13 @@ grow_chain (Molecule & m,
     if (1 == ncon[zatom])
       return rc;
 
-    atom_number_t tmp = m.other (zatom, 0);
+    atom_number_t tmp = m.other(zatom, 0);
     if (already_done[tmp])
-      tmp = m.other (zatom, 1);
+      tmp = m.other(zatom, 1);
 
-    assert (0 == already_done[tmp]);
+    assert(0 == already_done[tmp]);
 
-    if (6 != mz[tmp] || ncon[tmp] > 2 || m.is_ring_atom (tmp) || m.formal_charge (tmp))
+    if (6 != mz[tmp] || ncon[tmp] > 2 || m.is_ring_atom(tmp) || m.formal_charge(tmp))
       return rc;
 
     zatom = tmp;
@@ -536,33 +563,41 @@ grow_chain (Molecule & m,
 }
 
 static int
-determine_chain (Molecule & m,
+determine_chain(Molecule & m,
                  atom_number_t zatom,
                  const atomic_number_t * mz, const int * ncon,
                  int * already_done)
 {
-  int matoms = m.natoms ();
+//int matoms = m.natoms();
 
   already_done[zatom] = 1;
   int rc = 1;
 
-  assert (2 == ncon[zatom]);
+  assert(2 == ncon[zatom]);
 
-  const Atom * a = m.atomi (zatom);
+  const Atom * a = m.atomi(zatom);
 
   for (int i = 0; i < 2; i++)
   {
-    atom_number_t a1 = a->other (zatom, i);
-    assert (a1 >= 0 && a1 < matoms && 0 == already_done[a1]);
+    atom_number_t a1 = a->other(zatom, i);
+    assert(a1 >= 0 && a1 < m.natoms() && 0 == already_done[a1]);
 
-    if (6 == mz[a1] && ncon[a1] <= 2 && m.is_non_ring_atom (a1) && 0 == m.formal_charge (a1))
+    if (6 == mz[a1] && ncon[a1] <= 2 && m.is_non_ring_atom(a1) && 0 == m.formal_charge(a1))
     {
-      rc += grow_chain (m, a1, mz, ncon, already_done);
+      rc += grow_chain(m, a1, mz, ncon, already_done);
     }
   }
 
   return rc;
 }            
+
+static int cx_chain_rejection_length = 7;
+
+void
+set_cx_chain_rejection_length(int s)
+{
+  cx_chain_rejection_length = s;
+}
 
 static int c7_count = 0;
 static int apply_c7 = 1;
@@ -574,13 +609,14 @@ static int c4_count = 0;
 static int apply_c4 = 1;
 
 static int
-long_carbon_chains (Molecule & m, Demerit & demerit,
-                    const atomic_number_t * mz, const int * ncon,
-                    int * already_done)
+long_carbon_chains(Molecule & m, Demerit & demerit,
+                    const atomic_number_t * mz, const int * ncon)
 {
   extending_resizable_array<int> long_chain;
 
-  int matoms = m.natoms ();
+  int matoms = m.natoms();
+
+  int * already_done = new_int(matoms); std::unique_ptr<int[]> free_already_done(already_done);
 
   for (int i = 0; i < matoms; i++)
   {
@@ -593,14 +629,14 @@ long_carbon_chains (Molecule & m, Demerit & demerit,
     if (already_done[i])
       continue;
 
-    if (m.is_ring_atom (i))
+    if (m.is_ring_atom(i))
       continue;
 
-    const Atom * a = m.atomi (i);
+    const Atom * a = m.atomi(i);
 
-    if (2 == a->nbonds () && 0 == a->formal_charge ())
+    if (2 == a->nbonds() && 0 == a->formal_charge())
     {
-      int path_length = determine_chain (m, i, mz, ncon, already_done);
+      int path_length = determine_chain(m, i, mz, ncon, already_done);
 
       long_chain[path_length]++;
     }
@@ -620,28 +656,28 @@ long_carbon_chains (Molecule & m, Demerit & demerit,
   if (nl < 4)
     return 0;
 
-  if (apply_c4 && long_chain[4])
+  if (apply_c4 && long_chain[cx_chain_rejection_length - 3])
   {
     c4_count++;
-    demerit.extra (10 * long_chain[4], "C4");
+    demerit.extra(demerit_or_default_if_specified(10) * long_chain[4], "C4");
   }
 
   if (5 == nl)
     return 0;
 
-  if (apply_c5 && long_chain[5])
+  if (apply_c5 && long_chain[cx_chain_rejection_length - 2])
   {
     c5_count++;
-    demerit.extra(25 * long_chain[5], "C5");
+    demerit.extra(demerit_or_default_if_specified(25) * long_chain[5], "C5");
   }
 
   if (6 == nl)
     return 0;
 
-  if (apply_c6 && long_chain[6])
+  if (apply_c6 && long_chain[cx_chain_rejection_length - 1])
   {
     c6_count++;
-    demerit.extra(50 * long_chain[6], "C6");
+    demerit.extra(demerit_or_default_if_specified(50) * long_chain[6], "C6");
   }
 
   if (! apply_c7)
@@ -649,52 +685,19 @@ long_carbon_chains (Molecule & m, Demerit & demerit,
 
   int total_demerit = 0;
 
-  for (int i = 7; i < nl; i++)
+  for (int i = cx_chain_rejection_length; i < nl; i++)
   {
     if (0 == long_chain[i])
       continue;
 
-    total_demerit += 100 + (i - 7) * 50 * long_chain[i];
+    total_demerit += 100 + (i - cx_chain_rejection_length) * 50 * long_chain[i];
     c7_count++;
   }
 
   if (total_demerit)
-    demerit.extra(total_demerit, "C7");
-
-#ifdef OLD_WAY_OF_DEALING_WITH_LONG_CHAINS
-      if (path_length >= 7 && apply_c7)
-      {
-        demerit.extra (100 + (path_length - 7) * 50, "C7");
-        c7_count++;
-      }
-      if (6 == path_length && apply_c6)
-      {
-        demerit.extra (50, "C6");
-        c6_count++;
-      }
-      if (5 == path_length && apply_c5)
-      {
-        demerit.extra (25, "C5");
-        c5_count++;
-      }
-      if (4 == path_length && apply_c4)
-      {
-        demerit.extra (10, "C4");
-        c4_count++;
-      }
-#endif
+    demerit.extra(total_demerit, "LongCChain");
 
   return 0;
-}
-
-static int
-long_carbon_chains (Molecule & m, Demerit & demerit,
-                    const atomic_number_t * mz, const int * ncon)
-{
-  int matoms = m.natoms ();
-  int * tmp = new_int (matoms); iw_auto_array<int> free_tmp (tmp);
-
-  return long_carbon_chains (m, demerit, mz, ncon, tmp);
 }
 
 /*
@@ -712,7 +715,7 @@ static int too_many_chlorine_count = 0;
 static int apply_alkyl_halides = 1;
 
 static int
-alkyl_halides (Molecule & m, Demerit & demerit,
+alkyl_halides(Molecule & m, Demerit & demerit,
                const atomic_number_t * mz, const int * ncon)
 {
   if (! apply_alkyl_halides)
@@ -720,7 +723,7 @@ alkyl_halides (Molecule & m, Demerit & demerit,
 
   resizable_array<atom_number_t> ccl3;    // carbons which are CCl3 centres
 
-  int matoms = m.natoms ();
+  int matoms = m.natoms();
   int nbromine = 0;
   int nchlorine = 0;
   for (int i = 0; i < matoms; i++)
@@ -737,16 +740,16 @@ alkyl_halides (Molecule & m, Demerit & demerit,
     else
       continue;
 
-    const Atom * a = m.atomi (i);
+    const Atom * a = m.atomi(i);
 
-    atom_number_t c = a->other (i, 0);
+    atom_number_t c = a->other(i, 0);
     if (6 != mz[c])
       continue;
 
-    if (ccl3.contains (c))
+    if (ccl3.contains(c))
       continue;
 
-    if (ncon[c] < m.nbonds (c))
+    if (ncon[c] < m.nbonds(c))
       continue;
 
 //  We have a halogen attached to a saturated carbon.
@@ -754,24 +757,24 @@ alkyl_halides (Molecule & m, Demerit & demerit,
 
     if (4 == ncon[c])
     {
-      const Atom * ac = m.atomi (c);
+      const Atom * ac = m.atomi(c);
 
       int nc = 0;    // count the chlorines attached to 'c'
       for (int j = 0; j < 4; j++)
       {
-        atom_number_t k = ac->other (c, j);
+        atom_number_t k = ac->other(c, j);
         if (17 == mz[k])
           nc++;
       }
 
       if (nc >= 3)
       {
-        ccl3.add (c);
+        ccl3.add(c);
         continue;      // not considered an alkyl halide
       }
     }
 
-    demerit.reject ("alkyl_halide");
+    demerit.reject("alkyl_halide");
     alkyl_halides_count++;
     return 1;
   }
@@ -791,20 +794,20 @@ is_phosphorus_acid (const Atom * p,
   int doubly_bonded_oxygen = 0;
   int singly_bonded_oxygen = 0;
 
-  int pcon = p->ncon ();
+  int pcon = p->ncon();
 
   for (int i = 0; i < pcon; i++)
   {
-    const Bond * b = p->item (i);
+    const Bond * b = p->item(i);
 
-    atom_number_t j = b->other (zatom);
+    atom_number_t j = b->other(zatom);
 
     if (8 != mz[j])
       continue;
 
-    if (b->is_double_bond () && 1 == ncon[j])
+    if (b->is_double_bond() && 1 == ncon[j])
       doubly_bonded_oxygen++;
-    else if (b->is_single_bond ())   // note, no restriction on singly connected
+    else if (b->is_single_bond())   // note, no restriction on singly connected
       singly_bonded_oxygen++;
   }
 
@@ -835,17 +838,17 @@ identify_cfx_section (const Molecule & m,
 
   counted[c] = 1;
 
-  const Atom * a = m.atomi (c);
+  const Atom * a = m.atomi(c);
 
   int fluorine_connections = 0;
 
   Set_of_Atoms carbon_connections;
 
-  int acon = a->ncon ();
+  int acon = a->ncon();
 
   for (int i = 0; i < acon; i++)
   {
-    atom_number_t j = a->other (c, i);
+    atom_number_t j = a->other(c, i);
 
     if (counted[j])
       continue;
@@ -856,7 +859,7 @@ identify_cfx_section (const Molecule & m,
       fluorine_connections++;
     }
     else if (6 == z[j])
-      carbon_connections.add (j);
+      carbon_connections.add(j);
   }
 
   if (2 == fluorine_connections)
@@ -868,17 +871,79 @@ identify_cfx_section (const Molecule & m,
 
   int rc = 1;
 
-  for (int i = 0; i < carbon_connections.number_elements (); i++)
+  for (int i = 0; i < carbon_connections.number_elements(); i++)
   {
     atom_number_t c2 = carbon_connections[i];
 
-    rc += identify_cfx_section (m, z, c2, counted, cf2, cf3);
+    rc += identify_cfx_section(m, z, c2, counted, cf2, cf3);
   }
 
   return rc;
 }
 
+/*static int
+fluorine (Molecule & m,
+          Demerit & demerit,
+          const atomic_number_t * z,
+          const int * ncon)
+{
+  int cf2 = 0;
+  int cf3 = 0;
 
+  int matoms = m.natoms();
+
+  int * counted = new_int (matoms); std::unique_ptr<int[]> free_counted (counted);
+
+  for (int i = 0; i < matoms; i++)
+  {
+    if (counted[i])
+      continue;
+
+    if (9 != z[i])
+      continue;
+
+    if (0 == ncon[i])
+      continue;
+
+    atom_number_t c = m.other(i, 0);
+
+    if (counted[c])
+      continue;
+
+    int tmpcf2 = 0;
+    int tmpcf3 = 0;
+
+    if (! identify_cfx_section (m, z, c, counted, tmpcf2, tmpcf3))
+      continue;
+
+//  If there was a cf2 in this grouping, then the whole thing is a cf2 grouping
+
+    if (tmpcf2)
+      cf2 += tmpcf2 + tmpcf3;
+    else
+      cf3++;
+  }
+
+  if (cf2)
+  {
+    demerit.extra (cf2 * 35, "CF2");
+    molecules_with_cf2++;
+  }
+
+  if (cf3 < 2)
+    return demerit.rejected();
+
+  molecules_with_cf3++;
+
+  if (2 == cf3)
+    demerit.extra (10, "CF3");
+  else if (3 == cf3)
+    demerit.extra (60, "CF3");
+  else
+    demerit.reject("CF3");
+
+  return demerit.rejected();
+}*/
 
 
 /*
@@ -905,24 +970,24 @@ static int
 phosphorus (Molecule & m, Demerit & demerit,
             const atomic_number_t * mz, const int * ncon)
 {
-  int phosphoric_acids = 0;
+  const int matoms = m.natoms();
 
-  int matoms = m.natoms ();
+  int phosphoric_acids = 0;
   int np = 0;
   for (int i = 0; i < matoms; i++)
   {
     if (15 != mz[i])
       continue;
 
-    const Atom * p = m.atomi (i);
+    const Atom * p = m.atomi(i);
 
     np++;
 
-    if (ncon[i] > 2 && is_phosphorus_acid (p, i, mz, ncon))
+    if (ncon[i] > 2 && is_phosphorus_acid(p, i, mz, ncon))
       phosphoric_acids++;
     else if (np - phosphoric_acids > 1 && apply_more_than_two_phosporus)
     {
-      demerit.reject ("more_than_1_P");
+      demerit.reject("more_than_1_P");
       more_than_two_phosporus_count++;
       return 1;
     }
@@ -932,27 +997,27 @@ phosphorus (Molecule & m, Demerit & demerit,
     int ncarbon = 0;
     for (int j = 0; j < icon; j++)
     {
-      atomic_number_t z = mz[p->other (i, j)];
+      atomic_number_t z = mz[p->other(i, j)];
 
       if (6 == z)
       {
         ncarbon++;
         if (ncarbon > 1 && apply_phosphorus_to_two_carbons)
         {
-          demerit.reject ("CPC");
+          demerit.reject("CPC");
           phosphorus_to_two_carbons_count++;
           return 1;
         }
       }
       else if (7 == z && apply_phosphorus_to_nitrogen)
       {
-        demerit.reject ("PN");
+        demerit.reject("PN");
         phosphorus_to_nitrogen_count++;
         return 1;
       }
       else if (16 == z && apply_sulphur_phosphorus_bond)        // prior to 21 Aug, this also specified a double bond
       {
-        demerit.reject ("P-S");
+        demerit.reject("P-S");
         sulphur_phosphorus_bond_count++;
         return 1;
       }
@@ -981,21 +1046,21 @@ two_halogens_at_different_attach_points (Molecule & m, Demerit & demerit,
 
   int first_carbon_centre = INVALID_ATOM_NUMBER;
 
-  int matoms = m.natoms ();
+  int matoms = m.natoms();
   for (int i = 0; i < matoms; i++)
   {
     atomic_number_t z = mz[i];
     if ((17 == z || 35 == z || 53 == z) && 1 == ncon[i])
     {
-      atom_number_t c = m.other (i, 0);
+      atom_number_t c = m.other(i, 0);
       atomic_number_t cz = mz[c];
-      if (6 == cz && ncon[c] == m.nbonds (c))    // SP3 carbon only
+      if (6 == cz && ncon[c] == m.nbonds(c))    // SP3 carbon only
       {
         if (INVALID_ATOM_NUMBER == first_carbon_centre)
           first_carbon_centre = c;
         else if (c != first_carbon_centre)
         {
-          demerit.reject ("halogens_to_multiple_aliphatic_C");
+          demerit.reject("halogens_to_multiple_aliphatic_C");
           two_halogens_at_different_attach_points_count++;
           return 1;
         }
@@ -1006,43 +1071,36 @@ two_halogens_at_different_attach_points (Molecule & m, Demerit & demerit,
   return 0;
 }
 
-
-
-
-
 /*
   More than two [SD2]
 */
 
-static int more_than_three_sulphur_count = 0;
-static int apply_more_than_three_sulphur = 1;
+static int more_than_two_sulphur_count = 0;
+static int apply_more_than_two_sulphur = 1;
 
 static int
-more_than_three_sulphur (Molecule & m, Demerit & demerit,
-               const atomic_number_t * mz, const int * ncon)
+more_than_two_sulphur (Molecule & m, Demerit & demerit,
+                       const atomic_number_t * mz, const int * ncon)
 {
-  if (! apply_more_than_three_sulphur)
+  if (! apply_more_than_two_sulphur)
     return 0;
 
   int nsulphur = 0;
-  int matoms = m.natoms ();
+  int matoms = m.natoms();
   for (int i = 0; i < matoms; i++)
   {
-    atomic_number_t z = mz[i];
-    if (16 == z && 2 == ncon[i] && 0 == m.nrings (i))
-    {
+    if (16 == mz[i] && 2 == ncon[i] && 0 == m.nrings(i))
       nsulphur++;
-      if (nsulphur >= 3)
-      {
-        demerit.reject ("more_than_2_[SD2]");
-        more_than_three_sulphur_count++;
-        return 1;
-      }
-    }
   }
-  return 0;
-}
 
+  if (nsulphur < 3)
+    return 0;
+
+  more_than_two_sulphur_count++;
+  demerit.extra(demerit_or_default_if_specified(50) * (nsulphur - 1), "more_than_2_[SD2]");
+
+  return 1;
+}
 
 /*
   Rule here is [SD2]-N
@@ -1064,40 +1122,40 @@ sulphur_nitrogen (Molecule & m, Demerit & demerit,
   if (! apply_sulphur_nitrogen)
     return 0;
 
-  int matoms = m.natoms ();
+  int matoms = m.natoms();
   for (int i = 0; i < matoms; i++)
   {
-    if (16 != mz[i] || ncon[i] < 2 || ncon[i] > 4 || m.formal_charge (i))
+    if (16 != mz[i] || ncon[i] < 2 || ncon[i] > 4 || m.formal_charge(i))
       continue;
 
-    if (m.is_aromatic (i))
+    if (m.is_aromatic(i))
       continue;
 
 //  We now have a 2 or 3 connected S
 
-    const Atom * as = m.atomi (i);
+    const Atom * as = m.atomi(i);
     for (int j = 0; j < ncon[i]; j++)
     {
-      const Bond * b = as->item (j);
+      const Bond * b = as->item(j);
 
-      atom_number_t k = b->other (i);
+      atom_number_t k = b->other(i);
 
       if (7 != mz[k])
         continue;
 
-      if (m.is_ring_atom (k))
+      if (m.is_ring_atom(k))
         continue;
 
-      if (2 == ncon[i] && b->is_single_bond ())
-        demerit.reject ("[SD2]-N");
-      else if (2 == ncon[i] && b->is_double_bond ())
-        demerit.reject ("[SD2]=N");
-//    else if (3 == ncon[i] && b->is_double_bond ())    // removed 25 sept 2010
-//      demerit.reject ("[SD3]=N");
-      else if (4 == ncon[i] && 6 == as->nbonds ())    // sulphone type OK
+      if (2 == ncon[i] && b->is_single_bond())
+        demerit.reject("[SD2]-N");
+      else if (2 == ncon[i] && b->is_double_bond())
+        demerit.reject("[SD2]=N");
+//    else if (3 == ncon[i] && b->is_double_bond())    // removed 25 sept 2010
+//      demerit.reject("[SD3]=N");
+      else if (4 == ncon[i] && 6 == as->nbonds())    // sulphone type OK
         continue;
       else
-        demerit.reject ("sulfinamide");
+        demerit.reject("sulfinamide");
 
       sulphur_nitrogen_count++;
       return 1;
@@ -1106,11 +1164,6 @@ sulphur_nitrogen (Molecule & m, Demerit & demerit,
 
   return 0;
 }
-
-
-
-
-
 
 
 static int nitrogen_nitrogen_double_bond_count = 0;
@@ -1126,42 +1179,42 @@ static int
 nitrogen_nitrogen (Molecule & m, Demerit & demerit,
                const atomic_number_t * mz, const int * ncon)
 {
-  int matoms = m.natoms ();
+  int matoms = m.natoms();
   for (int i = 0; i < matoms; i++)
   {
     if (7 != mz[i])
       continue;
 
-    if (m.nrings (i))
+    if (m.nrings(i))
       continue;
 
-    const Atom * a = m.atomi (i);
+    const Atom * a = m.atomi(i);
 
     int icon = ncon[i];
     for (int j = 0; j < icon; j++)
     {
-      const Bond * b = a->item (j);
-      atom_number_t k = b->other (i);
+      const Bond * b = a->item(j);
+      atom_number_t k = b->other(i);
 
-      if (7 == mz[k] && 0 == m.nrings (k) && apply_nitrogen_nitrogen_triple_bond)     // two N's in a chain.
+      if (7 == mz[k] && 0 == m.nrings(k) && apply_nitrogen_nitrogen_triple_bond)     // two N's in a chain.
       {
-        if (b->is_triple_bond ())
+        if (b->is_triple_bond())
         {
-          demerit.reject ("N#N");
+          demerit.reject("N#N");
           nitrogen_nitrogen_triple_bond_count++;
           return 1;
         }
-        if (b->is_double_bond ())
+        if (b->is_double_bond())
         {
-          demerit.reject ("N=N");
+          demerit.reject("N=N");
           nitrogen_nitrogen_double_bond_count++;
           return 1;
         }
-        if (b->is_single_bond ())
+        if (b->is_single_bond())
         {
-          if (a->nbonds () > ncon[i] && m.nbonds (k) > ncon[k])
+          if (a->nbonds() > ncon[i] && m.nbonds(k) > ncon[k])
           {
-            demerit.reject ("=N-N=");
+            demerit.reject("=N-N=");
             two_nitrogens_with_double_bonds_count++;
             return 1;
           }
@@ -1176,6 +1229,127 @@ nitrogen_nitrogen (Molecule & m, Demerit & demerit,
 static int nitrogen_single_bond_nitrogen_count = 0;
 static int apply_nitrogen_single_bond_nitrogen = 1;
 
+/*
+  We have an N-N bond, need to see if the second nitrogen is doubly bonded to a carbon
+*/
+
+static int
+is_hydrazid (Molecule & m,
+             const atom_number_t n,
+             const atomic_number_t * mz,
+             const int * ncon)
+{
+  const Atom * a = m.atomi(n);
+
+  const int acon = ncon[n];
+
+  for (int i = 0; i < acon; ++i)
+  {
+    const Bond * b = a->item(i);
+
+    if (! b->is_single_bond())    // redudant
+      continue;
+
+    const atom_number_t j = b->other(n);
+
+    const atomic_number_t zj = mz[j];
+
+    if (7 == zj)   // looping back to the starting N atom
+      continue;
+
+    if (6 == zj || 16 == zj)
+      ;
+    else
+      continue;
+
+    if (m.is_aromatic(j))
+      continue;
+
+    const int jcon = ncon[j];
+
+    if (6 == zj && 3 == jcon)
+      ;
+    else if (32 == zj && 4 == jcon)
+      ;
+    else
+      continue;
+
+    const Atom * aj = m.atomi(j);
+
+    for (int x = 0; x < jcon; ++x)
+    {
+      const Bond * b = aj->item(x);
+
+      if (! b->is_double_bond())
+        continue;
+
+      const atom_number_t o = b->other(j);
+
+      if (8 == mz[o])
+        return 1;
+      else
+        return 0;
+    }
+  }
+
+  return 0;
+}
+
+static int
+is_hydrazone (const Molecule & m,
+              const atom_number_t n,
+              const atomic_number_t * mz,
+              const int * ncon)
+{
+  const Atom * a = m.atomi(n);
+
+  if (0 != a->formal_charge())
+    return 0;
+
+  const int acon = ncon[n];
+
+  for (int i = 0; i < acon; ++i)
+  {
+    const Bond * b = a->item(i);
+
+    if (! b->is_double_bond())
+      continue;
+
+    const atom_number_t c = b->other(n);
+
+    if (6 == mz[c])
+      return 1;
+  }
+
+  return 0;
+}
+
+static int
+is_hydrazone_or_hydrazid (Molecule & m,
+                          const atom_number_t n,
+                          const atomic_number_t * mz,
+                          const int * ncon)
+{
+  const Atom * a = m.atomi(n);
+
+  const int acon = ncon[n];
+
+  if (2 != acon)
+    return 0;
+
+  const int nb = a->nbonds();
+
+  if (3 == nb)
+    return is_hydrazone(m, n, mz, ncon);
+
+  if (2 == nb)
+    return is_hydrazid(m, n, mz, ncon);
+
+  return 0;
+}
+
+// Make sure we do not hit Hydrazones, or Hydrazids
+
 static int
 nitrogen_single_bond_nitrogen (Molecule & m,
                         Demerit & demerit,
@@ -1185,33 +1359,42 @@ nitrogen_single_bond_nitrogen (Molecule & m,
   if (! apply_nitrogen_single_bond_nitrogen)
     return 0;
 
-  int matoms = m.natoms ();
+  const int matoms = m.natoms();
   int NNcount = 0;
   for (int i = 0; i < matoms; i++)
   {
     if (7 != mz[i])
       continue;
 
-    const Atom * a = m.atomi (i);
+    const Atom * a = m.atomi(i);
 
     for (int j = 0; j < ncon[i]; j++)
     {
-      const Bond * b = a->item (j);
-      if (! b->is_single_bond ())
+      const Bond * b = a->item(j);
+      if (! b->is_single_bond())
         continue;
 
-      atom_number_t k = b->other (i);
+      atom_number_t k = b->other(i);
+
       if (k < i)   // make sure we only count these once
         continue;
 
-      if (7 == mz[k] && ! m.in_same_rings (i, k))
+      if (7 != mz[k])
+        continue;
+
+      if (1 == ncon[i] && is_hydrazone_or_hydrazid(m, k, mz, ncon))
+        continue;
+      else if (1 == ncon[k] && is_hydrazone_or_hydrazid(m, i, mz, ncon))
+        continue;
+
+      if (! m.in_same_rings(i, k))
         NNcount++;
     }
   }
 
   if (NNcount)
   {
-    demerit.extra (NNcount * 75, "N-N");   // jun97 change from 50 to 75 each
+    demerit.extra(NNcount * demerit_or_default_if_specified(75), "N-N");   // jun97 change from 50 to 75 each
     nitrogen_single_bond_nitrogen_count++;
   }
 
@@ -1227,15 +1410,47 @@ too_many_rings (Molecule & m,
   if (! apply_too_many_rings_demerit)
     return 0;
 
-  int nr = m.nrings ();
+  int nr = m.nrings();
 
-  if (nr > 6)
-    demerit.extra ((nr - 6) * 20, "too_many_rings");
+  if (nr > too_many_rings_cutoff)
+    demerit.extra((nr - too_many_rings_cutoff) * demerit_or_default_if_specified(20), "too_many_rings");
 
-  return demerit.rejected ();
+  return demerit.rejected();
 }
 
+/*static int apply_aromatic_rings_demerit = 1;
 
+static int
+too_many_aromatic_rings (Molecule & m,
+                         Demerit & demerit)
+{
+  if (! apply_aromatic_rings_demerit)
+    return 0;
+
+  int nr = m.nrings();
+
+  if (nr < 5)
+    return 0;
+
+  m.compute_aromaticity_if_needed();
+
+  int aromatic_rings = 0;
+
+  for (int i = 0; i < m.nrings(); i++)
+  {
+    const Ring * ri = m.ringi (i);
+
+    if (ri->is_aromatic())
+      aromatic_rings++;
+  }
+
+  if (aromatic_rings < 5)
+    return 0;
+
+  demerit.extra (40 * (aromatic_rings - 4), "Aromatic Rings");
+
+  return demerit.rejected();
+}*/
 
 static int
 hard_coded_queries (Molecule & m,
@@ -1243,49 +1458,50 @@ hard_coded_queries (Molecule & m,
                     const atomic_number_t * z,
                     const int * ncon)
 {
-  int * ring_membership = new int[m.natoms ()]; iw_auto_array<int> free_ring_membership (ring_membership);
-  m.ring_membership (ring_membership);
-
-  if (alkyl_halides (m, demerit, z, ncon) && 0 == keep_going_after_rejection)
+  if (alkyl_halides(m, demerit, z, ncon) && 0 == keep_going_after_rejection)
     return 1;
 
-//if (fluorine (m, demerit, z, ncon) && 0 == keep_going_after_rejection)
+//if (fluorine(m, demerit, z, ncon) && 0 == keep_going_after_rejection)
 //  return 1;
 
-  if (phosphorus (m, demerit, z, ncon) && 0 == keep_going_after_rejection)
+  if (phosphorus(m, demerit, z, ncon) && 0 == keep_going_after_rejection)
     return 1;
 
-  if (two_halogens_at_different_attach_points (m, demerit, z, ncon) && 0 == keep_going_after_rejection)
+  if (two_halogens_at_different_attach_points(m, demerit, z, ncon) && 0 == keep_going_after_rejection)
     return 1;
 
-  if (nitrogen_nitrogen (m, demerit, z, ncon) && 0 == keep_going_after_rejection)
+  if (nitrogen_nitrogen(m, demerit, z, ncon) && 0 == keep_going_after_rejection)
     return 1;
 
-  if (nitrogen_single_bond_nitrogen (m, demerit, z, ncon) && 0 == keep_going_after_rejection)
+  if (nitrogen_single_bond_nitrogen(m, demerit, z, ncon) && 0 == keep_going_after_rejection)
     return 1;
 
-  if (too_many_rings (m, demerit) && 0 == keep_going_after_rejection)
+  if (too_many_rings(m, demerit) && 0 == keep_going_after_rejection)
     return 1;
 
-  if (more_than_three_sulphur (m, demerit, z, ncon) && 0 == keep_going_after_rejection)
+  if (more_than_two_sulphur(m, demerit, z, ncon) && 0 == keep_going_after_rejection)
     return 1;
 
-  if (sulphur_nitrogen (m, demerit, z, ncon) && 0 == keep_going_after_rejection)
+  if (sulphur_nitrogen(m, demerit, z, ncon) && 0 == keep_going_after_rejection)
     return 1;
 
-  if (too_many_charges (m, demerit) && 0 == keep_going_after_rejection)
+  if (too_many_charges(m, demerit) && 0 == keep_going_after_rejection)
     return 1;
 
-  if (long_carbon_chains (m, demerit, z, ncon) && 0 == keep_going_after_rejection)
+  if (long_carbon_chains(m, demerit, z, ncon) && 0 == keep_going_after_rejection)
     return 1;
 
-  if (determine_c7_ring (m, demerit, z, ncon) && 0 == keep_going_after_rejection)
+  if (determine_c7_ring(m, demerit, z, ncon) && 0 == keep_going_after_rejection)
     return 1;
 
-  if (! apply_satcg)
-    ;
-  else if (large_saturated_carbon_sections_including_rings (m, demerit, z, ncon, ring_membership) && 0 == keep_going_after_rejection)
-    return 1;
+  if (apply_satcg)
+  {
+    int * ring_membership = new int[m.natoms()]; std::unique_ptr<int[]> free_ring_membership(ring_membership);
+    m.ring_membership(ring_membership);
+
+    if (large_saturated_carbon_sections_including_rings(m, demerit, z, ncon, ring_membership) && 0 == keep_going_after_rejection)
+      return 1;
+  }
 
 //if (complex_fused_rings(m, demerit))
 //  return 1;
@@ -1294,21 +1510,21 @@ hard_coded_queries (Molecule & m,
 }
 
 int
-hard_coded_queries (Molecule & m, Demerit & demerit)
+hard_coded_queries(Molecule & m, Demerit & demerit)
 {
-  int matoms = m.natoms ();
+  int matoms = m.natoms();
 
-  int * ncon = new int[matoms]; iw_auto_array<int> free_ncon (ncon);
-  (void) m.ncon (ncon);
+  int * ncon = new int[matoms]; std::unique_ptr<int[]> free_ncon(ncon);
+  (void) m.ncon(ncon);
 
-  atomic_number_t * z = new atomic_number_t[matoms]; iw_auto_array<atomic_number_t> free_z (z);
-  (void) m.atomic_numbers (z);
+  atomic_number_t * z = new atomic_number_t[matoms]; std::unique_ptr<atomic_number_t[]> free_z(z);
+  (void) m.atomic_numbers(z);
 
-  return hard_coded_queries (m, demerit, z, ncon);
+  return hard_coded_queries(m, demerit, z, ncon);
 }
 
 int
-hard_coded_queries_statistics (ostream & os)
+hard_coded_queries_statistics(std::ostream & os)
 {
   os << "alkyl_halides_count = " << alkyl_halides_count << endl;
 
@@ -1327,7 +1543,7 @@ hard_coded_queries_statistics (ostream & os)
 
   os << "two_halogens_at_different_attach_points_count = " << two_halogens_at_different_attach_points_count << endl;
 
-  os << "more_than_three_sulphur_count = " << more_than_three_sulphur_count << endl;
+  os << "more_than_two_sulphur_count = " << more_than_two_sulphur_count << endl;
 
   os << "sulphur_nitrogen_count = " << sulphur_nitrogen_count << endl;
 
@@ -1366,7 +1582,7 @@ hard_coded_queries_statistics (ostream & os)
 */
 
 int
-suppress_query (const const_IWSubstring & query_name)
+suppress_query(const const_IWSubstring & query_name)
 {
   if ("c4" == query_name)
     apply_c4 = 0;
@@ -1392,8 +1608,8 @@ suppress_query (const const_IWSubstring & query_name)
     apply_more_than_two_phosporus = 0;
   else if ("halogens_at_different_attach_points" == query_name)
     apply_two_halogens_at_different_attach_points = 0;
-  else if ("more_than_three_sulphur" == query_name)
-    apply_more_than_three_sulphur = 0;
+  else if ("more_than_two_sulphur" == query_name)
+    apply_more_than_two_sulphur = 0;
   else if ("sulphur_nitrogen" == query_name)
     apply_sulphur_nitrogen = 0;
 #ifdef SCHIFF_BASE
@@ -1427,11 +1643,11 @@ initialise_queries_to_do (const const_IWSubstring & buffer)
 
   buffer.word (0, t1);
 
-  if (buffer.nwords () < 2)     // all queries are on by default, so just one token on the line must mean do the query, therefore nothing to do here
+  if (buffer.nwords() < 2)     // all queries are on by default, so just one token on the line must mean do the query, therefore nothing to do here
     return 1;
 
   const_IWSubstring t2;
-  buffer.word (1, t2);
+  buffer.word(1, t2);
 
   if ('1' == t2 || "yes" == t2)
     return 1;
@@ -1446,7 +1662,7 @@ initialise_queries_to_do (const const_IWSubstring & buffer)
     return 0;
   }
 
-  if (suppress_query (t1))
+  if (suppress_query(t1))
   {
     cerr << "Demerit for '" << t1 << "' suppressed\n";
     return 1;
@@ -1457,23 +1673,23 @@ initialise_queries_to_do (const const_IWSubstring & buffer)
 }
 
 int
-initialise_queries_to_do (iwstring_data_source & input)
+initialise_queries_to_do(iwstring_data_source & input)
 {
   const_IWSubstring buffer;
 
-  while (input.next_record (buffer))
+  while (input.next_record(buffer))
   {
-    if (buffer.starts_with ('#'))
+    if (buffer.starts_with('#'))
       continue;
 
-    buffer.strip_trailing_blanks ();
+    buffer.strip_trailing_blanks();
 
-    if (0 == buffer.length ())
+    if (0 == buffer.length())
       continue;
 
-    if (! initialise_queries_to_do (buffer))
+    if (! initialise_queries_to_do(buffer))
     {
-      cerr << "initialise_queries_to_do: invalid or unrecognised directive on line " << input.lines_read () << endl;
+      cerr << "initialise_queries_to_do: invalid or unrecognised directive on line " << input.lines_read() << endl;
       cerr << buffer << endl;
       return 0;
     }
@@ -1483,29 +1699,29 @@ initialise_queries_to_do (iwstring_data_source & input)
 }
 
 int
-initialise_hard_coded_queries_to_do (IWString & fname)
+initialise_hard_coded_queries_to_do(IWString & fname)
 {
-  iwstring_data_source input (fname);
+  iwstring_data_source input(fname);
 
-  if (! input.good ())
+  if (! input.good())
   {
     cerr << "Cannot open '" << fname << "'\n";
     return 0;
   }
 
-  return initialise_queries_to_do (input);
+  return initialise_queries_to_do(input);
 }
 
 void
-set_only_apply_rejection_rules ()
+set_only_apply_rejection_rules()
 {
-  suppress_query ("c4");
-  suppress_query ("c5");
-  suppress_query ("c6");
-  suppress_query ("positive_charge");
-  suppress_query ("negative_charge");
-  suppress_query ("nitrogen_single_bond_nitrogen");
-  suppress_query ("rings");
+  suppress_query("c4");
+  suppress_query("c5");
+  suppress_query("c6");
+  suppress_query("positive_charge");
+  suppress_query("negative_charge");
+  suppress_query("nitrogen_single_bond_nitrogen");
+  suppress_query("rings");
 
   return;
 }

@@ -1,21 +1,3 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef IW_LOGICAL_EXP_H
 #define IW_LOGICAL_EXP_H
 
@@ -53,7 +35,8 @@ class const_IWSubstring;
 #define IW_LOGEXP_LOW_PRIORITY_AND 4
 
 #include <iostream>
-using namespace std;
+using std::cerr;
+using std::endl;
 
 #include "iwaray.h"
 #include "set_or_unset.h"
@@ -83,7 +66,7 @@ class IW_Logexp_AND_Grouping
     IW_Logexp_AND_Grouping ();
     ~IW_Logexp_AND_Grouping ();
 
-    int debug_print (ostream &) const;
+    int debug_print (std::ostream &) const;
 
     int istart () const { return _istart;}
 
@@ -129,7 +112,7 @@ class IW_Logexp_Low_Priority_and_Grouping
     IW_Logexp_Low_Priority_and_Grouping ();
     ~IW_Logexp_Low_Priority_and_Grouping ();
 
-    int debug_print (ostream &) const;
+    int debug_print (std::ostream &) const;
 
     IW_Logexp_Low_Priority_and_Grouping * next () const { return _next;}
 
@@ -165,7 +148,7 @@ class IW_Logical_Expression : private resizable_array<int>
     ~IW_Logical_Expression ();
 
     int ok () const;
-    int debug_print (ostream &) const;
+    int debug_print (std::ostream &) const;
 
     int number_results () const { return _number_elements;}
 

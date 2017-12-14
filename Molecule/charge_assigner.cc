@@ -1,34 +1,15 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #include <stdlib.h>
 #include <memory>
 using namespace std;
 
 #include "cmdline.h"
-#include "iw_auto_array.h"
 #include "misc.h"
 
 #include "molecule.h"
 #include "qry_wstats.h"
+#include "rwsubstructure.h"
 #include "charge_assigner.h"
 #include "target.h"
-#include "rwsubstructure.h"
 
 /*
   The simple flag is an attempt at efficiency.
@@ -83,8 +64,8 @@ Charge_Assigner::Charge_Assigner ()
 
 Charge_Assigner::~Charge_Assigner ()
 {
-  DELETE_IF_NOT_NULL (_which_atom);
-  DELETE_IF_NOT_NULL (_charge_to_assign);
+  DELETE_IF_NOT_NULL(_which_atom);
+  DELETE_IF_NOT_NULL(_charge_to_assign);
 
   _molecules_examined = -5;
 
@@ -97,7 +78,7 @@ Charge_Assigner::report (ostream & os) const
   os << "Report on Charge_Assigner with " << _number_elements << " queries\n";
   os << "Changed " << _molecules_changed << " of " << _molecules_examined << " molecules examined\n";
   if (0 == _molecules_examined)
-    return os.good ();
+    return os.good();
 
   os << "Assigned " << _negative_charges_assigned << " negative charges to " << _molecules_receiving_negative_charges << " molecules\n";
   os << "Assigned " << _positive_charges_assigned << " positive charges to " << _molecules_receiving_positive_charges << " molecules\n";
@@ -106,10 +87,10 @@ Charge_Assigner::report (ostream & os) const
   {
     const Substructure_Hit_Statistics * q = _things[i];
     os << "Charge Assigner Query " << i << ": ";
-    q->report (os, _verbose);
+    q->report(os, _verbose);
   }
 
-  return os.good ();
+  return os.good();
 }
 
 void
@@ -155,12 +136,12 @@ Charge_Assigner::construct_from_command_line (Command_Line & cl,
 
   const_IWSubstring opt;
   int i = 0;
-  while (cl.value (cflag, opt, i++))
+  while (cl.value(cflag, opt, i++))
   {
-    if (_temp_detach_hydrogens.recognised_directive (opt))
+    if (_temp_detach_hydrogens.recognised_directive(opt))
       continue;
 
-    if (opt.starts_with ("over"))
+    if (opt.starts_with("over"))
     {
       _overwrite_existing_formal_charges = 1;
       if (verbose)
@@ -170,27 +151,27 @@ Charge_Assigner::construct_from_command_line (Command_Line & cl,
     {
       simple_flag = 1;
     }
-    else if (opt.starts_with ("P:"))
+    else if (opt.starts_with("P:"))
     {
-      opt.remove_leading_chars (2);
-      if (NULL == (_positive_element = get_element_from_symbol (opt, _positive_isotope)))
+      opt.remove_leading_chars(2);
+      if (NULL == (_positive_element = get_element_from_symbol(opt, _positive_isotope)))
       {
         cerr << "Cannot discern positive element '" << opt << "'\n";
         return 0;
       }
       if (verbose)
-        cerr << "Positively charged atoms will be replace by element '" << _positive_element->symbol () << "'\n";
+        cerr << "Positively charged atoms will be replace by element '" << _positive_element->symbol() << "'\n";
     }
-    else if (opt.starts_with ("N:"))
+    else if (opt.starts_with("N:"))
     {
-      opt.remove_leading_chars (2);
-      if (NULL == (_negative_element = get_element_from_symbol (opt, _negative_isotope)))
+      opt.remove_leading_chars(2);
+      if (NULL == (_negative_element = get_element_from_symbol(opt, _negative_isotope)))
       {
         cerr << "Cannot discern negative element '" << opt << "'\n";
         return 0;
       }
       if (verbose)
-        cerr << "Negatively charged atoms will be replace by element '" << _negative_element->symbol () << "'\n";
+        cerr << "Negatively charged atoms will be replace by element '" << _negative_element->symbol() << "'\n";
     }
     else if ("isotope" == opt)
     {
@@ -198,10 +179,10 @@ Charge_Assigner::construct_from_command_line (Command_Line & cl,
       if (verbose)
         cerr << "Changed atoms will be isotopically labeled\n";
     }
-    else if (opt.starts_with ("F:"))
+    else if (opt.starts_with("F:"))
     {
-      opt.remove_leading_chars (2);
-      if (! queries_from_file (opt, tmp, 1, verbose))   // queries always in same directory as control file
+      opt.remove_leading_chars(2);
+      if (! queries_from_file(opt, tmp, 1, verbose))   // queries always in same directory as control file
       {
         cerr << "Charge_Assigner: cannot read queries from file specifier 'F:" << opt << "'\n";
         return 0;
@@ -226,10 +207,10 @@ Charge_Assigner::construct_from_command_line (Command_Line & cl,
       if (verbose)
         cerr << "Will attach an explicit Hydrogen atom to atoms assigned positive charges\n";
     }
-    else if (opt.starts_with ("minsep="))
+    else if (opt.starts_with("minsep="))
     {
-      opt.remove_leading_chars (7);
-      if (! opt.numeric_value (_min_distance_between_charges) || _min_distance_between_charges < 1)
+      opt.remove_leading_chars(7);
+      if (! opt.numeric_value(_min_distance_between_charges) || _min_distance_between_charges < 1)
       {
         cerr << "Charge_Assigner::invalid min distance '" << opt << "'\n";
         return 0;
@@ -237,22 +218,22 @@ Charge_Assigner::construct_from_command_line (Command_Line & cl,
     }
     else if ("help" == opt)
     {
-      display_all_charge_assigner_options (cerr, cflag);
-      exit (7);    // note exit!
+      display_all_charge_assigner_options(cerr, cflag);
+      exit(7);    // note exit!
     }
     else 
     {
-      Substructure_Hit_Statistics * q = new Substructure_Hit_Statistics (opt);
-      if (! q->read (opt))
+      Substructure_Hit_Statistics * q = new Substructure_Hit_Statistics(opt);
+      if (! q->read(opt))
       {
         cerr << "Charge_Assigner: cannot read query from '" << opt << "'\n";
         delete q;
         return 0;
       }
 
-      assert (q->ok ());
+      assert (q->ok());
 
-      add (q);
+      add(q);
 
       if (verbose)
         cerr << "Charge_Assigner::construct_from_command_line: made query from '" << opt << "'\n";
@@ -274,11 +255,11 @@ Charge_Assigner::construct_from_command_line (Command_Line & cl,
 
   if (simple_flag)
   {
-    _which_atom = new_int (_number_elements, -99);    // -99 means not initialised
-    _charge_to_assign = new_int (_number_elements, -99);
+    _which_atom = new_int(_number_elements, -99);    // -99 means not initialised
+    _charge_to_assign = new_int(_number_elements, -99);
   }
 
-  return _all_queries_have_numeric_value ();
+  return _all_queries_have_numeric_value();
 }
 
 void
@@ -307,14 +288,14 @@ Charge_Assigner::_all_queries_have_numeric_value () const
   {
     const Substructure_Query * cq = _things[i];   // the (possibly) composite substructure query
 
-    int nq = cq->number_elements ();
+    int nq = cq->number_elements();
     for (int j = 0; j < nq; j++)
     {
-      const Single_Substructure_Query * q = cq->item (j);
-      if (! _numeric_value_present (q))
+      const Single_Substructure_Query * q = cq->item(j);
+      if (! _numeric_value_present(q))
       {
         cerr << "Charge_Assigner::_all_queries_have_numeric_value: no numeric value found, query " << i << ", component " << j << endl;
-        cerr << cq->comment () << endl;
+        cerr << cq->comment() << endl;
         return 0;
       }
     }
@@ -326,12 +307,12 @@ Charge_Assigner::_all_queries_have_numeric_value () const
 int
 Charge_Assigner::_numeric_value_present (const Single_Substructure_Query * q) const
 {
-  int nr = q->root_atoms ();
+  int nr = q->root_atoms();
   for (int i = 0; i < nr; i++)
   {
-    const Substructure_Atom * a = q->root_atom (i);
+    const Substructure_Atom * a = q->root_atom(i);
 
-    if (_numeric_value_present (a))
+    if (_numeric_value_present(a))
       return 1;
   }
 
@@ -342,14 +323,14 @@ int
 Charge_Assigner::_numeric_value_present (const Substructure_Atom * a) const
 {
   double unused;
-  if (a->numeric_value (unused))
+  if (a->numeric_value(unused))
     return 1;
 
-  int nc = a->number_children ();
+  int nc = a->number_children();
   for (int i = 0; i < nc; i++)
   {
-    Substructure_Atom * child = a->child (i);
-    if (_numeric_value_present (child))
+    Substructure_Atom * child = a->child(i);
+    if (_numeric_value_present(child))
       return 1;
   }
 
@@ -371,13 +352,13 @@ Charge_Assigner::_add_charge_to_atom (Molecule_to_Match & target,
   if (charges_assigned[zatom])    // hmm, already assigned a charge to this one
     return 0;
 
-  if (target[zatom].formal_charge () && 0 == _overwrite_existing_formal_charges)
+  if (target[zatom].formal_charge() && 0 == _overwrite_existing_formal_charges)
     return 0;
 
   if (fc > 0)
-    positive_charges_assigned.add (zatom);
+    positive_charges_assigned.add(zatom);
   else
-    negative_charges_assigned.add (zatom);
+    negative_charges_assigned.add(zatom);
 
   charges_assigned[zatom] = fc;
 
@@ -502,7 +483,7 @@ Charge_Assigner::_process (Molecule_to_Match & target,
   {
     Substructure_Results sresults;
 
-    int nhits = _things[i]->substructure_search (target, sresults);
+    int nhits = _things[i]->substructure_search(target, sresults);
     if (0 == nhits)
       continue;
 
@@ -517,7 +498,7 @@ Charge_Assigner::_process (Molecule_to_Match & target,
 
     for (int j = 0; j < nhits; j++)
     {
-      const Set_of_Atoms * s = sresults.embedding (j);
+      const Set_of_Atoms * s = sresults.embedding(j);
 #ifdef DEBUG_CHARGE_ASSIGNER_PROCESS
       cerr << " hit " << j << " is " << (*s) << endl;
 #endif
@@ -526,28 +507,28 @@ Charge_Assigner::_process (Molecule_to_Match & target,
 
       if (_which_atom && _which_atom[i] >= 0)
       {
-        atom_number_t l = s->item (_which_atom[i]);
+        atom_number_t l = s->item(_which_atom[i]);
         if (_add_charge_to_atom(target, positive_charges_assigned, negative_charges_assigned, charges_assigned, l, _charge_to_assign[l]))
           rc++;
         continue;
       }
 
-      const Query_Atoms_Matched * qam = sresults.query_atoms_matching (j);
+      const Query_Atoms_Matched * qam = sresults.query_atoms_matching(j);
 
-      assert (s->number_elements () == qam->number_elements ());
+      assert (s->number_elements() == qam->number_elements());
 
       int found_non_zero_charge = 0;   // make sure every query has a charge to assign
 
-      int ns = s->number_elements ();
+      int ns = s->number_elements();
       for (int k = 0; k < ns; k++)
       {
-        const Substructure_Atom * a = qam->item (k);
+        const Substructure_Atom * a = qam->item(k);
 
         double tmp;
-        if (! a->numeric_value (tmp))
+        if (! a->numeric_value(tmp))
           continue;
 
-        formal_charge_t fc = static_cast<formal_charge_t> (tmp);   // double -> int conversion
+        formal_charge_t fc = static_cast<formal_charge_t>(tmp);   // double -> int conversion
         if (0 == fc)
           continue;
 
@@ -564,10 +545,10 @@ Charge_Assigner::_process (Molecule_to_Match & target,
 
         found_non_zero_charge++;
 
-        atom_number_t l = s->item (k);
+        atom_number_t l = s->item(k);
 
 #ifdef DEBUG_CHARGE_ASSIGNER_PROCESS
-        cerr << "k = " << k << " formal charge of " << fc << " to be placed on atom " << l << endl;
+        cerr << "k = " << k << " formal charge of " << fc << " to be placed on atom " << l << ", type " << target[l].atomic_number() << endl;
 #endif
 
         if (_add_charge_to_atom(target, positive_charges_assigned, negative_charges_assigned, charges_assigned, l, fc))
@@ -575,7 +556,7 @@ Charge_Assigner::_process (Molecule_to_Match & target,
       }
 
       if (0 == found_non_zero_charge)
-        cerr << "Hmmm, query '" << _things[i]->comment () << "' has no non-zero charges\n";
+        cerr << "Hmmm, query '" << _things[i]->comment() << "' has no non-zero charges\n";
     }
   }
 
@@ -593,17 +574,17 @@ Charge_Assigner::_remove_positive_charge_hits_on_chiral_atoms (Molecule & m,
                         Set_of_Atoms & positive_charges_assigned,
                         formal_charge_t * charges_assigned) const
 {
-  for (int i = 0; i < positive_charges_assigned.number_elements (); i++)
+  for (int i = 0; i < positive_charges_assigned.number_elements(); i++)
   {
     atom_number_t ai = positive_charges_assigned[i];
 
-    if (NULL == m.chiral_centre_at_atom (ai))
+    if (NULL == m.chiral_centre_at_atom(ai))
       continue;
 
     if (0 == m.hcount(ai))
       continue;
 
-    positive_charges_assigned.remove_item (i);
+    positive_charges_assigned.remove_item(i);
     charges_assigned[ai] = 0;
     i--;
   }
@@ -719,30 +700,30 @@ Charge_Assigner::_identify_charged_atoms_too_close (Molecule & m,
   cerr << "Looking for charges too close in " << s.number_elements() << " matches\n";
 #endif
 
-  for (int i = 0; i < s.number_elements (); i++)
+  for (int i = 0; i < s.number_elements(); i++)
   {
     atom_number_t ai = s[i];
 
-    int fi = m.fragment_membership (ai);
+    int fi = m.fragment_membership(ai);
 
-    for (int j = i + 1; j < s.number_elements (); j++)
+    for (int j = i + 1; j < s.number_elements(); j++)
     {
       atom_number_t aj = s[j];
 
-      if (m.fragment_membership (aj) != fi)
+      if (m.fragment_membership(aj) != fi)
         continue;
 
 #ifdef DEBUG_IDENTIFY_CHARGED_ATOMS_TOO_CLOSE
-      cerr << m.bonds_between (ai, aj) << " bonds between " << ai << " and " << aj << endl;
+      cerr << m.bonds_between(ai, aj) << " bonds between " << ai << " and " << aj << endl;
 #endif
 
       if (ai == aj)    // can this happen?
         ;
-      else if (m.bonds_between (ai, aj) > _min_distance_between_charges)
+      else if (m.bonds_between(ai, aj) > _min_distance_between_charges)
         continue;
 
 #ifdef DEBUG_IDENTIFY_CHARGED_ATOMS_TOO_CLOSE
-      cerr << "Atoms " << ai << " '" << m.smarts_equivalent_for_atom(ai) << "' and " << aj << " '" << m.smarts_equivalent_for_atom (aj) << "' too close " << m.bonds_between(ai, aj) << endl;
+      cerr << "Atoms " << ai << " '" << m.smarts_equivalent_for_atom(ai) << "' and " << aj << " '" << m.smarts_equivalent_for_atom(aj) << "' too close " << m.bonds_between(ai, aj) << endl;
 #endif
 
       too_close.add(ai);
@@ -765,12 +746,12 @@ Charge_Assigner::_remove_hits_too_close_isolation_score (Molecule & m,
                                          Set_of_Atoms & s,
                                          formal_charge_t * charges_assigned) const
 {
-  if (s.number_elements () < 2)    // no close matches to eliminate
+  if (s.number_elements() < 2)    // no close matches to eliminate
     return;
 
   int matoms = m.natoms();
 
-  int * times_too_close = new_int(matoms); iw_auto_array<int> free_times_too_close(times_too_close);
+  int * times_too_close = new_int(matoms); std::unique_ptr<int[]> free_times_too_close(times_too_close);
 
   if (0 == _identify_charged_atoms_too_close(m, s, times_too_close))  // great, nothing too close
     return;
@@ -822,7 +803,7 @@ Charge_Assigner::_remove_hits_too_close_isolation_score (Molecule & m,
       if (m.fragment_membership(ai) != m.fragment_membership(aj))
         continue;
 
-      if (m.bonds_between (ai, aj) > _min_distance_between_charges)
+      if (m.bonds_between(ai, aj) > _min_distance_between_charges)
         continue;
 
       atom_number_t survivor = identify_survivor(m, ai, aj, times_too_close);
@@ -846,40 +827,40 @@ Charge_Assigner::_remove_hits_too_close (Molecule & m,
                                          Set_of_Atoms & s,
                                          formal_charge_t * charges_assigned) const
 {
-  if (s.number_elements () < 2)    // no close matches to eliminate
+  if (s.number_elements() < 2)    // no close matches to eliminate
     return;
 
 #ifdef DEBUG_REMOVE_HITS_TOO_CLOSE
   cerr << "Atoms are " << s << endl;
 #endif
 
-  for (int i = 0; i < s.number_elements (); i++)
+  for (int i = 0; i < s.number_elements(); i++)
   {
     atom_number_t ai = s[i];
 
-    int fi = m.fragment_membership (ai);
+    int fi = m.fragment_membership(ai);
 
-    for (int j = i + 1; j < s.number_elements (); j++)
+    for (int j = i + 1; j < s.number_elements(); j++)
     {
       atom_number_t aj = s[j];
 
-      if (m.fragment_membership (aj) != fi)
+      if (m.fragment_membership(aj) != fi)
         continue;
 
 #ifdef DEBUG_REMOVE_HITS_TOO_CLOSE
-      cerr << m.bonds_between (ai, aj) << " bonds between " << ai << " and " << aj << endl;
+      cerr << m.bonds_between(ai, aj) << " bonds between " << ai << " and " << aj << endl;
 #endif
 
       if (ai == aj)
         ;
-      else if (m.bonds_between (ai, aj) > _min_distance_between_charges)
+      else if (m.bonds_between(ai, aj) > _min_distance_between_charges)
         continue;
 
 #ifdef DEBUG_REMOVE_HITS_TOO_CLOSE
-      cerr << "Removing atom " << aj << ", '" << m.smarts_equivalent_for_atom (aj) << "'\n";
+      cerr << "Removing atom " << aj << ", '" << m.smarts_equivalent_for_atom(aj) << "'\n";
 #endif
 
-      s.remove_item (j);
+      s.remove_item(j);
       charges_assigned[aj] = 0;
       j--;
     }
@@ -905,7 +886,7 @@ Charge_Assigner::_enumerate_possibilities0 (Molecule & m,
     return 1;
   }
 
-  return _enumerate_possibilities1 (m, s, 0, possibilities);
+  return _enumerate_possibilities1(m, s, 0, possibilities);
 }
 
 int
@@ -1000,7 +981,7 @@ Charge_Assigner::_enumerate_possibilities1 (Molecule & m,
 
   Jan 2005. Molecule
 
-  BrC1=CC(=C(C2=C1C=CC=C2)OC)C1=NC(=CO1)C[N@@H2+]C1CN(CC1)CC1=CC=CC=C1
+  BrC1=CC(=C(C2=C1C=CC=C2)OC)C1=NC(=CO1)C[N@@H2+]C1CN(CC1)CC1=CC=CC=C1 189899
 
   is invalid. Make sure we don't put a +ve charge on any chiral nitrogen
 
@@ -1015,19 +996,21 @@ Charge_Assigner::_process (Molecule & m,
   Set_of_Atoms positive_charges_assigned;
   Set_of_Atoms negative_charges_assigned;
 
-  int matoms = m.natoms ();
+  int matoms = m.natoms();
 
-  Molecule_to_Match target (&m);
+  Molecule_to_Match target(&m);
 
-  int rc = _process (target, positive_charges_assigned, negative_charges_assigned, charges_assigned);
+  int rc = _process(target, positive_charges_assigned, negative_charges_assigned, charges_assigned);
 
-  if (m.chiral_centres ())    // one or more chiral centres present
-    _remove_positive_charge_hits_on_chiral_atoms (m, positive_charges_assigned, charges_assigned);
+  if (m.chiral_centres())    // one or more chiral centres present
+    _remove_positive_charge_hits_on_chiral_atoms(m, positive_charges_assigned, charges_assigned);
+
+//cerr << "_min_distance_between_charges " << _min_distance_between_charges << ", npos " << positive_charges_assigned.number_elements() << endl;
 
   if (_min_distance_between_charges > 0)
   {
-    _remove_hits_too_close_isolation_score (m, positive_charges_assigned, charges_assigned);
-//  _remove_hits_too_close (m, negative_charges_assigned, charges_assigned);  this messes up putting 2 charges on a phosphoric acid
+    _remove_hits_too_close_isolation_score(m, positive_charges_assigned, charges_assigned);
+//  _remove_hits_too_close(m, negative_charges_assigned, charges_assigned);  this messes up putting 2 charges on a phosphoric acid
   }
 
 // Should we do anything about positive and negative being too close to each other?
@@ -1039,7 +1022,7 @@ Charge_Assigner::_process (Molecule & m,
 
     int ih;
     if (_preserve_implicit_hydrogen_count && (_positive_element || _negative_element))
-      ih = m.implicit_hydrogens (i);
+      ih = m.implicit_hydrogens(i);
     else
       ih = -1;
 
@@ -1048,18 +1031,18 @@ Charge_Assigner::_process (Molecule & m,
       if (NULL == _positive_element)      // just apply a charge
       {
         if (_apply_charges_to_molecule)
-          m.set_formal_charge (i, charges_assigned[i]);
+          m.set_formal_charge(i, charges_assigned[i]);
       }
       else if (_apply_isotopic_labels)
       {
-        m.set_element (i, _positive_element);
-        m.set_isotope (i, m.atomic_number (i));
+        m.set_element(i, _positive_element);
+        m.set_isotope(i, m.atomic_number(i));
       }
       else
       {
-        m.set_element (i, _positive_element);
+        m.set_element(i, _positive_element);
         if (_positive_isotope)
-          m.set_isotope (i, _positive_isotope);
+          m.set_isotope(i, _positive_isotope);
       }
     }
     else if (charges_assigned[i] < 0)
@@ -1067,30 +1050,30 @@ Charge_Assigner::_process (Molecule & m,
       if (NULL == _negative_element)      // just apply a charge
       {
         if (_apply_charges_to_molecule)
-          m.set_formal_charge (i, charges_assigned[i]);
+          m.set_formal_charge(i, charges_assigned[i]);
       }
       else if (_apply_isotopic_labels)
       {
-        m.set_element (i, _negative_element);
-        m.set_isotope (i, m.atomic_number (i));
+        m.set_element(i, _negative_element);
+        m.set_isotope(i, m.atomic_number(i));
       }
       else
       {
-        m.set_element (i, _negative_element);
+        m.set_element(i, _negative_element);
         if (_negative_isotope)
-          m.set_isotope (i, _negative_isotope);
+          m.set_isotope(i, _negative_isotope);
       }
     }
 
     if (ih >= 0)
-      m.set_implicit_hydrogens (i, ih, 1);    // set the "sticky" bit
+      m.set_implicit_hydrogens(i, ih, 1);    // set the "sticky" bit
 
     if (_remove_chiral_centres_from_changed_atoms && (_positive_element || _negative_element) &&
-        NULL != m.chiral_centre_at_atom (i))
-      m.remove_chiral_centre_at_atom (i);
+        NULL != m.chiral_centre_at_atom(i))
+      m.remove_chiral_centre_at_atom(i);
 
     if (_verbose > 1)
-      cerr << "Charge_Assigner::_process: atom " << i << " (" << m.atomic_symbol (i) << ") assigned " << charges_assigned[i] << endl;
+      cerr << "Charge_Assigner::_process: atom " << i << " (" << m.atomic_symbol(i) << ") assigned " << charges_assigned[i] << endl;
   }
 
   if (rc)
@@ -1099,18 +1082,28 @@ Charge_Assigner::_process (Molecule & m,
   return rc;
 }
 
+/*
+  October 2013. Nasty problems with a 3D molecule that had an explicit hydrogen early in the connection table.
+  We use the temp detach hydrogens, process the molecule, which adds a hydrogen atom.
+  But when temp detach does the re-attach, if notices that the atom is no longer needed and so drops it.
+  That totally messes up the ordering in the charges_assigned array.
+  To be safe, we always move explicit hydrogens to the end of the connection table
+*/
+
 int
 Charge_Assigner::process (Molecule & m,
                           formal_charge_t * charges_assigned)
 {
-  int matoms = m.natoms ();
+  int matoms = m.natoms();
   if (0 == matoms)
   {
     cerr << "Charge_Assigner::process: cannot process no-struct\n";
     return 0;
   }
 
-  _temp_detach_hydrogens.detach_atoms (m);
+  m.move_hydrogens_to_end_of_connection_table();   // temp detach may remove hydrogens that are found to be superfluous, and that will mess up our array
+
+  const int hydrogens_present = _temp_detach_hydrogens.detach_atoms(m);
 
   int i_need_to_delete_charges_assigned = 0;
 
@@ -1118,16 +1111,25 @@ Charge_Assigner::process (Molecule & m,
 
   if (NULL == charges_assigned)
   {
-    charges_assigned = new_int (matoms);
+    charges_assigned = new_int(matoms);
     i_need_to_delete_charges_assigned = 1;
   }
 
-  int rc = _process (m, charges_assigned);
+  int rc = _process(m, charges_assigned);
 
-  _temp_detach_hydrogens.reattach_atoms (m);
+  if (hydrogens_present)
+    _temp_detach_hydrogens.reattach_atoms(m);
+
+#ifdef DEBUG_CHARGE_ASSIGNER
+  for (auto i = 0; i < matoms; ++i)
+  {
+    if (charges_assigned[i] != 0)
+      cerr << "Atom " << i << " " << m.smarts_equivalent_for_atom(i) << " assigned " << charges_assigned[i] << endl;
+  }
+#endif
 
   if (_attach_explicit_hydrogen_to_positive_atom)
-    _do_make_implicit_hydrogens_explicit (m, charges_assigned);
+    _do_make_implicit_hydrogens_explicit(m, charges_assigned);
 
   if (i_need_to_delete_charges_assigned)
     delete [] charges_assigned;
@@ -1179,7 +1181,7 @@ Charge_Assigner::_process (Molecule & m,
 {
   int matoms = m.natoms();
 
-  formal_charge_t * charges_assigned = new formal_charge_t[matoms]; iw_auto_array<formal_charge_t> free_charges_assigned(charges_assigned);
+  formal_charge_t * charges_assigned = new formal_charge_t[matoms]; std::unique_ptr<formal_charge_t[]> free_charges_assigned(charges_assigned);
   set_vector(charges_assigned, matoms, static_cast<formal_charge_t>(0));
 
   Set_of_Atoms negative_charges_assigned, positive_charges_assigned;
@@ -1190,7 +1192,7 @@ Charge_Assigner::_process (Molecule & m,
   cerr << "Processing '" << m.name() << "'\n";
 #endif
 
-  if (0 == _process (target, positive_charges_assigned, negative_charges_assigned, charges_assigned))
+  if (0 == _process(target, positive_charges_assigned, negative_charges_assigned, charges_assigned))
     return 0;
 
 #ifdef DEBUG_CHARGE_ASSIGNER_PROCESS
@@ -1256,21 +1258,62 @@ Charge_Assigner::_do_make_implicit_hydrogens_explicit (Molecule & m,
 
   Make_Implicit_Hydrogens_Explicit mihe;
 
-  int matoms = m.natoms ();
+  int matoms = m.natoms();
 
   for (int i = 0; i < matoms; i++)
   {
+//  if (0 != charges_assigned[i])
+//    cerr << "Atom " << m.smarts_equivalent_for_atom(i) << " has charge " << charges_assigned[i] << ", ih " << m.implicit_hydrogens(i) << endl;
+
     if (charges_assigned[i] <= 0)
       continue;
 
-    if (1 != m.implicit_hydrogens (i))
+    if (1 != m.implicit_hydrogens(i))
       continue;
 
-    mihe.set_atom (i);
+    mihe.set_atom(i);
 
-    m.make_implicit_hydrogens_explicit (mihe);
+    m.make_implicit_hydrogens_explicit(mihe);
     rc++;
   }
 
   return rc;
+}
+
+int
+Charge_Assigner::build (const const_IWSubstring & s)
+{
+  resizable_array_p<Substructure_Hit_Statistics> & tmp = *this;
+
+  const_IWSubstring token;
+
+  int verbose = 0;
+
+  for (auto i = 0; s.nextword(token, i); )
+  {
+    if (token.starts_with("F:"))
+    {
+      token.remove_leading_chars(2);
+      if (! queries_from_file(token, tmp, 1, verbose))   // queries always in same directory as control file
+      {
+        cerr << "Charge_Assigner: cannot read queries from file specifier 'F:" << token << "'\n";
+        return 0;
+      }
+    }
+    else if ("verbose" == token)
+      verbose = 1;
+    else
+    {
+      cerr << "Charge_Assigner::build:unrecognised directive '" << token << "'\n";
+      return 0;
+    }
+  }
+
+  if (0 == _number_elements)
+  {
+    cerr << "Charge_Assigner::build:no queries\n";
+    return 0;
+  }
+
+  return 1;
 }

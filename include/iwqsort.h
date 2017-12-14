@@ -1,23 +1,7 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef IWQSORT_H
 #define IWQSORT_H 1
+
+#include <string.h>
 
 template <typename T> void iwqsort (T *, int);
 template <typename T> void iwqsort (T *, int, int (*) (T &, T &) );
@@ -27,7 +11,7 @@ template <typename T> void iwqsort (T *, int, int (*) (const T &, const T &) );
 
 template <typename T, typename C> void iwqsort (T *, int, C &);
 
-#if (IW_IMPLEMENTATIONS_EXPOSED) || defined(RESIZABLE_ARRAY_IWQSORT_IMPLEMENTATION)
+#ifdef RESIZABLE_ARRAY_IWQSORT_IMPLEMENTATION
 #define IWQSORT_FO_IMPLEMENTATION
 
 #include "iwaray.h"
@@ -44,9 +28,23 @@ resizable_array_base<T>::iwqsort (C & comparator)
   return;
 }
 
+template <typename T> template <typename C>
+void
+resizable_array_base<T>::iwqsort_lambda (C comparator)
+{
+  if (_number_elements < 2)
+    return;
+
+  ::iwqsort (_things, _number_elements, comparator);
+
+  return;
+}
+
 #endif
 
-#if (IW_IMPLEMENTATIONS_EXPOSED) || defined(IWQSORT_FO_IMPLEMENTATION)
+#ifdef IWQSORT_FO_IMPLEMENTATION
+
+#include <string.h>
 
 #include <assert.h>
 
@@ -63,9 +61,9 @@ swap_elements (T & t1, T & t2,
   t1 = t2;
   t2 = *tmp;
 #else
-  memcpy (tmp, &t1, sizeof (T));
-  memcpy (&t1, &t2, sizeof (T));
-  memcpy (&t2, tmp, sizeof (T));
+  ::memcpy (tmp, &t1, sizeof (T));
+  ::memcpy (&t1, &t2, sizeof (T));
+  ::memcpy (&t2, tmp, sizeof (T));
 #endif
 
   return;
@@ -205,8 +203,21 @@ iwqsort (T * t, int n,
     }
 #endif
 
-    for (int i = 0; i < low + 1; i++)
+    int nmove;
+    if (low + low >= right)
+      nmove = right - low - 1;
+    else
+      nmove = low;
+
+    for (int i = 0; i <= nmove ; i++)
     {
+//#define CHECK_USELESS_MOVES
+#ifdef CHECK_USELESS_MOVES
+      if (i >= (right-i))
+        cerr << "useless swap, i = " << i << " low " << low << " right " << right << endl;
+      else
+#endif
+
       swap_elements (t[i], t[right - i], tmp);
     }
   }
@@ -239,7 +250,7 @@ iwqsort (T * t, int n,
 
   iwqsort (t, n, comparitor, tmp);
 
-  delete tmp;
+  delete [] tmp;
 
   return;
 }
@@ -247,7 +258,7 @@ iwqsort (T * t, int n,
 #endif
 
 
-#if (IW_IMPLEMENTATIONS_EXPOSED) || defined(IW_IMPLEMENTATIONS_EXPOSED)
+#ifdef IWQSORT_IMPLEMENTATION
 
 #include <assert.h>
 
@@ -261,9 +272,9 @@ void
 swap_elements (T * t1, T * t2)
 {
   T tmp;
-  memcpy (&tmp, t1, sizeof (T));
-  memcpy (t1, t2, sizeof (T));
-  memcpy (t2, &tmp, sizeof (T));
+  ::memcpy (&tmp, t1, sizeof (T));
+  ::memcpy (t1, t2, sizeof (T));
+  ::memcpy (t2, &tmp, sizeof (T));
 
   return;
 }
@@ -477,8 +488,21 @@ IWSORT_FN (T * t, int n)
     }
 #endif
 
-    for (int i = 0; i < low + 1; i++)
+    int nmove;
+    if (low + low >= right)
+      nmove = right - low - 1;
+    else
+      nmove = low;
+
+
+    for (int i = 0; i <= nmove; i++)
     {
+#ifdef CHECK_USELESS_MOVES
+      if (i >= right - i)
+        cerr << "Useless swap, i = " << i << " low " << low << " right " << right << endl;
+      else
+#endif
+
       swap_elements (t + i, t + right - i);
     }
   }

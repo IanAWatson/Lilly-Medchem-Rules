@@ -1,30 +1,12 @@
-/**************************************************************************
-
-    Copyright (C) 2011  Eli Lilly and Company
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-**************************************************************************/
 #ifndef IWSTRING_DATA_SOURCE_H
 #define IWSTRING_DATA_SOURCE_H 1
 
 #include <sys/types.h>
 #include <iostream>
 #include "iwzlib.h"
+#include "lzma.h"
 #include "iwstring.h"
 #include "iwcrex.h"
-using namespace std;
 
 //#define STRING_DEFAULT_BUF_SIZE 4096
 #define STRING_DEFAULT_BUF_SIZE 8192
@@ -88,7 +70,7 @@ class iwstring_data_source
 //  so let's have the ability to echo every record returned by next_record ()
 //  to a stream
 
-    ostream * _echo_returned_records_stream;
+    std::ostream * _echo_returned_records_stream;
 
 //  Aug 2003. I want to be able to read gzip'd files
 
@@ -104,12 +86,14 @@ class iwstring_data_source
     int   _copy_next_record_from_read_buffer_to_buffer ();
     int   _read_more_data_into_read_buffer ();
     int   _fetch_record_into_buffer ();
-    int   _write_read_buffer (ostream & output, off_t & nbytes);
-    int   _write_read_buffer (IWString_and_File_Descriptor & output, off_t & nbytes);
+    int   _write_read_buffer (std::ostream & output, size_t & nbytes);
+    int   _write_read_buffer (IWString_and_File_Descriptor & output, size_t & nbytes);
     int   _copy_read_buffer_to_destination (void * destination, int & nbytes);
 
     int   _save_state (IWSDS_State &);
     int   _restore_state (IWSDS_State &);
+
+    size_t _copy_raw_bytes (void *, const size_t); 
 
 protected:
 	
@@ -144,23 +128,25 @@ protected:
 
     int is_open () const { return _open;}
 
-    int is_pipe () const { return 0 == _fd;}
+    int is_pipe () const;
+
+    const IWString & fname () const { return _fname;}
 
     void set_dos (int d) { _dos = d;}
     void set_record_delimiter (char d);
 
     int record_buffered() const { return _record_buffered;}
 
-    void set_echo_returned_records_stream (ostream & os) { _echo_returned_records_stream = &os;}
+    void set_echo_returned_records_stream (std::ostream & os) { _echo_returned_records_stream = &os;}
     void turn_off_echoing () { _echo_returned_records_stream = NULL;}
-    ostream * echo_stream () const { return _echo_returned_records_stream;}
+    std::ostream * echo_stream () const { return _echo_returned_records_stream;}
 
     int good () const;
     int ok () const;
     int eof () const { return _eof;}
     int at_eof () const { return _eof;}   // backwards compatability
 
-    int debug_print (ostream &) const;
+    int debug_print (std::ostream &) const;
 
     off_t    tellg () const;
     int      seekg (off_t, int = 0);
@@ -199,17 +185,21 @@ protected:
     int  grep (IW_Regular_Expression &);
     int  grep (int n, IW_Regular_Expression *, int *);   // look for N regular expressions at once
 
-    int  echo (ostream &, off_t);    // echo's bytes
-    int  echo (IWString_and_File_Descriptor &, off_t);    // echo's bytes
+    int  count_records_starting_with(const const_IWSubstring &);   // the most common thing we do with regexps
 
-    int echo_records (ostream & os, int necho);    // echo's records
+    int  echo (std::ostream &, size_t);    // echo's bytes
+    int  echo (IWString_and_File_Descriptor &, size_t);    // echo's bytes
+
+    int echo_records (std::ostream & os, int necho);    // echo's records
     int echo_records (IWString_and_File_Descriptor & os, int necho);    // echo's records
 
     int skip_records (int nskip);
 
     int skip_records (IW_Regular_Expression & rx, int nskip);
 
-    int read_bytes (void *, int);
+    int read_bytes (void *, size_t);
+
+    size_t copy_raw_bytes (void *, const size_t);    // does a save and restore of the state, so it will not advance the file pointer - just got too complicated...
 };
 
 #endif
