@@ -87,7 +87,7 @@ consider_isotopes_as_zero_and_non_zero ()
   return file_scope_consider_isotopes_as_zero_and_non_zero;
 }
 
-static int file_scope_use_version_two_initial_rank_assignment = 0;
+static int file_scope_use_version_two_initial_rank_assignment = 1;
 
 void
 set_unique_determination_version(const int s)
