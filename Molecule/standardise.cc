@@ -7039,7 +7039,9 @@ Chemical_Standardisation::_do_transform_pyrazolone(Molecule & m,
     }
     else if (2 == ncon[j])
       ;
-    else if (identity_exocyclic_singly_bonded_oxygen(m, j, exocyclic_singly_bonded_oxygen, current_molecule_data))
+    else if (6 != z[j]) // guard against S1(CC2=CCS(=O)(=O)C2)NC2=C(C=CC=C2)N=1 @takacsgergely Jan 2018
+      ;
+    else if (identity_exocyclic_singly_bonded_oxygen(m, j, exocyclic_singly_bonded_oxygen, current_molecule_data))   // guard against S1(CC2=CCS(=O)(=O)C2)NC2=C(C=CC=C2)N=1
       ndx_exocyclic_singly_bonded_oxygen = i;
   }
    
