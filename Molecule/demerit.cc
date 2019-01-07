@@ -161,14 +161,19 @@ Demerit::do_sort()
   if (2 == n)
     return;
 
-  _demerit.iwqsort_lambda([] (const Demerit_and_Reason * dr1, const Demerit_and_Reason * dr2)
-  {
-    if (dr1->demerit() < dr2->demerit())
-      return 1;
-    if (dr1->demerit() > dr2->demerit())
-      return -1;
-    return 0;
-  });
+  struct {
+    bool operator()(const Demerit_and_Reason * dr1, const Demerit_and_Reason * dr2) const
+    {   
+      if (dr1->demerit() < dr2->demerit())
+	return 1;
+      if (dr1->demerit() > dr2->demerit())
+	return -1;
+      return 0;
+
+    }   
+  } compareDemerit;  
+  
+  _demerit.iwqsort_lambda(compareDemerit);
 
   return;
 }

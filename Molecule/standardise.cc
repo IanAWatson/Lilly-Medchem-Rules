@@ -2248,10 +2248,14 @@ resolved (const int * score,
   tmp[1].first = n1;
   tmp[2].first = n2;
 
-  std::sort(tmp, tmp + 3, [] (const std::pair<int, unsigned int> & p1, const std::pair<int, unsigned int> & p2)
-                                        {
-                                          return p1.second < p2.second;
-                                        });
+  struct {
+        bool operator()(const std::pair<int, unsigned int> & p1, const std::pair<int, unsigned int> & p2) const
+        {   
+            return p1.second < p2.second;
+        }   
+  } comparePair;  
+  std::sort(tmp, tmp + 3, comparePair);
+  
 //cerr << "sorted " << tmp[0].second << ' ' << tmp[1].second << ' ' << tmp[2].second << endl;
   n0 = tmp[0].first;
   n1 = tmp[1].first;
