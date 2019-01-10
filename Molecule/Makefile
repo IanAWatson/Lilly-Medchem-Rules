@@ -32,6 +32,8 @@ COMMON_OBJECTS = molecule.o moleculeb.o moleculeh.o element.o atom.o bond.o bond
 	rwsubstructure.o substructure_nmab.o molecule_to_query.o is_actually_chiral.o tokenise_atomic_smarts.o temp_detach_atoms.o path_scoring.o \
 	element_hits_needed.o numass.o misc2.o standardise.o toggle_kekule_form.o
 
+LIBDIRS = -L../lib/ -L../supporting_libraries
+
 MC_FIRST_PASS_OBJECTS = mc_first_pass.o $(COMMON_OBJECTS)
 
 TSUBSTRUCTURE_OBJECTS = tsubstructure.o $(COMMON_OBJECTS)
@@ -51,16 +53,16 @@ install:  $(EXECUTABLES)
 	$(CP) -p $(EXECUTABLES) ../bin
 
 mc_first_pass: $(MC_FIRST_PASS_OBJECTS)
-	$(LD) -o $@ $(MC_FIRST_PASS_OBJECTS) -L../lib/ -liwsupport -lz
+	$(LD) -o $@ $(MC_FIRST_PASS_OBJECTS) $(LIBDIRS) -liwsupport -lz
 
 tsubstructure: $(TSUBSTRUCTURE_OBJECTS)
-	$(LD) -o $@ $(TSUBSTRUCTURE_OBJECTS) -L../lib/ -liwsupport -lz
+	$(LD) -o $@ $(TSUBSTRUCTURE_OBJECTS) $(LIBDIRS) -liwsupport -lz
 
 iwdemerit: $(IWDEMERIT_OBJECTS)
-	$(LD) -o $@ $(IWDEMERIT_OBJECTS) -L../lib/ -liwsupport -lz
+	$(LD) -o $@ $(IWDEMERIT_OBJECTS) $(LIBDIRS) -liwsupport -lz
 
 mc_summarise: $(MC_SUMMARISE_OBJECTS)
-	$(LD) -o $@ $(MC_SUMMARISE_OBJECTS) -L../lib/ -liwsupport -lz
+	$(LD) -o $@ $(MC_SUMMARISE_OBJECTS) $(LIBDIRS) -liwsupport -lz
 
 tsmiles: $(TSMILES_OBJECTS)
 	$(LD) -o $@ $(TSMILES_OBJECTS) -L../lib/ -liwsupport -lz
