@@ -11,10 +11,6 @@ There is no separate installation, the scripts are designed to be run
 from this location, although it would not be hard to change that. You
 will need to figure out your LD_LIBRARY_PATH.
 
-There is one potential difficulty with compilation with gcc. Newer
-versions of gcc may need the -std=c++0x option. You can usually just
-omit, but you will get warnings about deprecated features.
-
 Once the executables are built, the rules can be invoked via the ruby
 script Lilly_Medchem_Rules.rb in this directory.  That script will
 locate the executables and data files it needs from the directory
@@ -65,7 +61,7 @@ QUERY FILES
 
 The query files are on a modified Cerius-2 format. Today, there are
 many better choices for file formats, and if the software were
-being developed today, we would likely use JSON or similar.
+being developed today, we would likely use JSON, Proto or similar.
 
 SOFTWARE
 
@@ -224,10 +220,15 @@ etc..
 
 
 If you find bugs, we would be very interested in learning about those. 
-Please contact i.watson@lilly.com.  Or if you have a fix, then please
+Please contact ianiwatson@gmail.com  Or if you have a fix, then please
 do send it along.
 
 We hope this software proves useful, it has been very useful for us
 and we are pleased to be able to share.
+
+Longer term, the C++ software here will be replaced by the versions at
+[LillyMol](https://github.com/EliLillyCo/LillyMol), which contains
+more functionality. The query functionality will remain unchanged.
+
 
 Please consult the LICENSE file for details of the license.

@@ -4,7 +4,6 @@
 #include <sys/types.h>
 #include <iostream>
 #include "iwzlib.h"
-#include "lzma.h"
 #include "iwstring.h"
 #include "iwcrex.h"
 

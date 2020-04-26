@@ -1,8 +1,9 @@
 #ifndef IW_SMILES_H
 #define IW_SMILES_H 1
 
+#include <random>
+
 #include "molecule.h"
-#include "iwrandom.h"
 
 /*
   This contains functions used internally by the smiles routines.
@@ -40,8 +41,8 @@ class Temporarily_Set_Include_Chiral_Info_in_Smiles
     ~Temporarily_Set_Include_Chiral_Info_in_Smiles();
 };
 
-extern void set_smiles_random_number_seed (random_number_seed_t);
-extern random_number_seed_t set_smiles_random_number_seed_random ();
+extern void set_smiles_random_number_seed (std::mt19937::result_type seed);
+extern std::mt19937::result_type set_smiles_random_number_seed_random ();
 
 extern int smiles_process_atom (Molecule *, IWString &, atom_number_t, bond_type_t,
                                  atom_number_t, chiral_type_t = NON_CHIRAL);

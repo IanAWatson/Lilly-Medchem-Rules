@@ -9,7 +9,6 @@ using std::cerr;
 using std::endl;
 
 #include "cmdline.h"
-#include "iwrandom.h"
 
 #include "misc2.h"
 #include "molecule.h"
@@ -1432,7 +1431,7 @@ process_input_type (const Command_Line & cl, int & input_type)
   }
 
   if (RSMI == input_type)
-    iw_random_seed();
+    set_smiles_random_number_seed_random();
 
   if (0 != input_type)
     ;

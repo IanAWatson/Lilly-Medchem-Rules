@@ -2911,3 +2911,6 @@ FC(F)(C(F)(F)C(F)(F)F)C(F)(F)F PBCHM9638 TP1 no_interesting_atoms
 OC(CO)C=O PBCHM751 TP1 not_enough_atoms
 C(CCC)C1=CC(=C1)C PBCHM11832205 TP1 no_interesting_atoms
 S(=O)(=O)(O)OC1C(OC(=O)CC(C)C)C(OC2CC3(C)C4C5(CC(CC4)C(=C)C5O)CCC3C(C2)C(=O)O)OC(C1OS(=O)(=O)O)CO PBCHM2255 TP1 too_many_atoms
+S1SC(=S)C(=C1S)C CHEMBL1173447 TP1 no_interesting_atoms
+S1SC=CSSC=C1 CHEMBL1983626 TP1 no_interesting_atoms
+S1C2=CSC=C2SC1=S CHEMBL1982159 TP1 no_interesting_atoms
