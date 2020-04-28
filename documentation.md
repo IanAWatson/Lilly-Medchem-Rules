@@ -22,7 +22,7 @@ EXECUTION:
 
 The normal invocation will be of the form
 
-Lilly_Medchem_Rules.rb input.smi > okmedchem.smi
+ruby Lilly_Medchem_Rules.rb input.smi > okmedchem.smi
 
 The molecules from input.smi will be scanned, and those that survive
 will be written to stdout and captured in okmedchem.smi. Molecules
