@@ -5,23 +5,19 @@
 #LD = icpc
 #CXXFLAGS = -O2 -I . -I ../include -ffast-math -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 
+# Clang
+# CXX=clang++-9
+# CC=clang-9
+# LD=clang++-9
+
 CC=gcc
 CXX = g++
 LD = g++
 CXXFLAGS = -O2 -I . -I ../include -ffast-math -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 
-# Some versions of gcc need the -std= directive, remove if it causes problems
 CXXFLAGS = -O2 -I . -I ../include -ffast-math -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -DIW_IMPLEMENTATIONS_EXPOSED
 
-# Auto check gcc version from Raj Guha
-GCCVERSIONGTEQ4 := $(shell expr `gcc -dumpversion | cut -f1,2 -d.` \>= 4.3)
-ifeq "$(GCCVERSIONGTEQ4)" "1"
-    CXXFLAGS += -std=c++11
-endif
-
-
 CP = cp
-
 
 COMMON_OBJECTS = molecule.o moleculeb.o moleculeh.o element.o atom.o bond.o bond_list.o output.o ostream_and_type.o rmele.o etrans.o aromatic.o rwmolecule.o \
 	smi.o mdl.o mdl_v30.o parse_smarts_tmp.o mdl_file_data.o mdl_molecule.o mdl_atom_record.o isis_link_atom.o ISIS_Atom_List.o atom_alias.o molecule_smarts.o\

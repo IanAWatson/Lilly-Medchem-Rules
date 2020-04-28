@@ -3,6 +3,7 @@
 */
 
 #include <iostream>
+#include <random>
 #include <iomanip>
 #if (__GNUC__ == 2)
 #include <function.h>
@@ -23,7 +24,6 @@ using std::endl;
 
 #include "atom.h"
 #include "misc2.h"
-#include "iwrandom.h"
 
 static int copy_implicit_hydrogen_count_in_atom_copy_constructor = 1;
 
@@ -1541,8 +1541,7 @@ Atom::next_atom_for_unique_smiles (atom_number_t my_atom_number,
   return 0;
 }
 
-#ifdef RANDOM_SMILES_NOW_IN_SMILES_SOURCE_FILE
-static Random_Number_Working_Storage smiles_random_number_stream;
+static std::mt19937 smiles_random_number_stream;
 
 int
 Atom::next_atom_for_random_smiles (atom_number_t my_atom_number,
@@ -1554,6 +1553,9 @@ Atom::next_atom_for_random_smiles (atom_number_t my_atom_number,
 
   atom_number_t zdefault = INVALID_ATOM_NUMBER;
   atom_number_t multiple_bond = INVALID_ATOM_NUMBER;
+
+  std::bernoulli_distribution distribution(0.5);
+
 
   for (int i = 0; i < _number_elements; i++)
   {
@@ -1567,12 +1569,12 @@ Atom::next_atom_for_random_smiles (atom_number_t my_atom_number,
     {
       if (INVALID_ATOM_NUMBER == multiple_bond)
         multiple_bond = j;
-      else if (smiles_random_number_stream.random_one_or_zero())
+      else if (distribution(smiles_random_number_stream))
         multiple_bond = j;
     }
     else if (INVALID_ATOM_NUMBER == zdefault)
       zdefault = j;
-    else if (smiles_random_number_stream.random_one_or_zero())
+    else if (distribution(smiles_random_number_stream))
       zdefault = j;
   }
 
@@ -1590,7 +1592,6 @@ Atom::next_atom_for_random_smiles (atom_number_t my_atom_number,
 
   return 0;
 }
-#endif
 
 int
 Atom::set_bond_type_to_atom (atom_number_t zatom, bond_type_t bt)

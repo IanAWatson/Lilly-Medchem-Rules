@@ -7,7 +7,6 @@
 
 #include "misc.h"
 #include "iwbits.h"
-#include "iwrandom.h"
 
 
 // Define this to get the molecule private functions defined here
@@ -24,7 +23,7 @@
 #include "iwrnm.h"
 #include "iwrcb.h"
 
-static unsigned int random_smiles_default_seed = 3172776704;
+static std::mt19937::result_type random_smiles_default_seed = 3172776704;
 
 /*
   We have various classes that guide the atom ordering when building a smiles
@@ -992,13 +991,12 @@ Molecule::_smiles_choose_first_atom (const int * zorder,
 */
 
 void
-set_smiles_random_number_seed (random_number_seed_t seed)
+set_smiles_random_number_seed (std::mt19937::result_type seed)
 {
   random_smiles_default_seed = seed;
-
 }
 
-random_number_seed_t
+std::mt19937::result_type
 set_smiles_random_number_seed_random()
 {
   std::random_device rd;

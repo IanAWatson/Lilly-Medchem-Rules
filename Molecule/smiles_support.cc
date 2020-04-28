@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <random>
 
 /*
   Define symbol so we get private molecule functions
@@ -264,7 +265,7 @@ process_standard_smiles_options (Command_Line & cl, int verbose,
   IWString tmp;
   while (cl.value(sflag, tmp, i))
   {
-    long seed;
+    std::mt19937::result_type seed;
 
     if ("nru" == tmp)
     {
@@ -298,7 +299,7 @@ process_standard_smiles_options (Command_Line & cl, int verbose,
     }
     else if ("random" == tmp)
     {
-      random_number_seed_t tmp = set_smiles_random_number_seed_random();
+      std::mt19937::result_type tmp = set_smiles_random_number_seed_random();
       if (verbose)
         cerr << "Smiles generated with a random seed " << tmp << endl;
     }
@@ -377,7 +378,7 @@ process_standard_smiles_options (Command_Line & cl, int verbose,
     }
     else if (cl.value(sflag, seed, i))
     {
-      set_smiles_random_number_seed(random_number_seed_t(seed));
+      set_smiles_random_number_seed(seed);
       if (verbose)
         cerr << "Random smiles generated with seed " << seed << endl;
     }
