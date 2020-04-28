@@ -4,7 +4,8 @@ BUILDING:
 
 This software implements the rejection rules described by the 2012
 publication in the Journal of Medicinal Chemistry by
-R.F. Bruns and I.A. Watson.
+R.F. Bruns and I.A. Watson (J. Med. Chem. 2012, 55, 9763-9772, 
+freely accessible under doi 10.1021/jm301008n).
 
 Compiling should be as simple as entering 'make' in this directory. 
 There is no separate installation, the scripts are designed to be run
