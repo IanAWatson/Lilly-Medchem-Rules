@@ -4,7 +4,7 @@ BUILDING:
 
 This software implements the rejection rules described by the 2012
 publication in the Journal of Medicinal Chemistry by
-R.F. Bruns and I.A. Watson (J. Med. Chem. 2012, 55, 9763-9772, 
+R.F. Bruns and I.A. Watson (J. Med. Chem. 2012, 55, 9763-9772,
 freely accessible under doi 10.1021/jm301008n).
 
 Compiling should be as simple as entering 'make' in this directory.
@@ -16,7 +16,7 @@ will need to figure out your LD_LIBRARY_PATH.
 Once the executables are built, the rules can be invoked via the ruby
 script Lilly_Medchem_Rules.rb in this directory.  That script will
 locate the executables and data files it needs from the directory
-heirarchy and run the rules.
+hierarchy and run the rules.
 
 EXECUTION:
 
@@ -138,8 +138,8 @@ The Molecule object is a lazy object.  It will not contain any derived
 parameters unless requested.  For example, a ring determination will
 not be performed unless some method is invoked that requires ring
 perception.  Similarly for aromaticity, it will simply never be
-computed unless it is requested. There is no concept of a Molecule
-being in a modifiable or un-modifiable state, it tries very hard
+computed unless it is requested. There is no concept of a molecule
+being in a mutable or immutable state, it tries very hard
 to respond properly to changes and queries. Almost certainly, some
 efficiency is sacrificed because of this.
 
@@ -173,7 +173,7 @@ As will be visible within the code, the code supports only a limited
 number of file types, but for this distribution, we have included just
 smiles and various mdl flavours.  The other file types are not used
 extensively, and their handling is not always robust.  There are other
-tools available for doing such coversions in a robust fashion.
+tools available for doing such conversions in a robust fashion.
 
 Parsing of SDF files is very messy, but over the years, we have encountered
 a vast number of variations in SDF files.
