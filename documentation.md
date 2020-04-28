@@ -7,7 +7,8 @@ publication in the Journal of Medicinal Chemistry by
 R.F. Bruns and I.A. Watson (J. Med. Chem. 2012, 55, 9763-9772, 
 freely accessible under doi 10.1021/jm301008n).
 
-Compiling should be as simple as entering 'make' in this directory. 
+Compiling should be as simple as entering 'make' in this directory.
+Consider about 45 MB permanent memory to store the working program.
 There is no separate installation, the scripts are designed to be run
 from this location, although it would not be hard to change that. You
 will need to figure out your LD_LIBRARY_PATH.
