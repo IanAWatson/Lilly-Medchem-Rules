@@ -1,0 +1,21 @@
+O=C4[C@@H]5Oc1c2c(ccc1OC)C[C@H]3N(CC[C@]25[C@H]3CC4)C.CC(=O)Nc1ccc(O)cc1  Hydrocordone / Acetaminophen  $1.62B  pain
+O=C(O[C@@H]1[C@H]3C(=C/[C@H](C)C1)\C=C/[C@@H]([C@@H]3CC[C@H]2OC(=O)C[C@H](O)C2)C)C(C)(C)CC  Simvastatin  $1.39B  cholesterol
+O=C4[C@@H]5Oc1c2c(ccc1OC)C[C@H]3N(CC[C@]25[C@@]3(O)CC4)C  Oxycodone  $1.16B  pain
+O=C(O)[C@@H]2N3C(=O)[C@@H](NC(=O)[C@@H](c1ccc(O)cc1)N)[C@H]3SC2(C)C.O=C2N1[C@H](C(/O[C@@H]1C2)=C/CO)C(=O)O  Amoxicillin / Pot Clav  $0.93B  antibiotic
+O=C(O)C(c1ccc(cc1)C(O)CCCN2CCC(CC2)C(O)(c3ccccc3)c4ccccc4)(C)C  Fexofenadine  $0.91B  allergies
+O=C(CC)N(C1CCN(CC1)CCc2ccccc2)c3ccccc3  Fentanyl  $0.48B  pain
+C1CC(N(C1)C(=O)C(CCCCN)NC(CCC2=CC=CC=C2)C(=O)O)C(=O)O  Lisinopril  $0.873B  hypertension
+CC1=CN=C(C(=C1OC)C)CS(=O)C2=NC3=C(N2)C=C(C=C3)OC  Omeprazole  $0.64B  heartburn
+COC(=O)[C@H](c1ccccc1Cl)N2CCc3c(ccs3)C2  Clopridogrel  $0.63B  stroke  heart attack
+c1cc(ccc1[C@@H]2CCNC[C@H]2COc3ccc4c(c3)OCO4)F  Paroxetine  $0.62B  depression, panic
+ClC1=CC2=C(C=C1)N3C(C)=NN=C3CN=C2C4=CC=CC=C4  Alprazolam  $0.43B  anxiety, panic
+ClC1=CC=CC=C1C2=NC(C(NC3=C2C=C(C=C3)Cl)=O)O  Lorazepam  $0.36B  anxiety
+CC(=O)CC(C\1=C(/O)c2ccccc2OC/1=O)c3ccccc3  Warfarin  $0.34B  hypertension
+O=S(=O)(N)c1c(Cl)cc2c(c1)S(=O)(=O)NCN2  Hydrochlorothiazole  $0.30B  fluid buildup
+O=C2N1/C(=C(\CS[C@@H]1[C@@H]2NC(=O)[C@@H](c3ccccc3)N)C)C(=O)O  Cephalexin  $0.30B  antibiotic
+[O-][N+](C1=CC2=C(C=C1)NC(CN=C2C3=CC=CC=C3Cl)=O)=O  Clonazepam  $0.27B  seizures, panic
+O=C(OCC)[C@@H](N[C@H](C(=O)N2[C@H](C(=O)O)Cc1c(cccc1)C2)C)CCc3ccccc3  Quinapril  $0.24B  hypertension
+O=C2N(c3c(S[C@@H](c1ccc(OC)cc1)[C@H]2OC(=O)C)cccc3)CCN(C)  Diltiazem  $0.23B  hypertension, angina
+o1cccc1CNc(cc2Cl)c(C(=O)O)cc2S(=O)(=O)N  Furosemide  $0.22B  edema, hypertension
+C1CC1N2C=C(C(=O)C3=CC(=C(C=C32)N4CCNCC4)F)C(=O)O  Ciprofloxacin HCl  $0.22B  ulcers
+Fc1ccc(cc1)C3(OCc2cc(C#N)ccc23)CCCN(C)C  Citalopram HBr  $0.22B  depression
