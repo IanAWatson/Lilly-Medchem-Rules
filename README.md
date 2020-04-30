@@ -23,3 +23,8 @@ the rules and as a filter in its own right, an index of biological
 promiscuity was developed. The 584 gene targets with screening data at
 Lilly were assigned to 17 subfamilies, and the number of subfamilies
 at which a compound was active was used as a promiscuity index."
+
+The project includes multiple reference files to get familiar with
+motifs considered as "bad" or "good" by these rules.  This is expanded
+by compilations of some FDA-approved drugs whith active ingredients
+described in the English wikipedia.
