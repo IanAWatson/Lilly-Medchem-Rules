@@ -43,7 +43,7 @@ O=C(O[C@@H]1[C@H]3C(=C/[C@H](C)C1)\C=C/[C@@H]([C@@H]3CC[C@H]2OC(=O)C[C@H](O)C2)C
 O=C(O[C@]2(C(=O)CCl)[C@H](C)C[C@H]3[C@@H]4CCC\1=C\C(=O)\C=C/[C@]/1(C)[C@@]4(Cl)[C@@H](O)C[C@]23C)c5occc5  Nasonex
 CCCC1=NN(C2=C1N=C(NC2=O)C3=C(C=CC(=C3)S(=O)(=O)N4CCN(CC4)C)OCC)C  Viagra
 CCCC1O[C@@H]2C[C@H]3[C@@H]4CCC5=CC(=O)C=C[C@@]5([C@H]4[C@H](C[C@@]3([C@@]2(O1)C(=O)CO)C)O)C  Symbicort_1
-" O=CNc1cc(ccc1O)[C@@H](O)CN[C@H](C)Cc2ccc(OC)cc2"  Symbicort_2
+O=CNc1cc(ccc1O)[C@@H](O)CN[C@H](C)Cc2ccc(OC)cc2  Symbicort_2
 N\1=C(\c3c(Sc2c/1cccc2)cccc3)N4CCN(CCOCCO)CC4  Seroquel_XR
 Nc3nc2[nH]cc(CCc1ccc(C(=O)N[C@@H](CCC(=O)O)C(=O)O)cc1)c2c(=O)[nH]3  Alimta
 C[C@@H](N)Cc1ccccc1  Adderall_XR_1
@@ -98,22 +98,26 @@ FC(F)(F)c1cc(c(cc1)C(F)(F)F)NC(=O)[C@@H]3[C@]2(CC[C@H]4[C@H]([C@@H]2CC3)CC[C@H]5
 CC1=C(C=CC=C1)O[C@H](CCNC)C2=CC=CC=C2  Strattera
 O=C3C(=O)N1CCCC[C@H]1C(=O)O[C@H](C(=C/[C@@H]2CC[C@@H](O)[C@H](OC)C2)/C)[C@H](C)[C@@H](O)CC(=O)[C@@H](/C=C(/C[C@@H](C[C@H](OC)[C@H]4O[C@]3(O)[C@H](C)C[C@@H]4OC)C)C)C\C=C  Prograf
 ClCCN(c2ccc1c(nc(n1C)CCCC(=O)O)c2)CCCl  Treanda
-Cc1c(c(=O)n2c(n1)CCCC2)CCN3CCC(CC3)c4c5ccc(cc5on4)F  "Risperdal Consta"
+Cc1c(c(=O)n2c(n1)CCCC2)CCN3CCC(CC3)c4c5ccc(cc5on4)F  Risperdal_Consta
 O=C(N[C@@H]3C\1=C\C(=O)C(\OC)=C/C=C/1c2c(cc(OC)c(OC)c2OC)CC3)C  Colcrys
 CC(C)c4nc(CN(C)C(=O)N[C@@H](C(C)C)C(=O)N[C@@H](Cc1ccccc1)C[C@H](O)[C@H](Cc2ccccc2)NC(=O)OCc3cncs3)cs4  Norvir
 OCc1cc(ccc1O)[C@@H](O)CNC(C)(C)C  Xopenex
 FC(F)(F)c2cc(OC[C@H](O)/C=C/[C@@H]1[C@H]([C@@H](O)C[C@H]1O)C\C=C/CCCC(=O)OC(C)C)ccc2  Travatan_Z
-"n3c1c(ncn1[C@H]2/C=C\[C@@H](CO)C2)c(nc3N)NC4CC4 and O=C1/N=C(/N)\C=C/N1[C@@H]2O[C@@H](SC2)CO"  Epzicom
+n3c1c(ncn1[C@H]2/C=C\[C@@H](CO)C2)c(nc3N)NC4CC4  Epzicom_1
+O=C1/N=C(/N)\C=C/N1[C@@H]2O[C@@H](SC2)CO  Epzicom_2
 O=C5N([C@H]2C1CCN(CC1)C2)C[C@@H]4c3c5cccc3CCC4  Aloxi
 C[C@@H](N)Cc1ccccc1  Amphetamine_Salts_ER_1
 C[C@@H](Cc1ccccc1)N  Amphetamine_Salts_ER_2
 O=C(CC)N(C1CCN(CC1)CCc2ccccc2)c3ccccc3  Fentanyl
-"O=C1NC(=O)SC1Cc3ccc(OCCc2ncc(cc2)CC)cc3 and CN(C)C(=N)N=C(N)N"  ACTO_plus_met
-"O=C(C)Oc1ccccc1C(=O)O and OCCN(CCO)C(N=C1N2CCCCC2)=NC3=C1N=C(N(CCO)CCO)N=C3N4CCCCC4"  Aggrenox
+O=C1NC(=O)SC1Cc3ccc(OCCc2ncc(cc2)CC)cc3  ACTO_plus_met_1
+CN(C)C(=N)N=C(N)N  ACTO_plus_met_2
+O=C(C)Oc1ccccc1C(=O)O  Aggrenox_1
+OCCN(CCO)C(N=C1N2CCCCC2)=NC3=C1N=C(N(CCO)CCO)N=C3N4CCCCC4  Aggrenox_2
 O=P(O)(O)CO[C@H](C)Cn1c2ncnc(c2nc1)N  Viread
-O(c1ccc(cc1)CCOC)CC(O)CNC(C)C  "Metoprolol Succinate"
+O(c1ccc(cc1)CCOC)CC(O)CNC(C)C  Metoprolol_Succinate
 O=C1N(\C(=N/C12CCCC2)CCCC)Cc5ccc(c3ccccc3c4n[nH]nn4)cc5  Avapro
-"O=C(O)[C@@H]3N4C(=O)[C@@H](NC(=O)[C@@H](c1ccccc1)NC(=O)N2C(=O)C(=O)N(CC)CC2)[C@H]4SC3(C)C and O=S2(=O)[C@]([C@@H](N1C(=O)C[C@H]12)C(=O)O)(Cn3nncc3)C"  Zosyn
+O=C(O)[C@@H]3N4C(=O)[C@@H](NC(=O)[C@@H](c1ccccc1)NC(=O)N2C(=O)C(=O)N(CC)CC2)[C@H]4SC3(C)C  Zosyn_1
+O=S2(=O)[C@]([C@@H](N1C(=O)C[C@H]12)C(=O)O)(Cn3nncc3)C  Zosyn_2
 O=C(Oc1cc(ccc1)[C@@H](N(C)C)C)N(CC)C  Exelon
 O=C1NC(=O)CCC1N3C(=O)c2cccc(c2C3)N  Revlimid
 CNC(=O)C1=CN(N=C1)C2=NC(=C3C(=N2)N(C=N3)[C@H]4[C@@H]([C@@H]([C@H](O4)CO)O)O)N  Lexiscan
@@ -124,25 +128,29 @@ O=C(c1ncn2C(=O)N(\N=N/c12)C)N  Temodar
 CC(=O)O[C@H]3[C@H](C)[C@H](O)[C@H](C)[C@@H](O)[C@@H](C)\C=C\C=C(\C)C(=O)Nc6c2c(nc1cc(C)ccn12)c5c4C(=O)[C@@](C)(O/C=C/[C@H](OC)[C@H]3C)Oc4c(C)c(O)c5c6O  Xifaxan
 O=C(O)C[C@H](O)C[C@H](O)CCn2c(c(c(c2c1ccc(F)cc1)c3ccccc3)C(=O)Nc4ccccc4)C(C)C  Atorvastatin_calcium
 Fc4cc1c(OC(CC1)C(O)CNCC(O)C3Oc2ccc(F)cc2CC3)cc4  Bystolic
-O=C/1N5/C(=N\C(=C\1CCN4CCC(c3noc2cc(F)ccc23)CC4)C)[C@H](O)CCC5  "Invega Sustenna"
+O=C/1N5/C(=N\C(=C\1CCN4CCC(c3noc2cc(F)ccc23)CC4)C)[C@H](O)CCC5  Invega_Sustenna
 O=C(O)c1cc(ccc1O)N  Lialda
 CCCCCCCCC1=CC=C(C=C1)CCC(CO)(CO)N  Gilenya
 OC2(C(c1ccc(OC)cc1)CN(C)C)CCCCC2  Effexor_XR
-"O=C(N[C@@H](Cc1ccccc1)[C@@H](O)C[C@@H](NC(=O)[C@@H](N2C(=O)NCCC2)C(C)C)Cc3ccccc3)COc4c(cccc4C)C and CC(C)c4nc(CN(C)C(=O)N[C@@H](C(C)C)C(=O)N[C@@H](Cc1ccccc1)C[C@H](O)[C@H](Cc2ccccc2)NC(=O)OCc3cncs3)cs4"  Kaletra
-"O(c1ccc(cc1)CCOC)CC(O)CNC(C)C and C(CC(=O)O)C(=O)O"  "Metoprolol Succinate"
+O=C(N[C@@H](Cc1ccccc1)[C@@H](O)C[C@@H](NC(=O)[C@@H](N2C(=O)NCCC2)C(C)C)Cc3ccccc3)COc4c(cccc4C)C  Kaletra_1
+CC(C)c4nc(CN(C)C(=O)N[C@@H](C(C)C)C(=O)N[C@@H](Cc1ccccc1)C[C@H](O)[C@H](Cc2ccccc2)NC(=O)OCc3cncs3)cs4  Kaletra_2
+O(c1ccc(cc1)CCOC)CC(O)CNC(C)C  Metoprolol_Succinate_1
+C(CC(=O)O)C(=O)O  Metoprolol_Succinate_2
 O=C(OC(C)(C)C)N[C@@H](c1ccccc1)[C@@H](O)C(=O)O[C@@H]4C(=C3/[C@@H](O)C(=O)[C@]6([C@H]([C@H](OC(=O)c2ccccc2)[C@@](O)(C3(C)C)C4)[C@@]5(OC(=O)C)[C@H](OC5)C[C@@H]6O)C)/C  Taxotere
 O=C2c1cc(OC)c(OC)cc1CC2CC4CCN(Cc3ccccc3)CC4  Donepezil_HCl
 n1c2cc3c(cc2ncc1)[C@@H]4CNC[C@H]3C4  Chantix
 CCC(=O)OC1(C(CC2C1(CC(C3(C2CC(C4=CC(=O)C=CC43C)F)F)O)C)C)C(=O)SCF  Fluticasone_propionate
 COc1c2c(cc(c1N3C[C@@H]4CCCN[C@@H]4C3)F)c(=O)c(cn2C5CC5)C(=O)O  Avelox
-"Clc1ccccc1C2/C(C(=O)OC)=C(/C)N/C(COCCN)=C2/C(=O)OCC and CCCCC(=O)N(CC1=CC=C(C=C1)C2=CC=CC=C2C3=NNN=N3)C(C(C)C)C(=O)O"  Exforge
+Clc1ccccc1C2/C(C(=O)OC)=C(/C)N/C(COCCN)=C2/C(=O)OCC  Exforge_1
+CCCCC(=O)N(CC1=CC=C(C=C1)C2=CC=CC=C2C3=NNN=N3)C(C(C)C)C(=O)O  Exforge_2
 O=C(N1[C@H](C#N)C[C@@H]2C[C@H]12)[C@@H](N)C35CC4CC(C3)CC(O)(C4)C5  Onglyza
-"O=C4[C@@H]5Oc1c2c(ccc1OC)C[C@H]3N(CC[C@]25[C@H]3CC4)C and CC(=O)Nc1ccc(O)cc1"  hydrocodone/acetaminophen
+O=C4[C@@H]5Oc1c2c(ccc1OC)C[C@H]3N(CC[C@]25[C@H]3CC4)C  hydrocodone/acetaminophen_1
+CC(=O)Nc1ccc(O)cc1  hydrocodone/acetaminophen_2
 CN1CCN(CC1)C/2=N/c4ccccc4Nc3sc(C)cc\23  Zyprexa_Zydis
 O=C(C(C)NC(C)(C)C)C1=CC=CC(Cl)=C1  Bupropion_HCL_XL
 O=C(OCC(=O)[C@]3(OC(=O)CC)[C@]2(C[C@H](O)[C@]4(Cl)[C@@]/1(\C(=C/C(=O)\C=C\1)CC[C@H]4[C@@H]2C[C@@H]3C)C)C)CC  QVAR
 n1cncn1Cc2cc3c(cc2)[nH]cc3CCN(C)C  Maxalt_MLT
-"C[C@H](/C=C/[C@H](C)C(C)(C)O)[C@H]1CC[C@H]2/C(=C/C=C3C[C@H](C[C@@H](C3)O)O)/CCC[C@]12C	"  Zemplar
+C[C@H](/C=C/[C@H](C)C(C)(C)O)[C@H]1CC[C@H]2/C(=C/C=C3C[C@H](C[C@@H](C3)O)O)/CCC[C@]12C  Zemplar
 O=C(OC(C)(C)C)N[C@@H](c1ccccc1)[C@@H](O)C(=O)O[C@@H]4C(=C3/[C@@H](O)C(=O)[C@]6([C@H]([C@H](OC(=O)c2ccccc2)[C@@](O)(C3(C)C)C4)[C@@]5(OC(=O)C)[C@H](OC5)C[C@@H]6O)C)/C  Docetaxel
 C[C@H]1[C@H]([C@@](C[C@@H](O1)O[C@@H]2[C@H]([C@@H]([C@H](O[C@H]2Oc3c4cc5cc3Oc6ccc(cc6Cl)[C@H]([C@H](C(=O)N[C@H](C(=O)N[C@H]5C(=O)N[C@@H]7c8ccc(c(c8)-c9c(cc(cc9O)O)[C@H](NC(=O)[C@H]([C@@H](c1ccc(c(c1)Cl)O4)O)NC7=O)C(=O)O)O)CC(=O)N)NC(=O)[C@@H](CC(C)C)NC)O)CO)O)O)(C)N)O  Vancocin
 NC1=NC(N)=NN=C1C2=CC=CC(Cl)=C2Cl  Lamictal
