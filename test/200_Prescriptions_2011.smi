@@ -63,7 +63,7 @@ C[C@H]1COc2c3n1cc(c(=O)c3cc(c2N4CCN(CC4)C)F)C(=O)O  Levaquin
 Fc1cc(c(F)cc1F)C[C@@H](N)CC(=O)N3Cc2nnc(n2CC3)C(F)(F)F  Janumet_1
 CN(C)C(=N)N=C(N)N  Janumet_2
 O=C(OC)C(C1CCCCN1)C2=CC=CC=C2  Methylphenidate_ER
-OC2(C(c1ccc(OC)cc1)CN(C)C)CCCCC2.HCl  Venlafaxine_HCl_ER
+OC2(C(c1ccc(OC)cc1)CN(C)C)CCCCC2.[H]Cl  Venlafaxine_HCl_ER
 CC[C@H]1C(=O)N(CC(=O)N([C@H](C(=O)N[C@H](C(=O)N([C@H](C(=O)N[C@H](C(=O)N[C@@H](C(=O)N([C@H](C(=O)N([C@H](C(=O)N([C@H](C(=O)N([C@H](C(=O)N1)[C@@H]([C@H](C)C/C=C/C)O)C)C(C)C)C)CC(C)C)C)CC(C)C)C)C)C)CC(C)C)C)C(C)C)CC(C)C)C)C  Restasis
 O=C1O[C@@H](CNC(=O)C)CN1c3cc(F)c(N2CCOCC2)cc3  Zyvox
 O=C(c1c3ccc(O)cc3sc1c2ccc(O)cc2)c5ccc(OCCN4CCCCC4)cc5  Evista
