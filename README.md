@@ -54,8 +54,8 @@ The freely accessible publication and its supplementary material at ACS
 outline the structural pattern scrutinized and their demerits.  As a
 user training, this repository contains multiple reference `.smi` files
 in folder `test` to probe the program and its options.  Simulating a
-screening, applying the default parameters, the collection of 30811
-pubchem molecules in file `example_molecules.smi` yields a set of 4713
+screening, applying the default parameters, the collection of 22981
+pubchem molecules in file `example_molecules.smi` yields a set of 4435
 acceptable molecules reported in file `okmedchem.correct.smi`.
 
 Test data `table_S3.smi`, retrieved from [table S3](https://pubs.acs.org/doi/suppl/10.1021/jm301008n/suppl_file/jm301008n_si_001.pdf)
