@@ -34,6 +34,7 @@ def usage (rc)
   $stderr.print " -dcf  <fname>  demerit control file (the -C option to iwdemerit)\n" if ($expert)
   $stderr.print " -q <dir>       directory for queries\n" if ($expert)
   $stderr.print " -okiso         allow isotopic atoms to pass through\n";
+  $stderr.print"  -symm <bonds>  discard symmetric molecules where two symmetric atoms > <bonds> apart\n" if $expert
   $stderr.print " -noapdm        do not append demerit reasons\n"
   $stderr.print " -i <type>      input type\n" if ($expert)
   $stderr.print " -expert        more options\n" unless ($expert);
@@ -41,7 +42,7 @@ def usage (rc)
   exit(rc)
 end
 
-cl = IWCmdline.new("-v-noapdm-i=s-expert-b=fraction-B=s-q=dir-log=s-tp=close-iwd=close-bindir=dir-smarts=s-rej=s-c=ipos-Cs=ipos-Ch=ipos-okiso-odm=s-edm=sfile-relaxed-nodemerit-S=s-dcf=sfile-nobadfiles")
+cl = IWCmdline.new("-v-noapdm-i=s-expert-b=fraction-B=s-q=dir-log=s-tp=close-iwd=close-bindir=dir-smarts=s-rej=s-c=ipos-Cs=ipos-Ch=ipos-okiso-odm=s-edm=sfile-relaxed-nodemerit-S=s-dcf=sfile-nobadfiles-symm=ipos")
 
 if cl.unrecognised_options_encountered()
   $stderr.print "Unrecognised options encountered\n"
@@ -155,6 +156,10 @@ end
 
 if (cl.option_present('iwd'))
   extra_iwdemerit_options << " " << cl.value('iwd')
+end
+
+if cl.option_present('symm')
+  extra_iwdemerit_options << " -s " << cl.value('symm').to_s
 end
 
 charge_assigner = "#{ianhome}/charge_assigner/queries"

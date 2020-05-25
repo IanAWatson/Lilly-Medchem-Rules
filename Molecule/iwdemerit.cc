@@ -91,9 +91,17 @@ static int demerit_numeric_value_index = 0;
 
 static int make_implicit_hydrogens_explicit = 0;
 
+/*
+  Penalty for symmetric molecules.
+  If the bond separation between any pair of symmetric atoms is
+  greater than symmetric_atom_max_sep, reject.
+*/
+
+static int symmetric_atom_max_sep = 0;
+
 static void
-do_atom_count_demerits (Molecule & m,
-                        Demerit & demerit)
+do_atom_count_demerits(Molecule & m,
+                       Demerit & demerit)
 {
   int nf = m.number_fragments();
 
@@ -159,6 +167,34 @@ do_atom_count_demerits (Molecule & m,
   return;
 }
 
+// If there are any two atoms, that are symmetry related,
+// and they are further apart than `symmetric_atom_max_sep`
+// then reject.
+static int
+rejeced_for_symmetry(Molecule & m,
+                     const int symmetric_atom_max_sep,
+                     Demerit &demerit)
+{
+  const int matoms = m.natoms();
+  const int * symmetry = m.symmetry_classes();
+
+  for (int i = 0; i < matoms; ++i) {
+    for (int j = i + 1; j < matoms; ++j) {
+      if (symmetry[i] != symmetry[j]) {
+        continue;
+      }
+
+      if (m.bonds_between(i, j) <= symmetric_atom_max_sep) {
+        continue;
+      }
+
+      demerit.reject("Symmetry");
+      return 1;
+    }
+  }
+
+  return 0;
+}
 
 static void
 run_a_set_of_queries(Molecule_to_Match & target,
@@ -251,6 +287,12 @@ iwdemerit (Molecule & m,
 
     if (demerit.rejected())
       return;
+  }
+
+  if (symmetric_atom_max_sep > 0) {
+    if (rejeced_for_symmetry(m, symmetric_atom_max_sep, demerit)) {
+      return;
+    }
   }
 
   return;
@@ -533,14 +575,12 @@ usage (int rc)
   cerr << "  -d <number>    set all demerit numeric values to <number>\n";
   cerr << "  -N ...         charge assigner specifications, enter '-N help' for info\n";
   cerr << "  -W ...         miscellaneous options, enter -W for help\n";
+  cerr << "  -s <bonds>     if two symmetric atoms are > <bonds> apart, reject\n";
   cerr << "  -E <symbol>    create element with symbol\n";
   cerr << "  -X <symbol>    before processing, delete all <symbol> atoms\n";
   cerr << "  -o <type>      file type for structures written\n";
   cerr << "  -i <type>      specify input file type\n";
   display_standard_aromaticity_options(cerr);
-#ifdef USE_IWMALLOC
-  cerr << "  -d <block>     die when block <block> is allocated\n";
-#endif
   cerr << "  -v             verbose output\n";
 
   exit(rc);
@@ -593,7 +633,7 @@ display_atom_cutoff_options(std::ostream & output)
 int
 iwdemerit (int argc, char ** argv)
 {
-  Command_Line cl(argc, argv, "M:VX:tA:S:R:G:O:kd:Dq:E:vi:o:c:C:N:uyf:xrlI:Z:z:W:");
+  Command_Line cl(argc, argv, "M:VX:tA:S:R:G:O:kd:Dq:E:vi:o:c:C:N:uyf:xrlI:Z:z:W:s:");
 
   if (cl.unrecognised_options_encountered())
     usage(1);
@@ -1006,6 +1046,16 @@ iwdemerit (int argc, char ** argv)
         display_dash_W_options(cerr);
       }
     }
+  }
+
+  if (cl.option_present('s')) {
+    if (! cl.value('s', symmetric_atom_max_sep) || symmetric_atom_max_sep < 1) {
+      cerr << "The symmetric atom maximum separation option (-s) must be a whole +ve value\n";
+      return 1;
+    }
+
+    if (verbose)
+      cerr << "Discard molecules if two symmetric atoms > " << symmetric_atom_max_sep << " bonds apart\n";
   }
 
   int output_formats = 0;
