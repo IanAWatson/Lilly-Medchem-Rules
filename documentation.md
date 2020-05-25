@@ -30,6 +30,12 @@ failing the rules will be written to one of four files, bad0.smi
 through bad3.smi. Molecules in those files will be annotated with
 the reason for their rejection.
 
+In the preparation of the .smi files for this program, the user is
+advised to refrain from an articifical aromatization programs like
+openbabel may offer; this is quickly recognized by the use of lower
+case characters e.g., c, n, o, p, s for atoms of carbon, nitrogen,
+oxygen, phosphorous, and sulphur.
+
 The output file will look like
 
 ClC1=NC(Cl)=CC(=C1)C(=O)CN PBCHM19820997

@@ -1,0 +1,562 @@
+;;;;
+This is the basis of file 200_Prescriptions_2011.smi (folder "test").;;;
+;;;
+It is based on a Wikipedia WikiProject, compiling the 200 top;;;
+prescriptions 2011 in the U.S.A, listed on the following address:;;;
+https://en.wikipedia.org/wiki/Wikipedia:WikiProject_Pharmacology/Top_200_US_Prescriptions_2011;;;
+;;;
+This listing was chosen because each of the entries already was;;;
+crosslinked to a corresponding entry in the English Wikipedia.;;;
+The sales figures in the original list were removed, but the;;;
+consecution of the entries is the same as in the source consulted.;;;
+Instead, SMILES strings of the principal active ingredient(s) is /;;;
+are now in the first column of each of the three tables here, a /;;;
+the name of the commercial drug name and the manufacturer follow;;;
+in the next columns.;;;
+;;;
+Table 1/3 thus is almost a copy of the original sources consulted.;;;
+;;;
+Table 2/3 now only considers drugs of "small molecules" -- without;;;
+drugs e.g., derived from insuline, or antibodies.  If Wikipedia;;;
+stated more than one principal active ingredient, then this second;;;
+table lists the SMILES strings individually with the names of the;;;
+drug incremented (e.g., Truvada_1, Truvada_2).;;;
+;;;
+Table 3/3 reports only the relevant SMILES strings and drug names.;;;
+;;;
+The file uses UTF-8 character encoding and separates columns by a;;;
+semi-colon.  New lines are indicated in the Windows format, e.g.;;;
+(carriage return + line feed).;;;
+;;;
+Last edit: 2020-05-10 (YYYY-MM-DD).;;;
+;;;
+TABLE 1/3, start:;;;
+;;;
+O=C(O)C[C@H](O)C[C@H](O)CCn2c(c(c(c2c1ccc(F)cc1)c3ccccc3)C(=O)Nc4ccccc4)C(C)C;Lipitor;Pfizer;
+COC(=O)[C@H](c1ccccc1Cl)N2CCc3c(ccs3)C2;Plavix;Bristol-Myers Squibb/Sanofi-Aventis;
+COc1ccc2nc([nH]c2c1)S(=O)Cc1ncc(C)c(OC)c1C;Nexium;AstraZeneca;
+Clc4cccc(N3CCN(CCCCOc2ccc1c(NC(=O)CC1)c2)CC3)c4Cl;Abilify;Otsuka America;
+CCC(=O)OC1(C(CC2C1(CC(C3(C2CC(C4=CC(=O)C=CC43C)F)F)O)C)C)C(=O)SC and OCc1cc(ccc1O)[C@H](O)CNCCCCCCOCCCCc2ccccc2;Advair Diskus;GlaxoSmithKline;concat
+N\1=C(\c3c(Sc2c/1cccc2)cccc3)N4CCN(CCOCCO)CC4;Seroquel;AstraZeneca;
+O=C(O)CC1(CC1)CS[C@@H](c2cccc(c2)\C=C\c3nc4cc(Cl)ccc4cc3)CCc5ccccc5C(O)(C)C;Singulair;Merck & Co.;
+OC(=O)C[C@H](O)C[C@H](O)\C=C\c1c(C(C)C)nc(N(C)S(=O)(=O)C)nc1c2ccc(F)cc2;Crestor;AstraZeneca;
+CNCC[C@@H](C1=CC=CS1)OC2=CC=CC3=CC=CC=C32;Cymbalta;Lilly;
+;Humira;Abbott Laboratories;antibody
+;Enbrel;Amgen;fusion protein
+;Remicade;Centocor;antibody
+O=C1NC(=O)SC1Cc3ccc(OCCc2ncc(cc2)CC)cc3;Actos;Takeda;
+;Neulasta;Amgen;glycoprotein
+;Rituxan;Genentech;antibody
+CN1CCN(CC1)C/2=N/c4ccccc4Nc3sc(C)cc\23;Zyprexa;Lilly;
+;Copaxone;Teva CNS;peptide blend
+Fc1ccc(cc1)[C@@]3(OCc2cc(C#N)ccc23)CCCN(C)C;Lexapro;Forest;
+O=C4[C@@H]5Oc1c2c(ccc1OC)C[C@H]3N(CC[C@]25[C@@]3(O)CC4)C;Oxycontin;Purdue;
+;Epogen;Amgen;cell culture
+;Avastin;Genentech;antibody
+FC(F)([C@]1(OC(NC2=CC=C(C=C21)Cl)=O)C#CC3CC3)F and FC=1\C(=N/C(=O)N(C=1)[C@H]2O[C@H](SC2)CO)\N and O=P(O)(O)CO[C@H](C)Cn1c2ncnc(c2nc1)N;Atripla;Bristol-Myers Squibb/Gilead Sciences;concat
+C[N+]1(C2CC(CC1C3C2O3)OC(=O)C(C4=CC=CS4)(C5=CC=CS5)O)C.[Br-];Spiriva HandiHaler;Boehringer Ingelheim;SMILES with Br- chosen
+Fc1cc(c(F)cc1F)C[C@@H](N)CC(=O)N3Cc2nnc(n2CC3)C(F)(F)F;Januvia;Merck & Co.;
+;Lantus;sanofi-aventis;Insuline derivative
+C[C@H](Cn1cnc2c1ncnc2N)OCP(=O)(OCOC(=O)OC(C)C)OCOC(=O)OC(C)C and FC=1\C(=N/C(=O)N(C=1)[C@H]2O[C@H](SC2)CO)\N;Truvada;Gilead Sciences;concat
+CCCCC(=O)N(CC1=CC=C(C=C1)C2=CC=CC=C2C3=NNN=N3)C(C(C)C)C(=O)O;Diovan;Novartis;
+CC(C)CC(CC(=O)O)CN;Lyrica;Pfizer;
+O=S(=O)(c3ccc(n1nc(cc1c2ccc(cc2)C)C(F)(F)F)cc3)N;Celebrex;Pfizer;
+;Lucentis;Genentech;antibody
+;Herceptin;Genentech;antibody
+CCCCC(=O)N(CC1=CC=C(C=C1)C2=CC=CC=C2C3=NNN=N3)C(C(C)C)C(=O)O and O=S(=O)(N)c1c(Cl)cc2c(c1)S(=O)(=O)NCN2;Diovan HCT;Novartis;concat
+;Avonex;Biogen Idec;protein
+;Lantus Solostar;sanofi-aventis;insuline
+Cc1ccc(cc1Nc2nccc(n2)c3cccnc3)NC(=O)c4ccc(cc4)CN5CCN(CC5)C;Gleevec;Novartis;
+NC12CC3(CC(C1)(CC(C2)C3)C)C;Namenda;Forest;
+;Enoxaparin sodium;Sandoz;polysaccharide
+O=C1Cc2c(N1)cc(Cl)c(c2)CCN3CCN(CC3)c4nsc5ccccc45;Geodon;Pfizer;
+Fc1ccc(cc1)[C@@H](O)CC[C@H]4C(=O)N(c2ccc(F)cc2)[C@@H]4c3ccc(O)cc3;Zetia;Merck & Co./Schering-Plough;
+O=C(c1ccc(Cl)cc1)c2ccc(OC(C(=O)OC(C)C)(C)C)cc2;Tricor;Abbott Laboratories;
+O=C(N[C@H](Cc1ccccc1)C)[C@@H](N)CCCCN;Vyvanse;Shire;
+Oc7ccc5c1c7O[C@H]3[C@]6(OC)[C@H](C[C@@]2([C@H](N(CC[C@@]123)CC4CC4)C5)CC6)[C@@](O)(C)C(C)(C)C.O=C1[C@@H]2OC3=C(O)C=CC4=C3[C@@]2([C@]5(CC1)O)CCN(CC=C)[C@@H]5C4;Suboxone;Reckitt Benckiser;
+O=C(Nc1c(cccc1C)C)CN(CC)CC;Lidoderm;Endo;
+;Procrit;Janssen Biotech;glycoprotein
+O1C(=O)C(=O)O[Pt-2]12[NH2+]C0CCCCC0[NH2+]2;Eloxatin;sanofi-aventis;
+OC(=O)c1cccnc1;Niaspan;Abbott Laboratories;
+O=S(C(c1ccccc1)c2ccccc2)CC(=O)N;Provigil;Teva CNS;
+;Aranesp;Amgen;glycoprotein
+O=C4\C=C2/[C@]([C@H]1CC[C@@]3([C@@H](O)CC[C@H]3[C@@H]1CC2)C)(C)CC4;Androgel;Abbott Laboratories;
+CC(C)[N+]1(C2CCC1CC(C2)OC(=O)C(CO)C3=CC=CC=C3)C.[Br-] and CC(C)(C)NCC(C1=CC(=C(C=C1)O)CO)O;Combivent;Boehringer Ingelheim;concat Br- salt + #2
+;Lovenox;sanofi-aventis;polysaccharide
+;Rebif;EMD Serono;protein
+Fc1ccc(cc1)[C@@H](O)CC[C@H]4C(=O)N(c2ccc(F)cc2)[C@@H]4c3ccc(O)cc3 and O=C(O[C@@H]1[C@H]3C(=C/[C@H](C)C1)\C=C/[C@@H]([C@@H]3CC[C@H]2OC(=O)C[C@H](O)C2)C)C(C)(C)CC;Vytorin;Merck & Co./Schering-Plough;concat
+O=C(O[C@]2(C(=O)CCl)[C@H](C)C[C@H]3[C@@H]4CCC\1=C\C(=O)\C=C/[C@]/1(C)[C@@]4(Cl)[C@@H](O)C[C@]23C)c5occc5;Nasonex;Schering;
+CCCC1=NN(C2=C1N=C(NC2=O)C3=C(C=CC(=C3)S(=O)(=O)N4CCN(CC4)C)OCC)C;Viagra;Pfizer;
+CCCC1O[C@@H]2C[C@H]3[C@@H]4CCC5=CC(=O)C=C[C@@]5([C@H]4[C@H](C[C@@]3([C@@]2(O1)C(=O)CO)C)O)C and O=CNc1cc(ccc1O)[C@@H](O)CN[C@H](C)Cc2ccc(OC)cc2;Symbicort;AstraZeneca;concat
+N\1=C(\c3c(Sc2c/1cccc2)cccc3)N4CCN(CCOCCO)CC4;Seroquel XR;AstraZeneca;
+Nc3nc2[nH]cc(CCc1ccc(C(=O)N[C@@H](CCC(=O)O)C(=O)O)cc1)c2c(=O)[nH]3;Alimta;Lilly;
+;NovoLog;Novo Nordisk;insuline
+;Lovaza;GlaxoSmithKline;mixture of omega-3 acid ethyl esters
+;Humalog;Lilly;insuline
+C[C@@H](N)Cc1ccccc1 and C[C@@H](Cc1ccccc1)N;Adderall XR;Shire;concat
+;Neupogen;Amgen;protein
+CCC(=O)OC1(C(CC2C1(CC(C3(C2CC(C4=CC(=O)C=CC43C)F)F)O)C)C)C(=O)SCF;Flovent HFA;GlaxoSmithKline;
+CC(C)(C)NCC(C1=CC(=C(C=C1)O)CO)O;Proair HFA;Teva Respiratory;
+O=C(OC)N[C@H](C(=O)N[C@@H](Cc1ccccc1)[C@@H](O)CN(NC(=O)[C@@H](NC(=O)OC)C(C)(C)C)Cc3ccc(c2ncccc2)cc3)C(C)(C)C;Reyataz;Bristol-Myers Squibb HIV;
+CC1=C(C=CN=C1CS(=O)C2=NC3=CC=CC=C3N2)OCCCOC;Aciphex;Eisai;
+O=C(OC)C(C1CCCCN1)C2=CC=CC=C2;Concerta;Janssen;
+CCCC1O[C@@H]2C[C@H]3[C@@H]4CCC5=CC(=O)C=C[C@@]5([C@H]4[C@H](C[C@@]3([C@@]2(O1)C(=O)CO)C)O)C;Budesonide;Teva Pharmaceutical Industries;
+;Levemir;Novo Nordisk;insuline
+CCC[C@@H](C(=O)C(=O)NC1CC1)NC(=O)[C@@H]2[C@H]3CCC[C@H]3CN2C(=O)[C@H](C(C)(C)C)NC(=O)[C@H](C4CCCCC4)NC(=O)c5cnccn5;Incivek;Vertex;
+;Varivax;Merck & Co.;attenuated virus
+;Prevnar 13;Pfizer;polysaccharide
+O=C(O[C@H]3c1nccnc1C(=O)N3c2ncc(Cl)cc2)N4CCN(C)CC4;Lunesta;Sunovion;
+O=C1N(CC(N2[C@@H]1CC3=C([C@H]2C4=CC5=C(OCO5)C=C4)NC6=C3C=CC=C6)=O)C;Cialis;Lilly;
+CN(C)C1C2CC3CC4=C(C=CC(=C4C(=C3C(=O)C2(C(=C(C1=O)C(=O)N)O)O)O)O)N(C)C;Solodyn;Medicis;
+;NovoLog Flexpen;Novo Nordisk;insuline
+Cc1nnc(o1)C(=O)NC(C)(C)C\3=N\C(C(=O)NCc2ccc(F)cc2)=C(\O)C(=O)N/3C;Isentress;Merck & Co.;
+C[C@H]1COc2c3n1cc(c(=O)c3cc(c2N4CCN(CC4)C)F)C(=O)O;Levaquin;Janssen;
+Fc1cc(c(F)cc1F)C[C@@H](N)CC(=O)N3Cc2nnc(n2CC3)C(F)(F)F and CN(C)C(=N)N=C(N)N;Janumet;Merck & Co.;concat
+O=C(OC)C(C1CCCCN1)C2=CC=CC=C2;Methylphenidate ER;Watson;
+;Synagis;MedImmune;antibody
+OC2(C(c1ccc(OC)cc1)CN(C)C)CCCCC2.HCl;Venlafaxine HCl ER;Teva Pharmaceutical Industries;concat (manual)
+CC[C@H]1C(=O)N(CC(=O)N([C@H](C(=O)N[C@H](C(=O)N([C@H](C(=O)N[C@H](C(=O)N[C@@H](C(=O)N([C@H](C(=O)N([C@H](C(=O)N([C@H](C(=O)N([C@H](C(=O)N1)[C@@H]([C@H](C)C/C=C/C)O)C)C(C)C)C)CC(C)C)C)CC(C)C)C)C)C)CC(C)C)C)C(C)C)CC(C)C)C)C;Restasis;Allergan;
+O=C1O[C@@H](CNC(=O)C)CN1c3cc(F)c(N2CCOCC2)cc3;Zyvox;Pfizer;
+;Betaseron;Bayer HealthCare;protein
+O=C(c1c3ccc(O)cc3sc1c2ccc(O)cc2)c5ccc(OCCN4CCCCC4)cc5;Evista;Lilly;
+;Erbitux;ImClone;antibody
+CCCc1nc(c(n1Cc2ccc(cc2)c3ccccc3c4[nH]nnn4)C(=O)OCc5c(oc(=O)o5)C)C(C)(C)O;Benicar;Daiichi Sankyo;
+O=C(N[C@H](C(=O)N[C@H](B(O)O)CC(C)C)Cc1ccccc1)c2nccnc2;Velcade;Millenium;
+O=P(O)(O)C(O)(Cn1ccnc1)P(=O)(O)O;Zometa;Novartis;
+NC(Cc1cc(I)c(Oc2cc(I)c(O)c(I)c2)c(I)c1)C(O)=O;Synthroid;Abbott Laboratories;
+C1CN2CCC1[C@H](C2)OC(=O)N3CCC4=CC=CC=C4[C@@H]3C5=CC=CC=C5;Vesicare;Astellas Pharma US;
+FC=1\C(=N/C(=O)N(C=1)[C@@H]2O[C@@H]([C@@H](O)[C@H]2O)C)\NC(=O)OCCCCC;Xeloda;Roche;
+Cc1ccc(c(c1)[C@H](CCN(C(C)C)C(C)C)c2ccccc2)O;Detrol LA;Pfizer;
+O=C1[C@@H]2OC3=C(O)C=CC4=C3[C@@]2([C@]5(CC1)O)CCN(C)[C@@H]5C4;Opana ER;Endo;
+;Orencia;Bristol-Myers Squibb;antibody
+O=S(=O)(c1ccc(N)cc1)N(CC(C)C)C[C@@H](O)[C@@H](NC(=O)O[C@H]2CO[C@H]3OCC[C@@H]23)Cc4ccccc4;Prezista;Janssen;
+CC(C)(C)NCC(C1=CC(=C(C=C1)O)CO)O;Ventolin HFA;GlaxoSmithKline;
+O=S(=O)(N)c1c(Cl)cc2c(c1)S(=O)(=O)NCN2 and CCCc1nc(c(n1Cc2ccc(cc2)c3ccccc3c4[nH]nnn4)C(=O)OCc5c(oc(=O)o5)C)C(C)(C)O;Benicar HCT;Daiichi Sankyo;concat
+;Cubicin;Cubist;cyclopeptide
+O=P(O)(O)C(O)(CCN(CCCCC)C)P(=O)(O)O;Boniva;Roche;
+C[C@H]([C@H]1C(=O)N[C@@H](CSSC[C@@H](C(=O)N[C@H](C(=O)N[C@@H](C(=O)N[C@H](C(=O)N1)CCCCN)Cc2c[nH]c3c2cccc3)Cc4ccccc4)NC(=O)[C@@H](Cc5ccccc5)N)C(=O)N[C@H](CO)[C@@H](C)O)O;Sandostatin LAR;Novartis;octapeptide
+OC(Cc1cccnc1)(P(=O)(O)O)P(=O)(O)O;Actonel;Warner Chilcott;
+CC(C1=CC=CC2=CC=CC=C21)NCCCC3=CC(=CC=C3)C(F)(F)F;Sensipar;Amgen;
+C[C@@H](N)Cc1ccccc1 and C[C@@H](Cc1ccccc1)N;Amphetamine Salts ER;Teva Pharmaceutical Industries;concat
+O=C(O)c1cc(ccc1O)N;ASACOL;Warner Chilcott;
+Oc1cc4c(cc1)[C@H]3CC[C@]2([C@@H](CC[C@]2(C#C)O)[C@@H]3CC4)C and CC(=O)O[C@]1(CC[C@@H]2[C@@]1(CC[C@H]3[C@H]2CCC4=CC(=O)CC[C@H]34)C)C#C;Loestrin 24 FE;Warner Chilcott;concat
+COCCOc1cc2c(cc1OCCOC)ncnc2Nc3cccc(c3)C#C;Tarceva;Genentech;
+O=C(OCC)CCN(c1ncccc1)C(=O)c4ccc2c(nc(n2C)CNc3ccc(C(=N\C(=O)OCCCCCC)\N)cc3)c4;Pradaxa;Boehringer Ingelheim;
+;Renvela;Genzyme;polymer
+;Gamunex-C;Grifols USA;?
+OC2(C(c1ccc(O)cc1)CN(C)C)CCCCC2;Pristiq;Pfizer;
+n1c2ccccc2[nH]c1[S@](=O)Cc3nccc(c3C)OCC(F)(F)F;Dexilant;Takeda;
+O=C(c1ccc(Cl)cc1)c2ccc(OC(C(=O)OC(C)C)(C)C)cc2;Trilipix;Abbott Laboratories;
+O=C([C@@H]([C@@H]1NCCCC1)C2=CC=CC=C2)OC;Focalin XR;Novartis;
+FC(F)(F)c1cc(c(cc1)C(F)(F)F)NC(=O)[C@@H]3[C@]2(CC[C@H]4[C@H]([C@@H]2CC3)CC[C@H]5NC(=O)\C=C/[C@]45C)C;Avodart;GlaxoSmithKline;
+;Xolair;Genentech;antibody
+CC1=C(C=CC=C1)O[C@H](CCNC)C2=CC=CC=C2;Strattera;Lilly;
+;Byetta;Amylin;protein
+;Humalog Kwikpen;Lilly;insuline
+;Pegasys Convenience Pack;Roche;protein
+;Gammagard Liquid;Baxter;antibody
+O=C3C(=O)N1CCCC[C@H]1C(=O)O[C@H](C(=C/[C@@H]2CC[C@@H](O)[C@H](OC)C2)/C)[C@H](C)[C@@H](O)CC(=O)[C@@H](/C=C(/C[C@@H](C[C@H](OC)[C@H]4O[C@]3(O)[C@H](C)C[C@@H]4OC)C)C)C\C=C;Prograf;Astellas Pharma;
+ClCCN(c2ccc1c(nc(n1C)CCCC(=O)O)c2)CCCl;Treanda;Teva Oncology;
+Cc1c(c(=O)n2c(n1)CCCC2)CCN3CCC(CC3)c4c5ccc(cc5on4)F;Risperdal Consta;Janssen;
+O=C(N[C@@H]3C\1=C\C(=O)C(\OC)=C/C=C/1c2c(cc(OC)c(OC)c2OC)CC3)C;Colcrys;AR Scientific;
+CC(C)c4nc(CN(C)C(=O)N[C@@H](C(C)C)C(=O)N[C@@H](Cc1ccccc1)C[C@H](O)[C@H](Cc2ccccc2)NC(=O)OCc3cncs3)cs4;Norvir;Abbott Laboratories;
+;Premarin;Pfizer;?
+;Nuvaring;Organon;?
+OCc1cc(ccc1O)[C@@H](O)CNC(C)(C)C;Xopenex;SUNOVION;
+FC(F)(F)c2cc(OC[C@H](O)/C=C/[C@@H]1[C@H]([C@@H](O)C[C@H]1O)C\C=C/CCCC(=O)OC(C)C)ccc2;Travatan Z;Novartis Vision;
+n3c1c(ncn1[C@H]2/C=C\[C@@H](CO)C2)c(nc3N)NC4CC4 and O=C1/N=C(/N)\C=C/N1[C@@H]2O[C@@H](SC2)CO;Epzicom;ViiV Healthcare;
+O=C5N([C@H]2C1CCN(CC1)C2)C[C@@H]4c3c5cccc3CCC4;Aloxi;Eisai;
+C[C@@H](N)Cc1ccccc1 and C[C@@H](Cc1ccccc1)N;Amphetamine Salts ER;Global;
+O=C(CC)N(C1CCN(CC1)CCc2ccccc2)c3ccccc3;Fentanyl;Mylan;
+O=C1NC(=O)SC1Cc3ccc(OCCc2ncc(cc2)CC)cc3 and CN(C)C(=N)N=C(N)N;ACTO plus met;Takeda;
+O=C(C)Oc1ccccc1C(=O)O and OCCN(CCO)C(N=C1N2CCCCC2)=NC3=C1N=C(N(CCO)CCO)N=C3N4CCCCC4;Aggrenox;Boehringer Ingelheim;
+O=P(O)(O)CO[C@H](C)Cn1c2ncnc(c2nc1)N;Viread;Gilead Sciences;
+O(c1ccc(cc1)CCOC)CC(O)CNC(C)C;Metoprolol Succinate;Par;
+;Forteo;Lilly;proteine
+O=C1N(\C(=N/C12CCCC2)CCCC)Cc5ccc(c3ccccc3c4n[nH]nn4)cc5;Avapro;Bristol-Myers Squibb;
+;Mirena;Bayer HealthCare;?
+;Victoza 3-Pak;Novo Nordisk;proteine
+O=C(O)[C@@H]3N4C(=O)[C@@H](NC(=O)[C@@H](c1ccccc1)NC(=O)N2C(=O)C(=O)N(CC)CC2)[C@H]4SC3(C)C and O=S2(=O)[C@]([C@@H](N1C(=O)C[C@H]12)C(=O)O)(Cn3nncc3)C;Zosyn;Pfizer;
+O=C(Oc1cc(ccc1)[C@@H](N(C)C)C)N(CC)C;Exelon;Novartis;
+;Privigen;CSL Behring;antibody
+O=C1NC(=O)CCC1N3C(=O)c2cccc(c2C3)N;Revlimid;Celgene;
+CNC(=O)C1=CN(N=C1)C2=NC(=C3C(=N2)N(C=N3)[C@H]4[C@@H]([C@@H]([C@H](O4)CO)O)O)N;Lexiscan;Astellas Pharma US;
+;Stelara;Centocor;antibody
+;Adacel;sanofi-aventis PAS;vaccine
+;Ortho Tri-Cyclen Lo;Janssen;?
+;Welchol;Daiichi Sankyo;?
+;Angiomax;The Medicines Co;proteine
+;Gardasil;Merck & Co.;vaccine
+CCNC(=O)CCCC=CCC1C(CC(C1C=CC(CCC2=CC=CC=C2)O)O)O;Lumigan;Allergan;
+;Pulmozyme;Genentech;rhDNase
+O=C/1N5/C(=N\C(=C\1CCN4CCC(c3noc2cc(F)ccc23)CC4)C)[C@H](O)CCC5;Invega;Janssen;
+O=P(O)(O)C(O)(Cn1ccnc1)P(=O)(O)O;Reclast;Novartis;
+O=C(c1ncn2C(=O)N(\N=N/c12)C)N;Temodar;Schering;
+CC(=O)O[C@H]3[C@H](C)[C@H](O)[C@H](C)[C@@H](O)[C@@H](C)\C=C\C=C(\C)C(=O)Nc6c2c(nc1cc(C)ccn12)c5c4C(=O)[C@@](C)(O/C=C/[C@H](OC)[C@H]3C)Oc4c(C)c(O)c5c6O;Xifaxan;Salix;
+O=C(O)C[C@H](O)C[C@H](O)CCn2c(c(c(c2c1ccc(F)cc1)c3ccccc3)C(=O)Nc4ccccc4)C(C)C;Atorvastatin calcium;Watson;
+;NovoSeven RT;Novo Nordisk;?
+Fc4cc1c(OC(CC1)C(O)CNCC(O)C3Oc2ccc(F)cc2CC3)cc4;Bystolic;Forest;
+O=C/1N5/C(=N\C(=C\1CCN4CCC(c3noc2cc(F)ccc23)CC4)C)[C@H](O)CCC5;Invega Sustenna;Janssen;
+O=C(O)c1cc(ccc1O)N;Lialda;Shire;
+CCCCCCCCC1=CC=C(C=C1)CCC(CO)(CO)N;Gilenya;Novartis;
+OC2(C(c1ccc(OC)cc1)CN(C)C)CCCCC2;Effexor XR;Pfizer;
+;Pneumovax 23;Merck & Co.;vaccince
+O=C(N[C@@H](Cc1ccccc1)[C@@H](O)C[C@@H](NC(=O)[C@@H](N2C(=O)NCCC2)C(C)C)Cc3ccccc3)COc4c(cccc4C)C and CC(C)c4nc(CN(C)C(=O)N[C@@H](C(C)C)C(=O)N[C@@H](Cc1ccccc1)C[C@H](O)[C@H](Cc2ccccc2)NC(=O)OCc3cncs3)cs4;Kaletra;Abbott Laboratories;
+;Zostavax;Merck & Co.;vaccine
+O(c1ccc(cc1)CCOC)CC(O)CNC(C)C and C(CC(=O)O)C(=O)O;Metoprolol Succinate;Watson;concat (manual)
+O=C(OC(C)(C)C)N[C@@H](c1ccccc1)[C@@H](O)C(=O)O[C@@H]4C(=C3/[C@@H](O)C(=O)[C@]6([C@H]([C@H](OC(=O)c2ccccc2)[C@@](O)(C3(C)C)C4)[C@@]5(OC(=O)C)[C@H](OC5)C[C@@H]6O)C)/C;Taxotere;sanofi-aventis;
+;Tysabri;Elan;anitibody
+O=C2c1cc(OC)c(OC)cc1CC2CC4CCN(Cc3ccccc3)CC4;Donepezil HCl;Greenstone;
+n1c2cc3c(cc2ncc1)[C@@H]4CNC[C@H]3C4;Chantix;Pfizer;
+;Xgeva;Amgen;antibody
+;Nutropin AQ;Genentech;?
+CCC(=O)OC1(C(CC2C1(CC(C3(C2CC(C4=CC(=O)C=CC43C)F)F)O)C)C)C(=O)SCF;Fluticasone propionate;Roxane;
+COc1c2c(cc(c1N3C[C@@H]4CCCN[C@@H]4C3)F)c(=O)c(cn2C5CC5)C(=O)O;Avelox;Schering;
+;Yervoy;Bristol-Myers Squibb;antibody
+Clc1ccccc1C2/C(C(=O)OC)=C(/C)N/C(COCCN)=C2/C(=O)OCC and CCCCC(=O)N(CC1=CC=C(C=C1)C2=CC=CC=C2C3=NNN=N3)C(C(C)C)C(=O)O;Exforge;Novartis;
+O=C(N1[C@H](C#N)C[C@@H]2C[C@H]12)[C@@H](N)C35CC4CC(C3)CC(O)(C4)C5;Onglyza;Bristol-Myers Squibb;
+;Abraxane;Celgene;?
+O=C4[C@@H]5Oc1c2c(ccc1OC)C[C@H]3N(CC[C@]25[C@H]3CC4)C and CC(=O)Nc1ccc(O)cc1;hydrocodone/acetaminophen;Watson;
+;Synvisc-One;Genzyme;polysaccharide (hyalorone)
+CN1CCN(CC1)C/2=N/c4ccccc4Nc3sc(C)cc\23;Zyprexa Zydis;Eli Lilly;
+O=C(C(C)NC(C)(C)C)C1=CC=CC(Cl)=C1;Bupropion HCL XL;Mylan;
+O=C(OCC(=O)[C@]3(OC(=O)CC)[C@]2(C[C@H](O)[C@]4(Cl)[C@@]/1(\C(=C/C(=O)\C=C\1)CC[C@H]4[C@@H]2C[C@@H]3C)C)C)CC;QVAR;Teva Respiratory;
+;NovoLog Flexpen Mix;Novo Nordisk;insuline
+n1cncn1Cc2cc3c(cc2)[nH]cc3CCN(C)C;Maxalt MLT;Merck & Co.;
+C[C@H](/C=C/[C@H](C)C(C)(C)O)[C@H]1CC[C@H]2/C(=C/C=C3C[C@H](C[C@@H](C3)O)O)/CCC[C@]12C;Zemplar;Abbott Laboratories;convert from INCHI
+O=C(OC(C)(C)C)N[C@@H](c1ccccc1)[C@@H](O)C(=O)O[C@@H]4C(=C3/[C@@H](O)C(=O)[C@]6([C@H]([C@H](OC(=O)c2ccccc2)[C@@](O)(C3(C)C)C4)[C@@]5(OC(=O)C)[C@H](OC5)C[C@@H]6O)C)/C;Docetaxel;Hospira;
+C[C@H]1[C@H]([C@@](C[C@@H](O1)O[C@@H]2[C@H]([C@@H]([C@H](O[C@H]2Oc3c4cc5cc3Oc6ccc(cc6Cl)[C@H]([C@H](C(=O)N[C@H](C(=O)N[C@H]5C(=O)N[C@@H]7c8ccc(c(c8)-c9c(cc(cc9O)O)[C@H](NC(=O)[C@H]([C@@H](c1ccc(c(c1)Cl)O4)O)NC7=O)C(=O)O)O)CC(=O)N)NC(=O)[C@@H](CC(C)C)NC)O)CO)O)O)(C)N)O;Vancocin;Viropharma;
+NC1=NC(N)=NN=C1C2=CC=CC(Cl)=C2Cl;Lamictal;GlaxoSmithKline;
+;Menactra;Sanofi Pasteur;vaccine
+O=C1/N=C(\N=C/N1[C@@H]2O[C@@H]([C@@H](O)[C@H]2O)CO)N;Vidaza;Celgene;
+O=C(OCC(OCn1c2N\C(=N/C(=O)c2nc1)N)CO)[C@@H](N)C(C)C;Valcyte;Roche;
+O=C(N(c1c(I)c(c(I)c(c1I)C(=O)NCC(O)CO)C(=O)NCC(O)CO)CC(O)CO)C;Omnipaque;GE Healthcare;
+O=C(Nc1c(cccc1C)C)CN3CCN(CC(O)COc2ccccc2OC)CC3;Ranexa;Gilead Sciences;
+;;;
+;;;
+TABLE 2/3, start:;;;
+Only "small molecule drugs" -- retaining the same consecution of entries as in;;;
+the original list (i.e, TABLE 1/3).  In presence of more than one active ingredient;;;
+the entry is split (e.g., Combivent_1, Combivent_2).;;;
+;;;
+O=C(O)C[C@H](O)C[C@H](O)CCn2c(c(c(c2c1ccc(F)cc1)c3ccccc3)C(=O)Nc4ccccc4)C(C)C;Lipitor;Pfizer;
+COC(=O)[C@H](c1ccccc1Cl)N2CCc3c(ccs3)C2;Plavix;Bristol-Myers Squibb/Sanofi-Aventis;
+COc1ccc2nc([nH]c2c1)S(=O)Cc1ncc(C)c(OC)c1C;Nexium;AstraZeneca;
+Clc4cccc(N3CCN(CCCCOc2ccc1c(NC(=O)CC1)c2)CC3)c4Cl;Abilify;Otsuka America;
+CCC(=O)OC1(C(CC2C1(CC(C3(C2CC(C4=CC(=O)C=CC43C)F)F)O)C)C)C(=O)SC;Advair_Diskus_1;GlaxoSmithKline;
+OCc1cc(ccc1O)[C@H](O)CNCCCCCCOCCCCc2ccccc2;Advair_Diskus_2;;
+N\1=C(\c3c(Sc2c/1cccc2)cccc3)N4CCN(CCOCCO)CC4;Seroquel;AstraZeneca;
+O=C(O)CC1(CC1)CS[C@@H](c2cccc(c2)\C=C\c3nc4cc(Cl)ccc4cc3)CCc5ccccc5C(O)(C)C;Singulair;Merck & Co.;
+OC(=O)C[C@H](O)C[C@H](O)\C=C\c1c(C(C)C)nc(N(C)S(=O)(=O)C)nc1c2ccc(F)cc2;Crestor;AstraZeneca;
+CNCC[C@@H](C1=CC=CS1)OC2=CC=CC3=CC=CC=C32;Cymbalta;Lilly;
+O=C1NC(=O)SC1Cc3ccc(OCCc2ncc(cc2)CC)cc3;Actos;Takeda;
+CN1CCN(CC1)C/2=N/c4ccccc4Nc3sc(C)cc\23;Zyprexa;Lilly;
+Fc1ccc(cc1)[C@@]3(OCc2cc(C#N)ccc23)CCCN(C)C;Lexapro;Forest;
+O=C4[C@@H]5Oc1c2c(ccc1OC)C[C@H]3N(CC[C@]25[C@@]3(O)CC4)C;Oxycontin;Purdue;
+FC(F)([C@]1(OC(NC2=CC=C(C=C21)Cl)=O)C#CC3CC3)F;Atripla_1;Bristol-Myers Squibb/Gilead Sciences;concat
+FC=1\C(=N/C(=O)N(C=1)[C@H]2O[C@H](SC2)CO)\N;Atripla_2;;
+O=P(O)(O)CO[C@H](C)Cn1c2ncnc(c2nc1)N;Atripla_3;;
+C[N+]1(C2CC(CC1C3C2O3)OC(=O)C(C4=CC=CS4)(C5=CC=CS5)O)C.[Br-];Spiriva_HandiHaler;Boehringer Ingelheim;SMILES with Br- chosen
+Fc1cc(c(F)cc1F)C[C@@H](N)CC(=O)N3Cc2nnc(n2CC3)C(F)(F)F;Januvia;Merck & Co.;
+C[C@H](Cn1cnc2c1ncnc2N)OCP(=O)(OCOC(=O)OC(C)C)OCOC(=O)OC(C)C;Truvada_1;Gilead Sciences;concat
+FC=1\C(=N/C(=O)N(C=1)[C@H]2O[C@H](SC2)CO)\N;Truvada_2;;
+CCCCC(=O)N(CC1=CC=C(C=C1)C2=CC=CC=C2C3=NNN=N3)C(C(C)C)C(=O)O;Diovan;Novartis;
+CC(C)CC(CC(=O)O)CN;Lyrica;Pfizer;
+O=S(=O)(c3ccc(n1nc(cc1c2ccc(cc2)C)C(F)(F)F)cc3)N;Celebrex;Pfizer;
+CCCCC(=O)N(CC1=CC=C(C=C1)C2=CC=CC=C2C3=NNN=N3)C(C(C)C)C(=O)O;Diovan_HCT_1;Novartis;concat
+O=S(=O)(N)c1c(Cl)cc2c(c1)S(=O)(=O)NCN2;Diovan_HCT_2;;
+Cc1ccc(cc1Nc2nccc(n2)c3cccnc3)NC(=O)c4ccc(cc4)CN5CCN(CC5)C;Gleevec;Novartis;
+NC12CC3(CC(C1)(CC(C2)C3)C)C;Namenda;Forest;
+O=C1Cc2c(N1)cc(Cl)c(c2)CCN3CCN(CC3)c4nsc5ccccc45;Geodon;Pfizer;
+Fc1ccc(cc1)[C@@H](O)CC[C@H]4C(=O)N(c2ccc(F)cc2)[C@@H]4c3ccc(O)cc3;Zetia;Merck & Co./Schering-Plough;
+O=C(c1ccc(Cl)cc1)c2ccc(OC(C(=O)OC(C)C)(C)C)cc2;Tricor;Abbott Laboratories;
+O=C(N[C@H](Cc1ccccc1)C)[C@@H](N)CCCCN;Vyvanse;Shire;
+Oc7ccc5c1c7O[C@H]3[C@]6(OC)[C@H](C[C@@]2([C@H](N(CC[C@@]123)CC4CC4)C5)CC6)[C@@](O)(C)C(C)(C)C.O=C1[C@@H]2OC3=C(O)C=CC4=C3[C@@]2([C@]5(CC1)O)CCN(CC=C)[C@@H]5C4;Suboxone;Reckitt Benckiser;
+O=C(Nc1c(cccc1C)C)CN(CC)CC;Lidoderm;Endo;
+O1C(=O)C(=O)O[Pt-2]12[NH2+]C0CCCCC0[NH2+]2;Eloxatin;sanofi-aventis;
+OC(=O)c1cccnc1;Niaspan;Abbott Laboratories;
+O=S(C(c1ccccc1)c2ccccc2)CC(=O)N;Provigil;Teva CNS;
+O=C4\C=C2/[C@]([C@H]1CC[C@@]3([C@@H](O)CC[C@H]3[C@@H]1CC2)C)(C)CC4;Androgel;Abbott Laboratories;
+CC(C)[N+]1(C2CCC1CC(C2)OC(=O)C(CO)C3=CC=CC=C3)C.[Br-];Combivent_1;Boehringer Ingelheim;concat Br- salt + #2
+CC(C)(C)NCC(C1=CC(=C(C=C1)O)CO)O;Combivent_2;;
+Fc1ccc(cc1)[C@@H](O)CC[C@H]4C(=O)N(c2ccc(F)cc2)[C@@H]4c3ccc(O)cc3;Vytorin_1;Merck & Co./Schering-Plough;concat
+O=C(O[C@@H]1[C@H]3C(=C/[C@H](C)C1)\C=C/[C@@H]([C@@H]3CC[C@H]2OC(=O)C[C@H](O)C2)C)C(C)(C)CC;Vytorin_2;;
+O=C(O[C@]2(C(=O)CCl)[C@H](C)C[C@H]3[C@@H]4CCC\1=C\C(=O)\C=C/[C@]/1(C)[C@@]4(Cl)[C@@H](O)C[C@]23C)c5occc5;Nasonex;Schering;
+CCCC1=NN(C2=C1N=C(NC2=O)C3=C(C=CC(=C3)S(=O)(=O)N4CCN(CC4)C)OCC)C;Viagra;Pfizer;
+CCCC1O[C@@H]2C[C@H]3[C@@H]4CCC5=CC(=O)C=C[C@@]5([C@H]4[C@H](C[C@@]3([C@@]2(O1)C(=O)CO)C)O)C;Symbicort_1;AstraZeneca;concat
+O=CNc1cc(ccc1O)[C@@H](O)CN[C@H](C)Cc2ccc(OC)cc2;Symbicort_2;;
+N\1=C(\c3c(Sc2c/1cccc2)cccc3)N4CCN(CCOCCO)CC4;Seroquel_XR;AstraZeneca;
+Nc3nc2[nH]cc(CCc1ccc(C(=O)N[C@@H](CCC(=O)O)C(=O)O)cc1)c2c(=O)[nH]3;Alimta;Lilly;
+C[C@@H](N)Cc1ccccc1;Adderall_XR_1;Shire;concat
+C[C@@H](Cc1ccccc1)N;Adderall_XR_2;;
+CCC(=O)OC1(C(CC2C1(CC(C3(C2CC(C4=CC(=O)C=CC43C)F)F)O)C)C)C(=O)SCF;Flovent_HFA;GlaxoSmithKline;
+CC(C)(C)NCC(C1=CC(=C(C=C1)O)CO)O;Proair_HFA;Teva Respiratory;
+O=C(OC)N[C@H](C(=O)N[C@@H](Cc1ccccc1)[C@@H](O)CN(NC(=O)[C@@H](NC(=O)OC)C(C)(C)C)Cc3ccc(c2ncccc2)cc3)C(C)(C)C;Reyataz;Bristol-Myers Squibb HIV;
+CC1=C(C=CN=C1CS(=O)C2=NC3=CC=CC=C3N2)OCCCOC;Aciphex;Eisai;
+O=C(OC)C(C1CCCCN1)C2=CC=CC=C2;Concerta;Janssen;
+CCCC1O[C@@H]2C[C@H]3[C@@H]4CCC5=CC(=O)C=C[C@@]5([C@H]4[C@H](C[C@@]3([C@@]2(O1)C(=O)CO)C)O)C;Budesonide;Teva Pharmaceutical Industries;
+CCC[C@@H](C(=O)C(=O)NC1CC1)NC(=O)[C@@H]2[C@H]3CCC[C@H]3CN2C(=O)[C@H](C(C)(C)C)NC(=O)[C@H](C4CCCCC4)NC(=O)c5cnccn5;Incivek;Vertex;
+O=C(O[C@H]3c1nccnc1C(=O)N3c2ncc(Cl)cc2)N4CCN(C)CC4;Lunesta;Sunovion;
+O=C1N(CC(N2[C@@H]1CC3=C([C@H]2C4=CC5=C(OCO5)C=C4)NC6=C3C=CC=C6)=O)C;Cialis;Lilly;
+CN(C)C1C2CC3CC4=C(C=CC(=C4C(=C3C(=O)C2(C(=C(C1=O)C(=O)N)O)O)O)O)N(C)C;Solodyn;Medicis;
+Cc1nnc(o1)C(=O)NC(C)(C)C\3=N\C(C(=O)NCc2ccc(F)cc2)=C(\O)C(=O)N/3C;Isentress;Merck & Co.;
+C[C@H]1COc2c3n1cc(c(=O)c3cc(c2N4CCN(CC4)C)F)C(=O)O;Levaquin;Janssen;
+Fc1cc(c(F)cc1F)C[C@@H](N)CC(=O)N3Cc2nnc(n2CC3)C(F)(F)F;Janumet_1;Merck & Co.;concat
+CN(C)C(=N)N=C(N)N;Janumet_2;;
+O=C(OC)C(C1CCCCN1)C2=CC=CC=C2;Methylphenidate_ER;Watson;
+OC2(C(c1ccc(OC)cc1)CN(C)C)CCCCC2.HCl;Venlafaxine_HCl_ER;Teva Pharmaceutical Industries;concat (manual)
+CC[C@H]1C(=O)N(CC(=O)N([C@H](C(=O)N[C@H](C(=O)N([C@H](C(=O)N[C@H](C(=O)N[C@@H](C(=O)N([C@H](C(=O)N([C@H](C(=O)N([C@H](C(=O)N([C@H](C(=O)N1)[C@@H]([C@H](C)C/C=C/C)O)C)C(C)C)C)CC(C)C)C)CC(C)C)C)C)C)CC(C)C)C)C(C)C)CC(C)C)C)C;Restasis;Allergan;
+O=C1O[C@@H](CNC(=O)C)CN1c3cc(F)c(N2CCOCC2)cc3;Zyvox;Pfizer;
+O=C(c1c3ccc(O)cc3sc1c2ccc(O)cc2)c5ccc(OCCN4CCCCC4)cc5;Evista;Lilly;
+CCCc1nc(c(n1Cc2ccc(cc2)c3ccccc3c4[nH]nnn4)C(=O)OCc5c(oc(=O)o5)C)C(C)(C)O;Benicar;Daiichi Sankyo;
+O=C(N[C@H](C(=O)N[C@H](B(O)O)CC(C)C)Cc1ccccc1)c2nccnc2;Velcade;Millenium;
+O=P(O)(O)C(O)(Cn1ccnc1)P(=O)(O)O;Zometa;Novartis;
+NC(Cc1cc(I)c(Oc2cc(I)c(O)c(I)c2)c(I)c1)C(O)=O;Synthroid;Abbott Laboratories;
+C1CN2CCC1[C@H](C2)OC(=O)N3CCC4=CC=CC=C4[C@@H]3C5=CC=CC=C5;Vesicare;Astellas Pharma US;
+FC=1\C(=N/C(=O)N(C=1)[C@@H]2O[C@@H]([C@@H](O)[C@H]2O)C)\NC(=O)OCCCCC;Xeloda;Roche;
+Cc1ccc(c(c1)[C@H](CCN(C(C)C)C(C)C)c2ccccc2)O;Detrol_LA;Pfizer;
+O=C1[C@@H]2OC3=C(O)C=CC4=C3[C@@]2([C@]5(CC1)O)CCN(C)[C@@H]5C4;Opana_ER;Endo;
+O=S(=O)(c1ccc(N)cc1)N(CC(C)C)C[C@@H](O)[C@@H](NC(=O)O[C@H]2CO[C@H]3OCC[C@@H]23)Cc4ccccc4;Prezista;Janssen;
+CC(C)(C)NCC(C1=CC(=C(C=C1)O)CO)O;Ventolin_HFA;GlaxoSmithKline;
+O=S(=O)(N)c1c(Cl)cc2c(c1)S(=O)(=O)NCN2;Benicar_HCT_1;Daiichi Sankyo;concat
+CCCc1nc(c(n1Cc2ccc(cc2)c3ccccc3c4[nH]nnn4)C(=O)OCc5c(oc(=O)o5)C)C(C)(C)O;Benicar_HCT_2;;
+O=P(O)(O)C(O)(CCN(CCCCC)C)P(=O)(O)O;Boniva;Roche;
+C[C@H]([C@H]1C(=O)N[C@@H](CSSC[C@@H](C(=O)N[C@H](C(=O)N[C@@H](C(=O)N[C@H](C(=O)N1)CCCCN)Cc2c[nH]c3c2cccc3)Cc4ccccc4)NC(=O)[C@@H](Cc5ccccc5)N)C(=O)N[C@H](CO)[C@@H](C)O)O;Sandostatin_LAR;Novartis;octapeptide
+OC(Cc1cccnc1)(P(=O)(O)O)P(=O)(O)O;Actonel;Warner Chilcott;
+CC(C1=CC=CC2=CC=CC=C21)NCCCC3=CC(=CC=C3)C(F)(F)F;Sensipar;Amgen;
+C[C@@H](N)Cc1ccccc1;Amphetamine_Salts_ER_1;Teva Pharmaceutical Industries;concat
+C[C@@H](Cc1ccccc1)N;Amphetamine_Salts_ER_2;;
+O=C(O)c1cc(ccc1O)N;ASACOL;Warner Chilcott;
+Oc1cc4c(cc1)[C@H]3CC[C@]2([C@@H](CC[C@]2(C#C)O)[C@@H]3CC4)C;Loestrin_24_FE_1;Warner Chilcott;concat
+CC(=O)O[C@]1(CC[C@@H]2[C@@]1(CC[C@H]3[C@H]2CCC4=CC(=O)CC[C@H]34)C)C#C;Loestrin_24_FE_2;;
+COCCOc1cc2c(cc1OCCOC)ncnc2Nc3cccc(c3)C#C;Tarceva;Genentech;
+O=C(OCC)CCN(c1ncccc1)C(=O)c4ccc2c(nc(n2C)CNc3ccc(C(=N\C(=O)OCCCCCC)\N)cc3)c4;Pradaxa;Boehringer Ingelheim;
+OC2(C(c1ccc(O)cc1)CN(C)C)CCCCC2;Pristiq;Pfizer;
+n1c2ccccc2[nH]c1[S@](=O)Cc3nccc(c3C)OCC(F)(F)F;Dexilant;Takeda;
+O=C(c1ccc(Cl)cc1)c2ccc(OC(C(=O)OC(C)C)(C)C)cc2;Trilipix;Abbott Laboratories;
+O=C([C@@H]([C@@H]1NCCCC1)C2=CC=CC=C2)OC;Focalin_XR;Novartis;
+FC(F)(F)c1cc(c(cc1)C(F)(F)F)NC(=O)[C@@H]3[C@]2(CC[C@H]4[C@H]([C@@H]2CC3)CC[C@H]5NC(=O)\C=C/[C@]45C)C;Avodart;GlaxoSmithKline;
+CC1=C(C=CC=C1)O[C@H](CCNC)C2=CC=CC=C2;Strattera;Lilly;
+O=C3C(=O)N1CCCC[C@H]1C(=O)O[C@H](C(=C/[C@@H]2CC[C@@H](O)[C@H](OC)C2)/C)[C@H](C)[C@@H](O)CC(=O)[C@@H](/C=C(/C[C@@H](C[C@H](OC)[C@H]4O[C@]3(O)[C@H](C)C[C@@H]4OC)C)C)C\C=C;Prograf;Astellas Pharma;
+ClCCN(c2ccc1c(nc(n1C)CCCC(=O)O)c2)CCCl;Treanda;Teva Oncology;
+Cc1c(c(=O)n2c(n1)CCCC2)CCN3CCC(CC3)c4c5ccc(cc5on4)F;Risperdal Consta;Janssen;
+O=C(N[C@@H]3C\1=C\C(=O)C(\OC)=C/C=C/1c2c(cc(OC)c(OC)c2OC)CC3)C;Colcrys;AR Scientific;
+CC(C)c4nc(CN(C)C(=O)N[C@@H](C(C)C)C(=O)N[C@@H](Cc1ccccc1)C[C@H](O)[C@H](Cc2ccccc2)NC(=O)OCc3cncs3)cs4;Norvir;Abbott Laboratories;
+OCc1cc(ccc1O)[C@@H](O)CNC(C)(C)C;Xopenex;SUNOVION;
+FC(F)(F)c2cc(OC[C@H](O)/C=C/[C@@H]1[C@H]([C@@H](O)C[C@H]1O)C\C=C/CCCC(=O)OC(C)C)ccc2;Travatan_Z;Novartis Vision;
+n3c1c(ncn1[C@H]2/C=C\[C@@H](CO)C2)c(nc3N)NC4CC4 and O=C1/N=C(/N)\C=C/N1[C@@H]2O[C@@H](SC2)CO;Epzicom;ViiV Healthcare;
+O=C5N([C@H]2C1CCN(CC1)C2)C[C@@H]4c3c5cccc3CCC4;Aloxi;Eisai;
+C[C@@H](N)Cc1ccccc1;Amphetamine_Salts_ER_1;Global;concat
+C[C@@H](Cc1ccccc1)N;Amphetamine_Salts_ER_2;;
+O=C(CC)N(C1CCN(CC1)CCc2ccccc2)c3ccccc3;Fentanyl;Mylan;
+O=C1NC(=O)SC1Cc3ccc(OCCc2ncc(cc2)CC)cc3 and CN(C)C(=N)N=C(N)N;ACTO_plus_met;Takeda;
+O=C(C)Oc1ccccc1C(=O)O and OCCN(CCO)C(N=C1N2CCCCC2)=NC3=C1N=C(N(CCO)CCO)N=C3N4CCCCC4;Aggrenox;Boehringer Ingelheim;
+O=P(O)(O)CO[C@H](C)Cn1c2ncnc(c2nc1)N;Viread;Gilead Sciences;
+O(c1ccc(cc1)CCOC)CC(O)CNC(C)C;Metoprolol Succinate;Par;
+O=C1N(\C(=N/C12CCCC2)CCCC)Cc5ccc(c3ccccc3c4n[nH]nn4)cc5;Avapro;Bristol-Myers Squibb;
+O=C(O)[C@@H]3N4C(=O)[C@@H](NC(=O)[C@@H](c1ccccc1)NC(=O)N2C(=O)C(=O)N(CC)CC2)[C@H]4SC3(C)C and O=S2(=O)[C@]([C@@H](N1C(=O)C[C@H]12)C(=O)O)(Cn3nncc3)C;Zosyn;Pfizer;
+O=C(Oc1cc(ccc1)[C@@H](N(C)C)C)N(CC)C;Exelon;Novartis;
+O=C1NC(=O)CCC1N3C(=O)c2cccc(c2C3)N;Revlimid;Celgene;
+CNC(=O)C1=CN(N=C1)C2=NC(=C3C(=N2)N(C=N3)[C@H]4[C@@H]([C@@H]([C@H](O4)CO)O)O)N;Lexiscan;Astellas Pharma US;
+CCNC(=O)CCCC=CCC1C(CC(C1C=CC(CCC2=CC=CC=C2)O)O)O;Lumigan;Allergan;
+O=C/1N5/C(=N\C(=C\1CCN4CCC(c3noc2cc(F)ccc23)CC4)C)[C@H](O)CCC5;Invega;Janssen;
+O=P(O)(O)C(O)(Cn1ccnc1)P(=O)(O)O;Reclast;Novartis;
+O=C(c1ncn2C(=O)N(\N=N/c12)C)N;Temodar;Schering;
+CC(=O)O[C@H]3[C@H](C)[C@H](O)[C@H](C)[C@@H](O)[C@@H](C)\C=C\C=C(\C)C(=O)Nc6c2c(nc1cc(C)ccn12)c5c4C(=O)[C@@](C)(O/C=C/[C@H](OC)[C@H]3C)Oc4c(C)c(O)c5c6O;Xifaxan;Salix;
+O=C(O)C[C@H](O)C[C@H](O)CCn2c(c(c(c2c1ccc(F)cc1)c3ccccc3)C(=O)Nc4ccccc4)C(C)C;Atorvastatin_calcium;Watson;
+Fc4cc1c(OC(CC1)C(O)CNCC(O)C3Oc2ccc(F)cc2CC3)cc4;Bystolic;Forest;
+O=C/1N5/C(=N\C(=C\1CCN4CCC(c3noc2cc(F)ccc23)CC4)C)[C@H](O)CCC5;Invega Sustenna;Janssen;
+O=C(O)c1cc(ccc1O)N;Lialda;Shire;
+CCCCCCCCC1=CC=C(C=C1)CCC(CO)(CO)N;Gilenya;Novartis;
+OC2(C(c1ccc(OC)cc1)CN(C)C)CCCCC2;Effexor_XR;Pfizer;
+O=C(N[C@@H](Cc1ccccc1)[C@@H](O)C[C@@H](NC(=O)[C@@H](N2C(=O)NCCC2)C(C)C)Cc3ccccc3)COc4c(cccc4C)C and CC(C)c4nc(CN(C)C(=O)N[C@@H](C(C)C)C(=O)N[C@@H](Cc1ccccc1)C[C@H](O)[C@H](Cc2ccccc2)NC(=O)OCc3cncs3)cs4;Kaletra;Abbott Laboratories;
+O(c1ccc(cc1)CCOC)CC(O)CNC(C)C;Metoprolol Succinate_1;Watson;
+C(CC(=O)O)C(=O)O;Metoprolol Succinate_2;;
+O=C(OC(C)(C)C)N[C@@H](c1ccccc1)[C@@H](O)C(=O)O[C@@H]4C(=C3/[C@@H](O)C(=O)[C@]6([C@H]([C@H](OC(=O)c2ccccc2)[C@@](O)(C3(C)C)C4)[C@@]5(OC(=O)C)[C@H](OC5)C[C@@H]6O)C)/C;Taxotere;sanofi-aventis;
+O=C2c1cc(OC)c(OC)cc1CC2CC4CCN(Cc3ccccc3)CC4;Donepezil_HCl;Greenstone;
+n1c2cc3c(cc2ncc1)[C@@H]4CNC[C@H]3C4;Chantix;Pfizer;
+CCC(=O)OC1(C(CC2C1(CC(C3(C2CC(C4=CC(=O)C=CC43C)F)F)O)C)C)C(=O)SCF;Fluticasone_propionate;Roxane;
+COc1c2c(cc(c1N3C[C@@H]4CCCN[C@@H]4C3)F)c(=O)c(cn2C5CC5)C(=O)O;Avelox;Schering;
+Clc1ccccc1C2/C(C(=O)OC)=C(/C)N/C(COCCN)=C2/C(=O)OCC and CCCCC(=O)N(CC1=CC=C(C=C1)C2=CC=CC=C2C3=NNN=N3)C(C(C)C)C(=O)O;Exforge;Novartis;
+O=C(N1[C@H](C#N)C[C@@H]2C[C@H]12)[C@@H](N)C35CC4CC(C3)CC(O)(C4)C5;Onglyza;Bristol-Myers Squibb;
+O=C4[C@@H]5Oc1c2c(ccc1OC)C[C@H]3N(CC[C@]25[C@H]3CC4)C and CC(=O)Nc1ccc(O)cc1;hydrocodone/acetaminophen;Watson;
+CN1CCN(CC1)C/2=N/c4ccccc4Nc3sc(C)cc\23;Zyprexa_Zydis;Eli Lilly;
+O=C(C(C)NC(C)(C)C)C1=CC=CC(Cl)=C1;Bupropion_HCL_XL;Mylan;
+O=C(OCC(=O)[C@]3(OC(=O)CC)[C@]2(C[C@H](O)[C@]4(Cl)[C@@]/1(\C(=C/C(=O)\C=C\1)CC[C@H]4[C@@H]2C[C@@H]3C)C)C)CC;QVAR;Teva Respiratory;
+n1cncn1Cc2cc3c(cc2)[nH]cc3CCN(C)C;Maxalt_MLT;Merck & Co.;
+C[C@H](/C=C/[C@H](C)C(C)(C)O)[C@H]1CC[C@H]2/C(=C/C=C3C[C@H](C[C@@H](C3)O)O)/CCC[C@]12C;Zemplar;Abbott Laboratories;convert from INCHI
+O=C(OC(C)(C)C)N[C@@H](c1ccccc1)[C@@H](O)C(=O)O[C@@H]4C(=C3/[C@@H](O)C(=O)[C@]6([C@H]([C@H](OC(=O)c2ccccc2)[C@@](O)(C3(C)C)C4)[C@@]5(OC(=O)C)[C@H](OC5)C[C@@H]6O)C)/C;Docetaxel;Hospira;
+C[C@H]1[C@H]([C@@](C[C@@H](O1)O[C@@H]2[C@H]([C@@H]([C@H](O[C@H]2Oc3c4cc5cc3Oc6ccc(cc6Cl)[C@H]([C@H](C(=O)N[C@H](C(=O)N[C@H]5C(=O)N[C@@H]7c8ccc(c(c8)-c9c(cc(cc9O)O)[C@H](NC(=O)[C@H]([C@@H](c1ccc(c(c1)Cl)O4)O)NC7=O)C(=O)O)O)CC(=O)N)NC(=O)[C@@H](CC(C)C)NC)O)CO)O)O)(C)N)O;Vancocin;Viropharma;
+NC1=NC(N)=NN=C1C2=CC=CC(Cl)=C2Cl;Lamictal;GlaxoSmithKline;
+O=C1/N=C(\N=C/N1[C@@H]2O[C@@H]([C@@H](O)[C@H]2O)CO)N;Vidaza;Celgene;
+O=C(OCC(OCn1c2N\C(=N/C(=O)c2nc1)N)CO)[C@@H](N)C(C)C;Valcyte;Roche;
+O=C(N(c1c(I)c(c(I)c(c1I)C(=O)NCC(O)CO)C(=O)NCC(O)CO)CC(O)CO)C;Omnipaque;GE Healthcare;
+O=C(Nc1c(cccc1C)C)CN3CCN(CC(O)COc2ccccc2OC)CC3;Ranexa;Gilead Sciences;
+;;;
+;;;
+TABLE 3/3, start:;;;
+Only SMILES string and the (potentially enumerated) name of the drug are retained.;;;
+;;;
+O=C(O)C[C@H](O)C[C@H](O)CCn2c(c(c(c2c1ccc(F)cc1)c3ccccc3)C(=O)Nc4ccccc4)C(C)C;Lipitor;;
+COC(=O)[C@H](c1ccccc1Cl)N2CCc3c(ccs3)C2;Plavix;;
+COc1ccc2nc([nH]c2c1)S(=O)Cc1ncc(C)c(OC)c1C;Nexium;;
+Clc4cccc(N3CCN(CCCCOc2ccc1c(NC(=O)CC1)c2)CC3)c4Cl;Abilify;;
+CCC(=O)OC1(C(CC2C1(CC(C3(C2CC(C4=CC(=O)C=CC43C)F)F)O)C)C)C(=O)SC;Advair_Diskus_1;;
+OCc1cc(ccc1O)[C@H](O)CNCCCCCCOCCCCc2ccccc2;Advair_Diskus_2;;
+N\1=C(\c3c(Sc2c/1cccc2)cccc3)N4CCN(CCOCCO)CC4;Seroquel;;
+O=C(O)CC1(CC1)CS[C@@H](c2cccc(c2)\C=C\c3nc4cc(Cl)ccc4cc3)CCc5ccccc5C(O)(C)C;Singulair;;
+OC(=O)C[C@H](O)C[C@H](O)\C=C\c1c(C(C)C)nc(N(C)S(=O)(=O)C)nc1c2ccc(F)cc2;Crestor;;
+CNCC[C@@H](C1=CC=CS1)OC2=CC=CC3=CC=CC=C32;Cymbalta;;
+O=C1NC(=O)SC1Cc3ccc(OCCc2ncc(cc2)CC)cc3;Actos;;
+CN1CCN(CC1)C/2=N/c4ccccc4Nc3sc(C)cc\23;Zyprexa;;
+Fc1ccc(cc1)[C@@]3(OCc2cc(C#N)ccc23)CCCN(C)C;Lexapro;;
+O=C4[C@@H]5Oc1c2c(ccc1OC)C[C@H]3N(CC[C@]25[C@@]3(O)CC4)C;Oxycontin;;
+FC(F)([C@]1(OC(NC2=CC=C(C=C21)Cl)=O)C#CC3CC3)F;Atripla_1;;
+FC=1\C(=N/C(=O)N(C=1)[C@H]2O[C@H](SC2)CO)\N;Atripla_2;;
+O=P(O)(O)CO[C@H](C)Cn1c2ncnc(c2nc1)N;Atripla_3;;
+C[N+]1(C2CC(CC1C3C2O3)OC(=O)C(C4=CC=CS4)(C5=CC=CS5)O)C.[Br-];Spiriva_HandiHaler;;
+Fc1cc(c(F)cc1F)C[C@@H](N)CC(=O)N3Cc2nnc(n2CC3)C(F)(F)F;Januvia;;
+C[C@H](Cn1cnc2c1ncnc2N)OCP(=O)(OCOC(=O)OC(C)C)OCOC(=O)OC(C)C;Truvada_1;;
+FC=1\C(=N/C(=O)N(C=1)[C@H]2O[C@H](SC2)CO)\N;Truvada_2;;
+CCCCC(=O)N(CC1=CC=C(C=C1)C2=CC=CC=C2C3=NNN=N3)C(C(C)C)C(=O)O;Diovan;;
+CC(C)CC(CC(=O)O)CN;Lyrica;;
+O=S(=O)(c3ccc(n1nc(cc1c2ccc(cc2)C)C(F)(F)F)cc3)N;Celebrex;;
+CCCCC(=O)N(CC1=CC=C(C=C1)C2=CC=CC=C2C3=NNN=N3)C(C(C)C)C(=O)O;Diovan_HCT_1;;
+O=S(=O)(N)c1c(Cl)cc2c(c1)S(=O)(=O)NCN2;Diovan_HCT_2;;
+Cc1ccc(cc1Nc2nccc(n2)c3cccnc3)NC(=O)c4ccc(cc4)CN5CCN(CC5)C;Gleevec;;
+NC12CC3(CC(C1)(CC(C2)C3)C)C;Namenda;;
+O=C1Cc2c(N1)cc(Cl)c(c2)CCN3CCN(CC3)c4nsc5ccccc45;Geodon;;
+Fc1ccc(cc1)[C@@H](O)CC[C@H]4C(=O)N(c2ccc(F)cc2)[C@@H]4c3ccc(O)cc3;Zetia;;
+O=C(c1ccc(Cl)cc1)c2ccc(OC(C(=O)OC(C)C)(C)C)cc2;Tricor;;
+O=C(N[C@H](Cc1ccccc1)C)[C@@H](N)CCCCN;Vyvanse;;
+Oc7ccc5c1c7O[C@H]3[C@]6(OC)[C@H](C[C@@]2([C@H](N(CC[C@@]123)CC4CC4)C5)CC6)[C@@](O)(C)C(C)(C)C.O=C1[C@@H]2OC3=C(O)C=CC4=C3[C@@]2([C@]5(CC1)O)CCN(CC=C)[C@@H]5C4;Suboxone;;
+O=C(Nc1c(cccc1C)C)CN(CC)CC;Lidoderm;;
+O1C(=O)C(=O)O[Pt-2]12[NH2+]C0CCCCC0[NH2+]2;Eloxatin;;
+OC(=O)c1cccnc1;Niaspan;;
+O=S(C(c1ccccc1)c2ccccc2)CC(=O)N;Provigil;;
+O=C4\C=C2/[C@]([C@H]1CC[C@@]3([C@@H](O)CC[C@H]3[C@@H]1CC2)C)(C)CC4;Androgel;;
+CC(C)[N+]1(C2CCC1CC(C2)OC(=O)C(CO)C3=CC=CC=C3)C.[Br-];Combivent_1;;
+CC(C)(C)NCC(C1=CC(=C(C=C1)O)CO)O;Combivent_2;;
+Fc1ccc(cc1)[C@@H](O)CC[C@H]4C(=O)N(c2ccc(F)cc2)[C@@H]4c3ccc(O)cc3;Vytorin_1;;
+O=C(O[C@@H]1[C@H]3C(=C/[C@H](C)C1)\C=C/[C@@H]([C@@H]3CC[C@H]2OC(=O)C[C@H](O)C2)C)C(C)(C)CC;Vytorin_2;;
+O=C(O[C@]2(C(=O)CCl)[C@H](C)C[C@H]3[C@@H]4CCC\1=C\C(=O)\C=C/[C@]/1(C)[C@@]4(Cl)[C@@H](O)C[C@]23C)c5occc5;Nasonex;;
+CCCC1=NN(C2=C1N=C(NC2=O)C3=C(C=CC(=C3)S(=O)(=O)N4CCN(CC4)C)OCC)C;Viagra;;
+CCCC1O[C@@H]2C[C@H]3[C@@H]4CCC5=CC(=O)C=C[C@@]5([C@H]4[C@H](C[C@@]3([C@@]2(O1)C(=O)CO)C)O)C;Symbicort_1;;
+O=CNc1cc(ccc1O)[C@@H](O)CN[C@H](C)Cc2ccc(OC)cc2;Symbicort_2;;
+N\1=C(\c3c(Sc2c/1cccc2)cccc3)N4CCN(CCOCCO)CC4;Seroquel_XR;;
+Nc3nc2[nH]cc(CCc1ccc(C(=O)N[C@@H](CCC(=O)O)C(=O)O)cc1)c2c(=O)[nH]3;Alimta;;
+C[C@@H](N)Cc1ccccc1;Adderall_XR_1;;
+C[C@@H](Cc1ccccc1)N;Adderall_XR_2;;
+CCC(=O)OC1(C(CC2C1(CC(C3(C2CC(C4=CC(=O)C=CC43C)F)F)O)C)C)C(=O)SCF;Flovent_HFA;;
+CC(C)(C)NCC(C1=CC(=C(C=C1)O)CO)O;Proair_HFA;;
+O=C(OC)N[C@H](C(=O)N[C@@H](Cc1ccccc1)[C@@H](O)CN(NC(=O)[C@@H](NC(=O)OC)C(C)(C)C)Cc3ccc(c2ncccc2)cc3)C(C)(C)C;Reyataz;;
+CC1=C(C=CN=C1CS(=O)C2=NC3=CC=CC=C3N2)OCCCOC;Aciphex;;
+O=C(OC)C(C1CCCCN1)C2=CC=CC=C2;Concerta;;
+CCCC1O[C@@H]2C[C@H]3[C@@H]4CCC5=CC(=O)C=C[C@@]5([C@H]4[C@H](C[C@@]3([C@@]2(O1)C(=O)CO)C)O)C;Budesonide;;
+CCC[C@@H](C(=O)C(=O)NC1CC1)NC(=O)[C@@H]2[C@H]3CCC[C@H]3CN2C(=O)[C@H](C(C)(C)C)NC(=O)[C@H](C4CCCCC4)NC(=O)c5cnccn5;Incivek;;
+O=C(O[C@H]3c1nccnc1C(=O)N3c2ncc(Cl)cc2)N4CCN(C)CC4;Lunesta;;
+O=C1N(CC(N2[C@@H]1CC3=C([C@H]2C4=CC5=C(OCO5)C=C4)NC6=C3C=CC=C6)=O)C;Cialis;;
+CN(C)C1C2CC3CC4=C(C=CC(=C4C(=C3C(=O)C2(C(=C(C1=O)C(=O)N)O)O)O)O)N(C)C;Solodyn;;
+Cc1nnc(o1)C(=O)NC(C)(C)C\3=N\C(C(=O)NCc2ccc(F)cc2)=C(\O)C(=O)N/3C;Isentress;;
+C[C@H]1COc2c3n1cc(c(=O)c3cc(c2N4CCN(CC4)C)F)C(=O)O;Levaquin;;
+Fc1cc(c(F)cc1F)C[C@@H](N)CC(=O)N3Cc2nnc(n2CC3)C(F)(F)F;Janumet_1;;
+CN(C)C(=N)N=C(N)N;Janumet_2;;
+O=C(OC)C(C1CCCCN1)C2=CC=CC=C2;Methylphenidate_ER;;
+OC2(C(c1ccc(OC)cc1)CN(C)C)CCCCC2.HCl;Venlafaxine_HCl_ER;;
+CC[C@H]1C(=O)N(CC(=O)N([C@H](C(=O)N[C@H](C(=O)N([C@H](C(=O)N[C@H](C(=O)N[C@@H](C(=O)N([C@H](C(=O)N([C@H](C(=O)N([C@H](C(=O)N([C@H](C(=O)N1)[C@@H]([C@H](C)C/C=C/C)O)C)C(C)C)C)CC(C)C)C)CC(C)C)C)C)C)CC(C)C)C)C(C)C)CC(C)C)C)C;Restasis;;
+O=C1O[C@@H](CNC(=O)C)CN1c3cc(F)c(N2CCOCC2)cc3;Zyvox;;
+O=C(c1c3ccc(O)cc3sc1c2ccc(O)cc2)c5ccc(OCCN4CCCCC4)cc5;Evista;;
+CCCc1nc(c(n1Cc2ccc(cc2)c3ccccc3c4[nH]nnn4)C(=O)OCc5c(oc(=O)o5)C)C(C)(C)O;Benicar;;
+O=C(N[C@H](C(=O)N[C@H](B(O)O)CC(C)C)Cc1ccccc1)c2nccnc2;Velcade;;
+O=P(O)(O)C(O)(Cn1ccnc1)P(=O)(O)O;Zometa;;
+NC(Cc1cc(I)c(Oc2cc(I)c(O)c(I)c2)c(I)c1)C(O)=O;Synthroid;;
+C1CN2CCC1[C@H](C2)OC(=O)N3CCC4=CC=CC=C4[C@@H]3C5=CC=CC=C5;Vesicare;;
+FC=1\C(=N/C(=O)N(C=1)[C@@H]2O[C@@H]([C@@H](O)[C@H]2O)C)\NC(=O)OCCCCC;Xeloda;;
+Cc1ccc(c(c1)[C@H](CCN(C(C)C)C(C)C)c2ccccc2)O;Detrol_LA;;
+O=C1[C@@H]2OC3=C(O)C=CC4=C3[C@@]2([C@]5(CC1)O)CCN(C)[C@@H]5C4;Opana_ER;;
+O=S(=O)(c1ccc(N)cc1)N(CC(C)C)C[C@@H](O)[C@@H](NC(=O)O[C@H]2CO[C@H]3OCC[C@@H]23)Cc4ccccc4;Prezista;;
+CC(C)(C)NCC(C1=CC(=C(C=C1)O)CO)O;Ventolin_HFA;;
+O=S(=O)(N)c1c(Cl)cc2c(c1)S(=O)(=O)NCN2;Benicar_HCT_1;;
+CCCc1nc(c(n1Cc2ccc(cc2)c3ccccc3c4[nH]nnn4)C(=O)OCc5c(oc(=O)o5)C)C(C)(C)O;Benicar_HCT_2;;
+O=P(O)(O)C(O)(CCN(CCCCC)C)P(=O)(O)O;Boniva;;
+C[C@H]([C@H]1C(=O)N[C@@H](CSSC[C@@H](C(=O)N[C@H](C(=O)N[C@@H](C(=O)N[C@H](C(=O)N1)CCCCN)Cc2c[nH]c3c2cccc3)Cc4ccccc4)NC(=O)[C@@H](Cc5ccccc5)N)C(=O)N[C@H](CO)[C@@H](C)O)O;Sandostatin_LAR;;
+OC(Cc1cccnc1)(P(=O)(O)O)P(=O)(O)O;Actonel;;
+CC(C1=CC=CC2=CC=CC=C21)NCCCC3=CC(=CC=C3)C(F)(F)F;Sensipar;;
+C[C@@H](N)Cc1ccccc1;Amphetamine_Salts_ER_1;;
+C[C@@H](Cc1ccccc1)N;Amphetamine_Salts_ER_2;;
+O=C(O)c1cc(ccc1O)N;ASACOL;;
+Oc1cc4c(cc1)[C@H]3CC[C@]2([C@@H](CC[C@]2(C#C)O)[C@@H]3CC4)C;Loestrin_24_FE_1;;
+CC(=O)O[C@]1(CC[C@@H]2[C@@]1(CC[C@H]3[C@H]2CCC4=CC(=O)CC[C@H]34)C)C#C;Loestrin_24_FE_2;;
+COCCOc1cc2c(cc1OCCOC)ncnc2Nc3cccc(c3)C#C;Tarceva;;
+O=C(OCC)CCN(c1ncccc1)C(=O)c4ccc2c(nc(n2C)CNc3ccc(C(=N\C(=O)OCCCCCC)\N)cc3)c4;Pradaxa;;
+OC2(C(c1ccc(O)cc1)CN(C)C)CCCCC2;Pristiq;;
+n1c2ccccc2[nH]c1[S@](=O)Cc3nccc(c3C)OCC(F)(F)F;Dexilant;;
+O=C(c1ccc(Cl)cc1)c2ccc(OC(C(=O)OC(C)C)(C)C)cc2;Trilipix;;
+O=C([C@@H]([C@@H]1NCCCC1)C2=CC=CC=C2)OC;Focalin_XR;;
+FC(F)(F)c1cc(c(cc1)C(F)(F)F)NC(=O)[C@@H]3[C@]2(CC[C@H]4[C@H]([C@@H]2CC3)CC[C@H]5NC(=O)\C=C/[C@]45C)C;Avodart;;
+CC1=C(C=CC=C1)O[C@H](CCNC)C2=CC=CC=C2;Strattera;;
+O=C3C(=O)N1CCCC[C@H]1C(=O)O[C@H](C(=C/[C@@H]2CC[C@@H](O)[C@H](OC)C2)/C)[C@H](C)[C@@H](O)CC(=O)[C@@H](/C=C(/C[C@@H](C[C@H](OC)[C@H]4O[C@]3(O)[C@H](C)C[C@@H]4OC)C)C)C\C=C;Prograf;;
+ClCCN(c2ccc1c(nc(n1C)CCCC(=O)O)c2)CCCl;Treanda;;
+Cc1c(c(=O)n2c(n1)CCCC2)CCN3CCC(CC3)c4c5ccc(cc5on4)F;Risperdal_Consta;;
+O=C(N[C@@H]3C\1=C\C(=O)C(\OC)=C/C=C/1c2c(cc(OC)c(OC)c2OC)CC3)C;Colcrys;;
+CC(C)c4nc(CN(C)C(=O)N[C@@H](C(C)C)C(=O)N[C@@H](Cc1ccccc1)C[C@H](O)[C@H](Cc2ccccc2)NC(=O)OCc3cncs3)cs4;Norvir;;
+OCc1cc(ccc1O)[C@@H](O)CNC(C)(C)C;Xopenex;;
+FC(F)(F)c2cc(OC[C@H](O)/C=C/[C@@H]1[C@H]([C@@H](O)C[C@H]1O)C\C=C/CCCC(=O)OC(C)C)ccc2;Travatan_Z;;
+n3c1c(ncn1[C@H]2/C=C\[C@@H](CO)C2)c(nc3N)NC4CC4;Epzicom_1;;
+O=C1/N=C(/N)\C=C/N1[C@@H]2O[C@@H](SC2)CO;Epzicom_2;;
+O=C5N([C@H]2C1CCN(CC1)C2)C[C@@H]4c3c5cccc3CCC4;Aloxi;;
+C[C@@H](N)Cc1ccccc1;Amphetamine_Salts_ER_1;;
+C[C@@H](Cc1ccccc1)N;Amphetamine_Salts_ER_2;;
+O=C(CC)N(C1CCN(CC1)CCc2ccccc2)c3ccccc3;Fentanyl;;
+O=C1NC(=O)SC1Cc3ccc(OCCc2ncc(cc2)CC)cc3;ACTO_plus_met_1;;
+CN(C)C(=N)N=C(N)N;ACTO_plus_met_2;;
+O=C(C)Oc1ccccc1C(=O)O;Aggrenox_1;;
+OCCN(CCO)C(N=C1N2CCCCC2)=NC3=C1N=C(N(CCO)CCO)N=C3N4CCCCC4;Aggrenox_2;;
+O=P(O)(O)CO[C@H](C)Cn1c2ncnc(c2nc1)N;Viread;;
+O(c1ccc(cc1)CCOC)CC(O)CNC(C)C;Metoprolol_Succinate_1;;
+C(CC(=O)O)C(=O)O;Metoprolol_Succinate_2;;
+O=C1N(\C(=N/C12CCCC2)CCCC)Cc5ccc(c3ccccc3c4n[nH]nn4)cc5;Avapro;;
+O=C(O)[C@@H]3N4C(=O)[C@@H](NC(=O)[C@@H](c1ccccc1)NC(=O)N2C(=O)C(=O)N(CC)CC2)[C@H]4SC3(C)C;Zosyn_1;;
+O=S2(=O)[C@]([C@@H](N1C(=O)C[C@H]12)C(=O)O)(Cn3nncc3)C;Zosyn_2;;
+O=C(Oc1cc(ccc1)[C@@H](N(C)C)C)N(CC)C;Exelon;;
+O=C1NC(=O)CCC1N3C(=O)c2cccc(c2C3)N;Revlimid;;
+CNC(=O)C1=CN(N=C1)C2=NC(=C3C(=N2)N(C=N3)[C@H]4[C@@H]([C@@H]([C@H](O4)CO)O)O)N;Lexiscan;;
+CCNC(=O)CCCC=CCC1C(CC(C1C=CC(CCC2=CC=CC=C2)O)O)O;Lumigan;;
+O=C/1N5/C(=N\C(=C\1CCN4CCC(c3noc2cc(F)ccc23)CC4)C)[C@H](O)CCC5;Invega;;
+O=P(O)(O)C(O)(Cn1ccnc1)P(=O)(O)O;Reclast;;
+O=C(c1ncn2C(=O)N(\N=N/c12)C)N;Temodar;;
+CC(=O)O[C@H]3[C@H](C)[C@H](O)[C@H](C)[C@@H](O)[C@@H](C)\C=C\C=C(\C)C(=O)Nc6c2c(nc1cc(C)ccn12)c5c4C(=O)[C@@](C)(O/C=C/[C@H](OC)[C@H]3C)Oc4c(C)c(O)c5c6O;Xifaxan;;
+O=C(O)C[C@H](O)C[C@H](O)CCn2c(c(c(c2c1ccc(F)cc1)c3ccccc3)C(=O)Nc4ccccc4)C(C)C;Atorvastatin_calcium;;
+Fc4cc1c(OC(CC1)C(O)CNCC(O)C3Oc2ccc(F)cc2CC3)cc4;Bystolic;;
+O=C/1N5/C(=N\C(=C\1CCN4CCC(c3noc2cc(F)ccc23)CC4)C)[C@H](O)CCC5;Invega_Sustenna;;
+O=C(O)c1cc(ccc1O)N;Lialda;;
+CCCCCCCCC1=CC=C(C=C1)CCC(CO)(CO)N;Gilenya;;
+OC2(C(c1ccc(OC)cc1)CN(C)C)CCCCC2;Effexor_XR;;
+O=C(N[C@@H](Cc1ccccc1)[C@@H](O)C[C@@H](NC(=O)[C@@H](N2C(=O)NCCC2)C(C)C)Cc3ccccc3)COc4c(cccc4C)C;Kaletra_1;;
+CC(C)c4nc(CN(C)C(=O)N[C@@H](C(C)C)C(=O)N[C@@H](Cc1ccccc1)C[C@H](O)[C@H](Cc2ccccc2)NC(=O)OCc3cncs3)cs4;Kaletra_2;;
+O(c1ccc(cc1)CCOC)CC(O)CNC(C)C;Metoprolol_Succinate_1;;
+C(CC(=O)O)C(=O)O;Metoprolol_Succinate_2;;
+O=C(OC(C)(C)C)N[C@@H](c1ccccc1)[C@@H](O)C(=O)O[C@@H]4C(=C3/[C@@H](O)C(=O)[C@]6([C@H]([C@H](OC(=O)c2ccccc2)[C@@](O)(C3(C)C)C4)[C@@]5(OC(=O)C)[C@H](OC5)C[C@@H]6O)C)/C;Taxotere;;
+O=C2c1cc(OC)c(OC)cc1CC2CC4CCN(Cc3ccccc3)CC4;Donepezil_HCl;;
+n1c2cc3c(cc2ncc1)[C@@H]4CNC[C@H]3C4;Chantix;;
+CCC(=O)OC1(C(CC2C1(CC(C3(C2CC(C4=CC(=O)C=CC43C)F)F)O)C)C)C(=O)SCF;Fluticasone_propionate;;
+COc1c2c(cc(c1N3C[C@@H]4CCCN[C@@H]4C3)F)c(=O)c(cn2C5CC5)C(=O)O;Avelox;;
+Clc1ccccc1C2/C(C(=O)OC)=C(/C)N/C(COCCN)=C2/C(=O)OCC;Exforge_1;;
+CCCCC(=O)N(CC1=CC=C(C=C1)C2=CC=CC=C2C3=NNN=N3)C(C(C)C)C(=O)O;Exforge_2;;
+O=C(N1[C@H](C#N)C[C@@H]2C[C@H]12)[C@@H](N)C35CC4CC(C3)CC(O)(C4)C5;Onglyza;;
+O=C4[C@@H]5Oc1c2c(ccc1OC)C[C@H]3N(CC[C@]25[C@H]3CC4)C;hydrocodone/acetaminophen_1;;
+CC(=O)Nc1ccc(O)cc1;hydrocodone/acetaminophen_2;;
+CN1CCN(CC1)C/2=N/c4ccccc4Nc3sc(C)cc\23;Zyprexa_Zydis;;
+O=C(C(C)NC(C)(C)C)C1=CC=CC(Cl)=C1;Bupropion_HCL_XL;;
+O=C(OCC(=O)[C@]3(OC(=O)CC)[C@]2(C[C@H](O)[C@]4(Cl)[C@@]/1(\C(=C/C(=O)\C=C\1)CC[C@H]4[C@@H]2C[C@@H]3C)C)C)CC;QVAR;;
+n1cncn1Cc2cc3c(cc2)[nH]cc3CCN(C)C;Maxalt_MLT;;
+C[C@H](/C=C/[C@H](C)C(C)(C)O)[C@H]1CC[C@H]2/C(=C/C=C3C[C@H](C[C@@H](C3)O)O)/CCC[C@]12C;Zemplar;;
+O=C(OC(C)(C)C)N[C@@H](c1ccccc1)[C@@H](O)C(=O)O[C@@H]4C(=C3/[C@@H](O)C(=O)[C@]6([C@H]([C@H](OC(=O)c2ccccc2)[C@@](O)(C3(C)C)C4)[C@@]5(OC(=O)C)[C@H](OC5)C[C@@H]6O)C)/C;Docetaxel;;
+C[C@H]1[C@H]([C@@](C[C@@H](O1)O[C@@H]2[C@H]([C@@H]([C@H](O[C@H]2Oc3c4cc5cc3Oc6ccc(cc6Cl)[C@H]([C@H](C(=O)N[C@H](C(=O)N[C@H]5C(=O)N[C@@H]7c8ccc(c(c8)-c9c(cc(cc9O)O)[C@H](NC(=O)[C@H]([C@@H](c1ccc(c(c1)Cl)O4)O)NC7=O)C(=O)O)O)CC(=O)N)NC(=O)[C@@H](CC(C)C)NC)O)CO)O)O)(C)N)O;Vancocin;;
+NC1=NC(N)=NN=C1C2=CC=CC(Cl)=C2Cl;Lamictal;;
+O=C1/N=C(\N=C/N1[C@@H]2O[C@@H]([C@@H](O)[C@H]2O)CO)N;Vidaza;;
+O=C(OCC(OCn1c2N\C(=N/C(=O)c2nc1)N)CO)[C@@H](N)C(C)C;Valcyte;;
+O=C(N(c1c(I)c(c(I)c(c1I)C(=O)NCC(O)CO)C(=O)NCC(O)CO)CC(O)CO)C;Omnipaque;;
+O=C(Nc1c(cccc1C)C)CN3CCN(CC(O)COc2ccccc2OC)CC3;Ranexa;;
+;;;
+END of file.;;;
