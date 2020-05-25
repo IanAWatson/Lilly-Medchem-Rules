@@ -37,7 +37,7 @@ S(CC1=CC=C(O1)CN(C)C)CCNC(=CN(=O)=O)NC,ZANTAC,rejection,vinyl_nitro
 S1(=O)(=O)N(C)C(=C(O)NC2=NC=C(C)S2)C(=O)C2=CC=CC=C12,MOBIC,fail on demerits,enamine_2:enol_or_vinyl_ether
 IC1=CC(=CC(I)=C1O)OC1=C(I)C=C(C[C@H](N)C(O)=O)C=C1I,SYNTHROID,fail on demerits,negative:aromatic_iodide
 P(O)(O)(=O)C(O)(P(O)(O)=O)CCN(C)CCCCC,BONIVA,fail on demerits,negative:C5:no_rings
-P(O)(O)(=O)C(O)(P(O)(O)=O)CCCN,FOSAMAX,fail on demerits,negative:no  rings:phosphoric_acid
+P(O)(O)(=O)C(O)(P(O)(O)=O)CCCN,FOSAMAX,fail on demerits,negative:no rings:phosphoric_acid
 O(C)C(=O)C1=C(C)NC(C)=C(C1C1=CC=CC=C1N(=O)=O)C(=O)OC,ADALAT,fail on demerits,nitro:ester
 O(C)C1=CC2=C(N=CC2=CNNC(=NCCCCC)N)C=C1,ZELNORM,fail on demerits,N-N:C5
 S(CCC(=NS(=O)(=O)N)N)CC1=CSC(=N1)NN(C)C,PEPCID,fail on demerits,N-N:sulfonyl_imine
@@ -47,11 +47,11 @@ FC1=CC=C(C2=C(C(=C(N2CC[C@H](O)C[C@H](O)CC(O)=O)C(C)C)C(=O)NC2=CC=CC=C2)C2=CC=CC
 ClC1=CC2=C(C=CC(=N2)C=CC2=CC(=CC=C2)[C@H](SCC2(CC2)CC(O)=O)CCC2=CC=CCC2C(O)(C)C)C=C1,SINGULAIR,fail on demerits,too_many_atoms
 O=C(NC1=CC(=C(C)C=C1)NC1=NC=CC(=N1)C1=CN=CC=C1)C1=CC=C(CN2CCN(C)CC2)C=C1,GLEEVEC,fail on demerits,too_many_atoms:aniline_acyl_newd
 O[C@H]1[C@@H]([C@H]([C@@H](O)C1)CC=CCCCC(=O)OC(C)C)CC[C@@H](O)CCC1=CC=CC=C1,XALATAN,fail on demerits,too_many_atoms:C6:ester
-ClC1=CC=CC=C1C1C(=C(NC(=C1C(=O)OC)C)COCCN)C(=O)OCC,NORVASC,fail on demerits,too  many  atoms:ester:enamine_2
-O(CC)C1=NC2=CC=CC(=C2N1CC1=CC=C(C2=CC=CC=C2C2=NN=NN2)C=C1)C(O)=O,BLOPRESS,fail on demerits,too  many  atoms:negative
-OC(=O)[C@@H](N(CC1=CC=C(C=C1)C1=CC=CC=C1C1=NN=NN1)C(=O)CCCC)C(C)C,DIOVAN,fail on demerits,too  many  atoms:negative:C4
-S1C2=CC=CC=C2C(=NC2=CC=CC=C12)N1CCN(CC1)CCOCCO,SEROQUEL,fail on demerits,too  many  atoms:positive:crown_2_2
-S(=O)(=O)(NC(=O)NC1CCC(C)CC1)C1=CC=C(CCNC(=O)N2CC(C)=C(CC)C2=O)C=C1,AMARYL,fail on demerits,too  many  atoms:sulfonyl_urea
+ClC1=CC=CC=C1C1C(=C(NC(=C1C(=O)OC)C)COCCN)C(=O)OCC,NORVASC,fail on demerits,too many atoms:ester:enamine_2
+O(CC)C1=NC2=CC=CC(=C2N1CC1=CC=C(C2=CC=CC=C2C2=NN=NN2)C=C1)C(O)=O,BLOPRESS,fail on demerits,too many atoms:negative
+OC(=O)[C@@H](N(CC1=CC=C(C=C1)C1=CC=CC=C1C1=NN=NN1)C(=O)CCCC)C(C)C,DIOVAN,fail on demerits,too many atoms:negative:C4
+S1C2=CC=CC=C2C(=NC2=CC=CC=C12)N1CCN(CC1)CCOCCO,SEROQUEL,fail on demerits,too many atoms:positive:crown_2_2
+S(=O)(=O)(NC(=O)NC1CCC(C)CC1)C1=CC=C(CCNC(=O)N2CC(C)=C(CC)C2=O)C=C1,AMARYL,fail on demerits,too many atoms:sulfonyl_urea
 ClC1=C(N2CCN(CC2)CCCCOC2=CC3=C(CCC(=O)N3)C=C2)C=CC=C1Cl,ABILIFY,pass,
 S(=O)(CC1=NC=CC(=C1C)OCCCOC)C1=NC2=CC=CC=C2N1,ACIPHEX,pass,
 P(O)(O)(=O)C(O)(P(O)(O)=O)CC1=CN=CC=C1,ACTONEL,pass,
