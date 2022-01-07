@@ -4,5 +4,5 @@
 
 # One of the C=O must be a ketone, so T1 for 1st carbon
 
-  (A C smarts "[O,N,S;D1]=[#6;T1]~[#6]=[O,N,S;D1]")
+  (A C smarts "[O,N,S;D1]=[#6T1]~[#6]=[O,N,S;D1]")
 )

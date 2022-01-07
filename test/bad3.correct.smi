@@ -36,6 +36,7 @@ BrC1=C2OC3=C(Br)C(=C(Br)C=C3C3(OC(=O)C4=CC=CC=C34)C2=CC(Br)=C1O)O PBCHM27020 : D
 BrC1=C2OC3=C(Br)C(O)=C(Br)C=C3C3(OC(=O)C4=C(Cl)C=CC(Cl)=C34)C2=CC(Br)=C1O PBCHM22948 : D(190) bromine:negative:too_many_atoms
 BrC1=CC(=C(OC)C=C1N(CCN(CC)CC)CCN(CC)CC)OC PBCHM22400 : D(125) positive:bromine:aniline_no_h_newd:aniline_no_h_ewd:too_many_atoms
 BrC1=CC(=CC(Br)=C1O)C1(OC(=O)C2=CC=CC=C12)C1=CC(Br)=C(O)C(Br)=C1 PBCHM65569 : D(170) bromine:negative:too_many_atoms
+BrC1=CC(=NS(=O)(=O)C2=CC=CC=C2)C(=NS(=O)(=O)C2=CC=CC=C2)C=C1 PBCHM291494 : D(113) thio_oxime:too_many_atoms
 BrC1=CC2=C(C(C)(C)C(=O)N(CCC3=CC=C(S(=O)(=O)NC(=O)NC45CC6CC(C4)CC(C5)C6)C=C3)C2=O)C=C1 PBCHM64301 : D(100) too_many_atoms
 BrC1=CC2=C(C(C)(C)C(=O)N(CCC3=CC=C(S(=O)(=O)NC(=O)NC45CC6CC(C4)CC(C5)C6)C=C3)C2=O)C=C1 PBCHM64302 : D(100) too_many_atoms
 BrC1=CC2=C(N(C(=O)C2OC(=O)CC)C(=O)CC)C=C1 PBCHM57503 : D(129) acyl_amide_cyclic:ester:bromine
@@ -905,6 +906,8 @@ O=C(NC1C2CC3CC1CC(C2)C3)C12CC3(CC(C1)CC(C2)C3)C1=CC=C(C)C=C1 PBCHM3918800 : D(10
 O=C(NC1CC(C)(CC(C)(C)C1)CNC(=O)N1CCCCCC1=O)N1CCCCCC1=O PBCHM91960 : D(116) acylurea:too_many_atoms
 O=C(NC1CCC(CC2CCC(NC(=O)C34CC5CC(C3)CC(C4)C5)CC2)CC1)C12CC3CC(C1)CC(C2)C3 PBCHM337302 : D(133) too_many_atoms:too_many_rings
 O=C(NC1CCCCC1)NC(=O)C(CC=C)(CC=C)C(=O)OCC PBCHM38530 : D(110) acyl_amide_acyclic:acylurea:ester
+O=C(NCC)NC(=O)C(=NOC)C#N PBCHM103234 : D(100) vinyl_cyano_het:no_rings:oxime
+O=C(NCC)NC(=O)C(=NOC)C#N PBCHM42614 : D(100) vinyl_cyano_het:no_rings:oxime
 O=C(NCC12CC3CC(C1)CC(C2)C3)C12CC3(CC(C1)CC(C2)C3)C1=CC=C(C)C=C1 PBCHM3964756 : D(115) adamantane:too_many_atoms:too_many_rings
 O=C(NCC12CC3CC(C1)CC(C2)C3)C12CC3(C[C@@H](C1)C[C@@H](C2)C3)C1=CC=C(C)C=C1 PBCHM7312500 : D(115) adamantane:too_many_atoms:too_many_rings
 O=C(NCC1=CC=CC=C1)CCNNC(=O)C1=CC=NC=C1 PBCHM14400 : D(125) N-N:hydrazide_acyclic
@@ -1289,7 +1292,10 @@ S(=O)(=O)(N1C=C(N=C1)CC(NC(=O)OC(C)(C)C)C(=O)N1C(CCC1)C(=O)OC)C1=CC=C(C)C=C1 PBC
 S(=O)(=O)(N1N=NC(=C1CCC)CCC)C1=CC=C(N(=O)=O)C=C1 PBCHM274510 : D(110) nitro:sulfonyl_n_aromatic_edg
 S(=O)(=O)(N=C1C(=C(N(C)C)N(C)C)C=CC=C1)C1=CC=CC=C1 PBCHM329702 : D(100) thio_oxime:enamine_2
 S(=O)(=O)(N=C1C(=C(N2CCOCC2)N2CCOCC2)C=CC=C1)C1=CC=CC=C1 PBCHM329703 : D(126) thio_oxime:enamine_2:too_many_atoms
+S(=O)(=O)(N=C1C(=NS(=O)(=O)C2=CC=CC=C2)C=CC(=C1)CC)C1=CC=CC=C1 PBCHM251579 : D(120) thio_oxime:too_many_atoms
+S(=O)(=O)(N=C1C(=NS(=O)(=O)C2=CC=CC=C2)C=CC=C1)C1=CC=CC=C1 PBCHM285918 : D(106) thio_oxime:too_many_atoms
 S(=O)(=O)(N=C1C(C)(OC(=O)C)C=CC2=CC=CC=C12)C1=CC=CC=C1 PBCHM286351 : D(110) thio_oxime:ester:sulfonyl_imine
+S(=O)(=O)(N=C1C2=C3C(=CC1=NS(=O)(=O)C1=CC=CC=C1)CCC3=CC=C2)C1=CC=CC=C1 PBCHM286360 : D(146) thio_oxime:too_many_atoms
 S(=O)(=O)(N=C1C2=CC=CC=C2C(C)(OC(=O)C)C=C1)C1=CC=C(C)C=C1 PBCHM286359 : D(116) thio_oxime:ester:sulfonyl_imine:too_many_atoms
 S(=O)(=O)(N=C1C=CC(OC(=O)C)(C2(OC(=O)C)C=CC(=NS(=O)(=O)C3=CC=CC=C3)C=C2)C=C1)C1=CC=CC=C1 PBCHM291455 : D(100) too_many_atoms
 S(=O)(=O)(N=CC1=CC=CC=C1)C1=CC=C(N(=O)=O)C=C1 PBCHM320393 : D(110) nitro:thio_oxime
@@ -1412,6 +1418,8 @@ S(=O)(=O)(O)CNC(=O)CCC(N)C(=O)O PBCHM2935 : D(120) negative:sulfonic_acid:no_rin
 S(=O)(=O)(O)CNNC(=O)C1=CC=NC=C1 PBCHM3769 : D(115) N-N:sulfonic_acid
 S(=O)(=O)(O)C[C@H](N)C(=O)O PBCHM72886 : D(180) reverse_michael:negative:no_rings
 S(=O)(=O)(O)N1C(=NC2=CC=CC=C12)CCCCCCCCCCC PBCHM62084 : D(300) LongCChain
+S(=O)(=O)(O)N1C(C(NC(=O)C(=NOCC(=O)O)C2=CSC(=N2)N)C1=O)COC(=O)N PBCHM2584 : D(103) negative:too_many_atoms:oxime
+S(=O)(=O)(O)N1C(C)C(NC(=O)C(=NOC(C)(C)C(=O)O)C2=CSC(=N2)N)C1=O PBCHM2274 : D(130) negative:sulfonic_acid:too_many_atoms:oxime
 S(=O)(=O)(O)N=CC1=CC(=C(OC)C=C1)OC PBCHM410534 : D(115) thio_oxime:sulfonic_acid:sulfonyl_imine
 S(=O)(=O)(O)N=CC1=CC=C(OC)C=C1 PBCHM410532 : D(115) thio_oxime:sulfonic_acid:sulfonyl_imine
 S(=O)(=O)(O)N=NC1=CC=C(N(C)C)C=C1 PBCHM8808 : D(100) N=N
