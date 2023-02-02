@@ -34,7 +34,7 @@ def usage (rc)
   $stderr.print " -dcf  <fname>  demerit control file (the -C option to iwdemerit)\n" if ($expert)
   $stderr.print " -q <dir>       directory for queries\n" if ($expert)
   $stderr.print " -okiso         allow isotopic atoms to pass through\n";
-  $stderr.print"  -symm <bonds>  discard symmetric molecules where two symmetric atoms > <bonds> apart\n" if $expert
+  $stderr.print " -symm <bonds>  discard symmetric molecules where two symmetric atoms > <bonds> apart\n" if $expert
   $stderr.print " -noapdm        do not append demerit reasons\n"
   $stderr.print " -i <type>      input type\n" if ($expert)
   $stderr.print " -expert        more options\n" unless ($expert);
@@ -55,7 +55,7 @@ if (cl.option_present('expert'))
   $expert = true
 end
 
-if (0 == ARGV.size)
+if ARGV.empty?
   $stderr.print "Insufficient arguments\n"
   usage(2)
 end
@@ -65,23 +65,23 @@ append_demerit_reason = ! cl.option_present('noapdm')   # convoluted inverse log
 stop_afer_completing_step = 3    # no longer optional
 
 input_type = ""
-if (cl.option_present('i'))
+if cl.option_present('i')
   input_type = '-i ' << cl.value('i')
 end
 
 # The ring bond ratio used by mc_first_pass
 
 ring_bond_ratio = -1
-if (cl.option_present('b'))
+if cl.option_present('b')
   ring_bond_ratio = cl.value('b')
 end
 
 mc_first_pass_options = ""
-if (cl.option_present('tp'))
+if cl.option_present('tp')
   mc_first_pass_options = cl.value('tp')
 end
 
-if (! cl.option_present('okiso'))
+unless cl.option_present('okiso')
   mc_first_pass_options << ' -I 0'
 end
 
@@ -99,7 +99,7 @@ tsubstructure = bindir.find_executable('tsubstructure')
 
 query_dir = "#{ianhome}/queries";
 
-if (cl.option_present('q'))
+if cl.option_present('q')
   query_dir = cl.value('q')
 end
 
@@ -115,9 +115,9 @@ query_file[3] = 'demerits'
 
 bad_stem = false
 
-if (cl.option_present('B'))
+if cl.option_present('B')
   bad_stem = cl.value('B')
-elsif (cl.option_present('nobadfiles'))
+elsif cl.option_present('nobadfiles')
   true
 else
   bad_stem = 'bad'
@@ -127,7 +127,7 @@ end
 
 logfilestem = 'ok';
 
-if (cl.option_present('log'))
+if cl.option_present('log')
   logfilestem = cl.value('log')
 end
 
@@ -143,18 +143,18 @@ end
 
 extra_iwdemerit_options = ""
 
-if (cl.option_present('relaxed'))
+if cl.option_present('relaxed')
   $default_soft_upper_atom_count_cutoff = 26
   $default_hard_upper_atom_count_cutoff = 50
   extra_iwdemerit_options << " -f 160"
 end
 
-if (cl.option_present('nodemerit'))
+if cl.option_present('nodemerit')
   extra_iwdemerit_options << " -r"
   $default_soft_upper_atom_count_cutoff = $default_hard_upper_atom_count_cutoff - 1
 end
 
-if (cl.option_present('iwd'))
+if cl.option_present('iwd')
   extra_iwdemerit_options << " " << cl.value('iwd')
 end
 
@@ -164,26 +164,26 @@ end
 
 charge_assigner = "#{ianhome}/charge_assigner/queries"
 
-if (! FileTest.size?(charge_assigner))
+unless FileTest.size?(charge_assigner)
   $stderr.print "Charge assigner not available, skipping\n"
 else
   extra_iwdemerit_options << " -N F:#{charge_assigner}"
 end
 
 lower_atom_count_cutoff = $default_lower_atom_count_cutoff
-if (cl.option_present('c'))
+if cl.option_present('c')
   lower_atom_count_cutoff = cl.value('c')
 end
 
 soft_upper_atom_count_cutoff = $default_soft_upper_atom_count_cutoff;
-if (cl.option_present('Cs'))
+if cl.option_present('Cs')
   soft_upper_atom_count_cutoff = cl.value('Cs')
 end
 
 hard_upper_atom_count_cutoff = $default_hard_upper_atom_count_cutoff;
-if (cl.option_present('Ch'))
+if cl.option_present('Ch')
   hard_upper_atom_count_cutoff = cl.value('Ch')
-  if (! cl.option_present('Cs'))
+  unless cl.option_present('Cs')
     soft_upper_atom_count_cutoff = hard_upper_atom_count_cutoff - 1
   end
 end
@@ -192,7 +192,7 @@ if (hard_upper_atom_count_cutoff < soft_upper_atom_count_cutoff)
   hard_upper_atom_count_cutoff = soft_upper_atom_count_cutoff + 1
 end
 
-unless (FileTest.directory?(query_dir))
+unless FileTest.directory?(query_dir)
   $stderr.print "Cannot continue, query dir '#{query_dir}' invalid\n"
   exit(3)
 end
@@ -241,7 +241,7 @@ end
 if (cl.option_present('odm'))
 
   tmpdir = "."
-  if (cl.option_present('tmpdir'))
+  if cl.option_present('tmpdir')
     tmpdir = cl.value('tmpdir')
   end
 
@@ -265,7 +265,7 @@ if (cl.option_present('odm'))
 
     stem = m[1]
 
-    if (odm.match(stem))
+    if odm.match(stem)
       items_discarded += 1
     else
       new_demerits << "#{query_dir}/#{stem}.qry\n"
@@ -287,11 +287,11 @@ end
 
 iwdemerit_optional_control_file = false
 
-if (cl.option_present('dcf'))
+if cl.option_present('dcf')
   iwdemerit_optional_control_file = cl.value('dcf')
 end
 
-if (cl.option_present('edm'))
+if cl.option_present('edm')
   additional_demerits = cl.value('edm')
 end
 
@@ -332,7 +332,7 @@ if (stop_afer_completing_step >= 1)
   end
 end
 
-if (cl.option_present('S'))
+if cl.option_present('S')
   s = cl.value('S')
   cmd << " > #{s}"
 end

@@ -39,7 +39,7 @@ After downloading the software, multiple options are offered to
 install the program.  These include a compilation with `make` e.g.,
 in Cygwin or Linux Ubuntu, or as docker file and are documented in
 dedicated `.md` files.  In addition to C++, an installation of Ruby
-is required allowing to perform a basic scrutiny by
+is required allowing to perform a basic functionality by
 
 `ruby Lilly_Medchem_Rules.rb input.smi > okmedchem.smi`
 
@@ -64,3 +64,20 @@ cross-linked [Wikipedia project](https://en.wikipedia.org/wiki/Wikipedia:WikiPro
 are provided to illustrate the outcome of this set of rules among drugs
 eventually marketed.  These of course represent a stage of development
 much later than the of screening the program targets.
+
+## Adjusting Defaults
+
+By default, molecules with fewer than 7 heavy atoms are rejected. Molecules with
+between 25 and 40 heavy atoms are progressively demerited, and after 40, molecules are rejected.
+These upper limits are referred to as the soft and hard upper cutoffs. 
+Atom count paramters can be adjusted via the `-c` (lower cutoff) and
+`-Cs` and `-Ch` (soft and hard upper atom count) options.  For example
+if you wanted to filter to molecules that contained between 10 and 40
+atoms with no demerits, and then reject at 50 heavy atoms, that could
+be
+
+`ruby Lilly_Medchem_Rules.rb -c 10 -Cs 40 -Ch 50 input.smi > okmedchem.smi`
+
+Unfortunately as currently implemented the combination `-Cs 50 -Ch 50` does
+not work, so if you want to largely avoid demerits for heavy atom count try
+something like `-Cs 50 -Ch 51`.
