@@ -1,0 +1,18 @@
+# RuleClass rings
+# SubClass count
+
+(11 Query
+  (A C Comment "naphthalene_singly_connected")
+  (A I Version 2)
+  (A I one_embedding_per_start_atom 1)
+  (A I subtract_from_rc 1)
+  (A I min_hits_needed 2)
+  (A I ncon 1)
+  (A I unique_embeddings_only 1)
+  (A I all_hits_in_same_fragment 1)
+  (A I min_nrings 4)
+  (A I min_aromatic_ring_count 4)
+  (A I embeddings_do_not_overlap 1)
+  (A D numeric_value 55)
+  (A C smarts "c12:c:c:c:c:c2:c:c:c:c1")
+)

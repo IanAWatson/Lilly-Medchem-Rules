@@ -182,13 +182,14 @@ usage (int rc = 1)
   cerr << "  -s good        ignore erroneous chiral input\n";
   cerr << "  -s 1           include chiral info in output (default)\n";
   cerr << "  -s 0           exclude chiral info from output\n";
-//cerr << "  -n <number>    assign sequential numbers R(%d) starting with <number>\n";
   cerr << "  -b <ratio>     skip molecules with ring bond ratio's >= than <ratio>\n";
   cerr << "  -w             run all checks - normally discards molecules once problem found\n";
   cerr << "  -V             skip any molecule with abnormal valences\n";
   cerr << "  -k             allow molecules having no \"interesting\" atoms to pass\n";
   cerr << "  -f <fraction>  minimum fraction of interesting atoms required\n";
   cerr << "  -y             allow non periodic table elements if they are not connected\n";
+  cerr << "  -e <ele>       temporarily make element <ele> organic\n";
+  cerr << "  -n <ele>       temporarily make element <ele> non-organic\n";
   cerr << "  -L <fname>     write rejected molecules to <fname>\n";
   cerr << "  -a             append rejection reason to name in reject log\n";
   cerr << "  -u             write the rejection reason like tsubstructure\n";
@@ -398,7 +399,7 @@ static int
 exclude_for_atom_type (const Molecule & m)
 {
 
-  int matoms = m.natoms ();
+  const int matoms = m.natoms ();
   for (int i = 0; i < matoms; i++)
   {
     const Atom * a = m.atomi (i);
@@ -856,7 +857,7 @@ tp_first_pass (const char *fname,
 static int
 tp_first_pass (int argc, char ** argv)
 {
-  Command_Line cl (argc, argv, "aI:g:t:n:L:S:d:A:K:X:c:C:E:vVi:o:r:R:B:P:p:b:kyue:x:Z:wf:");
+  Command_Line cl(argc, argv, "aI:g:t:n:L:S:d:A:K:X:c:C:E:vVi:o:r:R:B:P:p:b:kyue:x:Z:wf:");
 
   verbose = cl.option_count ('v');
 
@@ -1059,12 +1060,6 @@ tp_first_pass (int argc, char ** argv)
     usage (50);
   }
 
-//if (! number_assigner.initialise (cl, 'n', verbose))
-//{
-//  cerr << "Cannot process -n option\n";
-//  usage (51);
-//}
-
   if (cl.option_present ('r'))
   {
     if (! cl.value ('r', lower_ring_count_cutoff) ||
@@ -1265,6 +1260,21 @@ tp_first_pass (int argc, char ** argv)
       {
         Element * x = const_cast<Element *>(o);
         x->set_organic(1);
+      }
+    }
+  }
+
+  if (cl.option_present('n')) {
+    IWString ele;
+    for (int i = 0; cl.value('n', ele, i); ++i) {
+      const Element * e = get_element_from_symbol_no_case_conversion(ele);
+      if (e == NULL) {
+        cerr << "Unrecognised element '" << ele << "'\n";
+        return 1;
+      }
+      const_cast<Element*>(e)->set_organic(0);
+      if (verbose) {
+        cerr << "Element '" << ele << "' marked non organic\n";
       }
     }
   }

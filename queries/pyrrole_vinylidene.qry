@@ -1,5 +1,5 @@
 (0 Query
   (A I Version 2)
   (A C Comment "pyrrole_vinylidene")
-  (A C smarts "[N;r5]1=C-C=C-C1=*")
+  (A C smarts "[Nr5]1=C-C=C-C1=*")
 )

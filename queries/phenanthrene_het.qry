@@ -1,11 +1,13 @@
 # RuleClass rings
 # SubClass polyaromatic
 
+# Feb 2004. Change to 60 demerits
+
 (14 Query
   (A C Comment "phenanthrene_het")
   (A I min_nrings 3)
   (A D numeric_value 60)
-  (A I one_embedding_per_start_atom 1)
+  (A I unique_embeddings_only 1)
   (1 Ring_System_Specifier
     (A I min_nrings 3)
     (A I min_aromatic_ring_count 3)

@@ -1,5 +1,10 @@
 (0 Query
   (A I Version 2)
   (A C Comment "non_ring_ketal")
-  (A C smarts "[O,N,S;!$(S~O)]!@[C;H0;X4](!@[O,N,S;!$(S~O)])(C)")
+#  (A C smarts "[O,N,S;!$(S~O)]!@[C;H0;X4](!@[O,N,S;!$(S~O)])(C)")
+  (A C smarts "[O,N,S]!@[CH0X4T2](!@[O,N,S])C")
+  (1 Environment_no_Match
+    (A I bond (0 2))
+    (A C smarts "O")
+  )
 )

@@ -4,6 +4,10 @@
 (9 Query
   (A C Comment "trifluoroacetate_ester")
   (A I Version 2)
+  (0 Elements_Needed
+    (A I atomic_number 9)
+    (A I min_hits_needed 3)
+  )
   (0 Query_Atom
     (A I atomic_number 9)
     (A I ncon 1)

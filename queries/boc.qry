@@ -6,6 +6,7 @@
   (A I Version 2)
   (A D numeric_value 30)
   (A I min_hits_needed 2)
+  (A I unique_embeddings_only 1)
 
   (0 Query_Atom
     (A I atomic_number 7)

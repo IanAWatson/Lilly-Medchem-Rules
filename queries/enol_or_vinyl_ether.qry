@@ -3,5 +3,5 @@
   (A I version 2)
   (A D numeric_value 50)
   (A I embeddings_do_not_overlap 1)
-  (A C smarts "C=C-O")
+  (A C smarts "C=C-[OD2R0]")
 )

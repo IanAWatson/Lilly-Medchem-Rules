@@ -1,6 +1,8 @@
 # RuleClass rings
 # SubClass count
 
+# Feb 2004. Change to 55 demerits
+
 (11 Query
   (A C Comment "naphthyl")
   (A I Version 2)
@@ -96,13 +98,21 @@
     (A I bond 8)
     (A I bond 4)
   )
-  (19 Environment
+# (19 Environment
+#   (A I single_bond (3 6 7 8 9))
+#   (A I no_other_substituents_allowed 1)
+#   (20 Query_Atom
+#     (A I atomic_number (6 9 17))
+#     (A I Optional_match 1)
+#     (A I ncon 1)
+#   )
+# )
+  (20 Environment_no_Match
     (A I single_bond (3 6 7 8 9))
-    (A I no_other_substituents_allowed 1)
-    (20 Query_Atom
-      (A I atomic_number (6 9 17))
-      (A I Optional_match 1)
-      (A I ncon 1)
-    )
+    (A C smarts "[D>1]")
+  )
+  (21 Environment_no_Match
+    (A I single_bond (3 6 7 8 9))
+    (A C smarts "[!#6;!#9;!#17;D1]")
   )
 )

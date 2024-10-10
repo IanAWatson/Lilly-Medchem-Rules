@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Launching test, this may take a while, processing 25k molecules..." 
+echo "Launching test, this may take a while, processing 35k molecules..." 
 
 time ../Lilly_Medchem_Rules.rb example_molecules.smi > okmedchem.smi
 

@@ -546,19 +546,33 @@ grow_chain(Molecule & m,
     already_done[zatom]++;
     rc++;
 
-    if (1 == ncon[zatom])
+    if (1 == ncon[zatom]) {
       return rc;
+    }
 
-    atom_number_t tmp = m.other(zatom, 0);
-    if (already_done[tmp])
-      tmp = m.other(zatom, 1);
+    atom_number_t next_atom = INVALID_ATOM_NUMBER;
+    const Atom * a = m.atomi(zatom);
+    for (int i = 0; i < ncon[zatom]; ++i) {
+      const Bond* b = a->item(i);
+      if (! b->is_single_bond()) {  // do NOT pass through multiple bonds.
+        continue;
+      }
+      const atom_number_t o = b->other(zatom);
+      if (already_done[o]) {
+        continue;
+      }
 
-    assert(0 == already_done[tmp]);
+      if (6 != mz[o] || ncon[o] > 2 || m.is_ring_atom(o) || m.formal_charge(o)) {
+        return rc;
+      }
 
-    if (6 != mz[tmp] || ncon[tmp] > 2 || m.is_ring_atom(tmp) || m.formal_charge(tmp))
+      next_atom = o;
+      break;
+    }
+    if (next_atom == INVALID_ATOM_NUMBER) {
       return rc;
-
-    zatom = tmp;
+    }
+    zatom = next_atom;
   }
 }
 
@@ -579,7 +593,11 @@ determine_chain(Molecule & m,
 
   for (int i = 0; i < 2; i++)
   {
-    atom_number_t a1 = a->other(zatom, i);
+    const Bond * b = a->item(i);
+    if (! b->is_single_bond()) {
+      continue;
+    }
+    atom_number_t a1 = b->other(zatom);
     assert(a1 >= 0 && a1 < m.natoms() && 0 == already_done[a1]);
 
     if (6 == mz[a1] && ncon[a1] <= 2 && m.is_non_ring_atom(a1) && 0 == m.formal_charge(a1))
@@ -644,7 +662,7 @@ long_carbon_chains(Molecule & m, Demerit & demerit,
 
   int nl = long_chain.number_elements();
 
-//#define ECHO_CHAIN_LENGTHS
+#define ECHO_CHAIN_LENGTHS
 #ifdef ECHO_CHAIN_LENGTHS
   for (int i = 0; i < nl; i++)
   {

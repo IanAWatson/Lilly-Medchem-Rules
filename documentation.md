@@ -1,6 +1,6 @@
 Welcome to the Eli Lilly Medchem Rules implementation.
 
-BUILDING:
+# BUILDING:
 
 This software implements the rejection rules described by the 2012
 publication in the Journal of Medicinal Chemistry by
@@ -18,23 +18,28 @@ script Lilly_Medchem_Rules.rb in this directory.  That script will
 locate the executables and data files it needs from the directory
 hierarchy and run the rules.
 
-EXECUTION:
+# EXECUTION:
 
 The normal invocation will be of the form
 
+```
 ruby Lilly_Medchem_Rules.rb input.smi > okmedchem.smi
+```
 
-The molecules from input.smi will be scanned, and those that survive
-will be written to stdout and captured in okmedchem.smi. Molecules
+The molecules from input.smi will be scanned, and those that pass the rules
+will be written to stdout and captured in `okmedchem.smi`. Molecules
 failing the rules will be written to one of four files, bad0.smi
 through bad3.smi. Molecules in those files will be annotated with
 the reason for their rejection.
 
-In the preparation of the .smi files for this program, the user is
-advised to refrain from an articifical aromatization programs like
-openbabel may offer; this is quickly recognized by the use of lower
-case characters e.g., c, n, o, p, s for atoms of carbon, nitrogen,
-oxygen, phosphorous, and sulphur.
+Things will generally work better if you can use Kekule smiles as
+input, rather than aromatic forms. So, 'C1=CC=CC=C1' rather than
+'c1ccccc1' for benzene.
+The reason for this is that different
+tools have different ideas for what can be considered aromatic,
+and so something written as aromatic by one tool may not be
+decipherable by another tool which has different ideas about
+what can be aromatic.
 
 The output file will look like
 
@@ -51,27 +56,57 @@ unchanged through the rules, accruing no demerits - the first two
 examples above. Other molecules that have passed, but have attracted
 demerits will have the demerits shown in the form D(nn) above,
 followed by the reason(s) for the demerits. If you don't care about
-the demerits associated with passing molecules, invoke the script
-with -noapdm and the demerit information will not be appended.
+which demerits might be associated with passing molecules, invoke the script
+with -noapdm and the demerit information will not be appended. The
+demerit rules are still applied.
 
-Note that the software is set up to ignore smiles it cannot interpret.
+Note that this is separate from the -nodemerit option, which does
+not apply any of the demerit rules, the hard rejections only.
+
+Note that the software will ignore smiles it cannot interpret.
 This might be a bad idea, potentially problematic structures should
 generally be investigated. Check the file ok0.log after execution to 
-see evidence of failed smiles interpretation.
+see evidence of failed smiles interpretation, and decide whether
+or not corrective action should be undertaken.
 
 Tool mc_summarise can be helpful in getting an overview of how the
 rules might be impacting a particular set of molecules. An example
 usage might be
 
+```
 bin/mc_summarise -T Reasons okmedchem.smi
+```
 
-QUERY FILES
+# QUERY FILES
 
 The query files are on a modified Cerius-2 format. Today, there are
 many better choices for file formats, and if the software were
-being developed today, we would likely use JSON, Proto or similar.
+being developed today. The current version of LillyMol uses
+Protocol Buffers, and can specify queries in a variety of forms.
 
-SOFTWARE
+# Annotating Rejected Molecules
+If you are curious about why a molecule has matched a query, add the `-label`
+option. This passed `-j 1` to the tsubstructure invocations. With this
+in effect the first matched atom will be assigned isotope 1, the second
+isotope 2, etc. Note that different queries have differing numbers
+of atoms in the query, so the number of isotopic atoms will vary.
+
+tsubstructure is responsible for the files 'bad1.smi' and 'bad2.smi'
+so those are the only two bad* files that will contain labelled atoms.
+
+Note too that some rules do not work by atom matching - large
+ring systems for example. Therefore some rejected molecules from
+tsubstructure may have zero isotopes.
+
+# SOFTWARE
+
+The software included here has evolved to become [LillyMol](https://github.com/EliLillyCo/LillyMol).
+The version of the software used in this repo, Lilly Medchem Rules,
+is mostly frozen and only significant bug fixes are applied. All new
+development is done with LillyMol. The Lilly Medchem Rules
+are also part of LillyMol.
+
+# HISTORICAL INTEREST ONLY
 
 This software has been extensively tested on a variety of *nix type
 systems.  Today it is primarily used on RedHat systems, using either
@@ -165,7 +200,9 @@ difficulties. The tool tsmiles (cd Molecule && make tsmiles) is a tester
 that will automatically test canonicalisation and identify failures.
 Suggest always using the -u option.
 
+```
 time Molecule/tsmiles -p 5 -a -t 0 -w 3 -m 2 -u -q test/example_molecules.smi
+```
 
 Takes around 1 minute to test these 36k molecules - no errors reported.
 
@@ -237,6 +274,5 @@ and we are pleased to be able to share.
 Longer term, the C++ software here will be replaced by the versions at
 [LillyMol](https://github.com/EliLillyCo/LillyMol), which contains
 more functionality. The query functionality will remain unchanged.
-
 
 Please consult the LICENSE file for details of the license.

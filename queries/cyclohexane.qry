@@ -7,6 +7,8 @@
   (A I unique_embeddings_only 1)
   (A I one_embedding_per_start_atom 1)
   (A D numeric_value 40)
+  (A I min_nrings 3)
+  (A I min_aliphatic_ring_count 3)
   (A I min_hits_needed 3)
   (A I embeddings_do_not_overlap 1)
 # We are interested in three or more cyclohexanes

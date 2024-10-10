@@ -35,6 +35,7 @@
     (A I aromatic 1)
     (A I nrings 1)
     (A I ring_size 5)
-    (A I single_bond 2)
+    (A I aromatic_bond 2)
+#   (A I single_bond 2)     sept 2014, aromatic bond is fine
   )
 )

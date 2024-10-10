@@ -1,5 +1,9 @@
 Containers
 ==========
+
+* V2.0 Note. The Docker container has not yet been updated.
+* Will do that once we it looks like this new release is stable.
+
 With this release, I am including infrastructure to help those using
 Docker containers.  This may help people who have difficulty building
 the software from scratch - although you will need to install and

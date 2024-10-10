@@ -1,0 +1,10 @@
+(0 Query
+  (A I Version 2)
+  (A D numeric_value 60)
+  (1 Ring_Specifier
+    (A I aromatic 1)
+    (A I heteratom_count 0)
+    (A I fused 0)
+    (A C environment ">1c[OD1]")
+  )
+)
