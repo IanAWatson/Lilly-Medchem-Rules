@@ -1,0 +1,9 @@
+# SubClass misc
+
+(0 query
+  (A I Version 2)
+  (A C Comment "fulvene")
+  (A D numeric_value 15)
+  (A I one_embedding_per_start_atom 1)
+  (A C smarts "C1=CC=CC1=[CR0]")
+)

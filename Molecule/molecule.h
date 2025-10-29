@@ -11,6 +11,8 @@ class XMLNode;
   Header file for Molecule objects
 */
 
+#include <cstdint>
+
 #include "iwstring.h"
 #include "iwmtypes.h"
 class iwstring_data_source;

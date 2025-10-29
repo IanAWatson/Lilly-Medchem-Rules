@@ -2,6 +2,8 @@
   This function initialises an array of elements.
 */
 
+#include <cstdint>
+
 #include <stdlib.h>
 #include <ctype.h>
 #include <iostream>

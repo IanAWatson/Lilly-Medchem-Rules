@@ -187,13 +187,14 @@ compute_within_ring_unsaturation (const Ring * r, Molecule_to_Match & target)
   return rc;
 }
 
-//#define DEBUG_SS_RING_MATCHES
+// #define DEBUG_SS_RING_MATCHES
 
 int
 Substructure_Ring_Specification::matches (Molecule_to_Match & target)
 {
-  if (SUBSTRUCTURE_NOT_SPECIFIED != _aromatic)
-    target.molecule()->compute_aromaticity();
+  if (SUBSTRUCTURE_NOT_SPECIFIED != _aromatic) {
+    target.molecule()->compute_aromaticity_if_needed();
+  }
 
   int nr = target.nrings();
 
@@ -214,7 +215,7 @@ Substructure_Ring_Specification::matches (Molecule_to_Match & target)
 
 #ifdef DEBUG_SS_RING_MATCHES
     cerr << "Testing ring " << i << " of size " << rsize << " matches is " <<
-          _ring_size.matches(rsize) << endl;
+          _ring_size.matches(rsize) << " aromatic? " << r->is_aromatic() << '\n';
 #endif
 
     if (! _ring_size.matches(rsize))

@@ -662,7 +662,7 @@ long_carbon_chains(Molecule & m, Demerit & demerit,
 
   int nl = long_chain.number_elements();
 
-#define ECHO_CHAIN_LENGTHS
+// #define ECHO_CHAIN_LENGTHS
 #ifdef ECHO_CHAIN_LENGTHS
   for (int i = 0; i < nl; i++)
   {

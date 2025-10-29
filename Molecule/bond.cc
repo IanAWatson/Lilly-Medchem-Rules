@@ -44,19 +44,19 @@ Bond::adjust_for_loss_of_atom (atom_number_t i)
 {
   assert(ok());
 
-  if (_a1 > i)
-    _a1--;
-  else if (_a1 == i)
-  {
+  if (_a1 > i) {
+    _a1--; }
+  else if (_a1 < i) {
+  } else if (_a1 == i) {
     cerr << "Bond::adjust_for_loss_of_atom: involves atom " << i << endl;
     debug_print(cerr);
     assert(NULL == "This should not happen");
   }
 
-  if (_a2 > i)
+  if (_a2 > i) {
     _a2--;
-  else if (_a2 == i)
-  {
+  } else if (_a2 < i) {
+  } else if (_a2 == i) {
     cerr << "Bond::adjust_for_loss_of_atom: involves atom " << i << endl;
     debug_print(cerr);
     assert(NULL == "This should not happen");

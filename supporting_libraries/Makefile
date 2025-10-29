@@ -17,7 +17,7 @@ CP = cp
 RM = rm
 
 
-CFLAGS = -O2 -I . -I ../include -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
+CFLAGS = -O2 -DNDEBUG -I . -I ../include -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 
 LIBRARY_OBJECTS = IWString_class.o cmdline.o iwstring_data_source.o string_data_source.o logical_expression.o msi_object.o new_int.o\
 	iwzlib.o iwgrep-2.5.o grep-2.5.regex.o iwstring_and_file_descriptor.o mtrand.o iwwrite.o iwstring.o iwbits.o\

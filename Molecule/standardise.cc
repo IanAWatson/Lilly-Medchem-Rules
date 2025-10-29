@@ -780,8 +780,11 @@ Chemical_Standardisation::_do_remove_hydrogens(Molecule & m)
 
   const int matoms = m.natoms();
 
-  if (1 == matoms && 1 == m.atomic_number(0))   // Hydrogen molecule, do not "disappear" it...
+  if (1 == matoms && 1 == m.atomic_number(0)) {   // Hydrogen molecule, do not "disappear" it...
     return 0;
+  }
+
+  std::unique_ptr<int[]> to_remove(new_int(matoms));
 
   int rc = 0;
 
@@ -830,12 +833,11 @@ Chemical_Standardisation::_do_remove_hydrogens(Molecule & m)
       }
     }
 
-//  const atom_number_t j = a->other(i, 0);
-    m.remove_atom(i);
-//  cerr << "AFTER removing H residual j IH " << m.implicit_hydrogens(j) << endl;
+    to_remove[i] = 1;
     rc++;
   }
 
+  m.remove_atoms(to_remove.get());
 //cerr << "After removing explicit Hydrogens\n";
 //m.debug_print(cerr);
 
@@ -1477,8 +1479,9 @@ Chemical_Standardisation::_do_protonate_carboxyllic_acids (Molecule & m,
   if (rc)
   {
     _protonate_carboxyllic_acids.extra(rc);
-    if (_verbose)
+    if (_verbose) {
       cerr << "Protonated " << rc << " carboxyllic acids\n";
+    }
 
     if (_append_string_depending_on_what_changed)
       _append_to_changed_molecules << " STD:[OH]-C=O";
@@ -1652,8 +1655,9 @@ Chemical_Standardisation::_do_protonate_sulfur_acids (Molecule & m,
   if (rc)
   {
     _protonate_sulfur_acids.extra(rc);
-    if (_verbose)
+    if (_verbose) {
       cerr << "Protonated " << rc << " Sulphur acids\n";
+    }
 
     if (_append_string_depending_on_what_changed)
       _append_to_changed_molecules << " STD:[SH]-[C,P,S]=[O,S]";
@@ -1739,9 +1743,11 @@ Chemical_Standardisation::_do_protonate_sulfonic_acids (Molecule & m,
 
     if (2 == doubly_bonded_oxygen_count && 1 == ai->formal_charge())    
     {
-      m.set_formal_charge(i, 0);
-      current_molecule_data.change_nneg(-1);
-      current_molecule_data.change_ominus(-1);
+      if (m.formal_charge(i) < 0) {
+        m.set_formal_charge(i, 0);
+        current_molecule_data.change_nneg(-1);
+        current_molecule_data.change_ominus(-1);
+      }
     }
     else if (1 == doubly_bonded_oxygen_count && 1 == as->formal_charge() && 0 == ai->formal_charge())
     {
@@ -1756,8 +1762,7 @@ Chemical_Standardisation::_do_protonate_sulfonic_acids (Molecule & m,
     rc++;
   }
 
-  if (rc)
-  {
+  if (rc) {
     _protonate_sulfonic_acids.extra(rc);
     if (_verbose)
       cerr << "Protonated " << rc << " sulfonic acids\n";

@@ -1,0 +1,8 @@
+(0 Query
+  (A I Version 2)
+  (A C Comment "halogenated_ring_system")
+  (1 ring_system_specifier 
+    (A I min_rings_in_system 2)
+    (A C environment ">3c-[Br,Cl,I]")
+  )
+)

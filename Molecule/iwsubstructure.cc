@@ -2041,7 +2041,7 @@ Single_Substructure_Query::_discern_global_conditions_present ()
   return 0;
 }
 
-//#define DEBUG_CHECK_GLOBAL_CONDITIONS
+// #define DEBUG_CHECK_GLOBAL_CONDITIONS
 
 /*
   At the beginning of a substructure search, check any global specifications
@@ -2118,8 +2118,9 @@ Single_Substructure_Query::_match_global_specifications (Molecule_to_Match & tar
 
   if (_ring_specification.number_elements())
   {
-    if (! _match_ring_specifications(target_molecule))
+    if (! _match_ring_specifications(target_molecule)) {
       return 0;
+    }
   }
 
   if (_ring_system_specification.number_elements())
