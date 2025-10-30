@@ -86,11 +86,27 @@ are provided to illustrate the outcome of this set of rules among drugs
 eventually marketed.  These of course represent a stage of development
 much later than the of screening the program targets.
 
+## Python
+See [iwatobipen](https://iwatobipen.wordpress.com/2023/12/17/useful-package-for-filtering-molecules-of-python-rdkit-python-memo/) for
+a discussion of a nice looking python implemention of this ruleset.
+
 ## Performance
 Performance is reasonable. Using all defaults, Chembl version 33 (2.23M molecules) can be processed
 using a relatively recent (2021) consumer grade CPU, `12th Gen Intel(R) Core(TM) i7-12700K`,
 in 133 seconds. 1.39M molecules pass. A summary of how many molecules hit each
 rule can be found in the file [summary](test/Chembl.txt).
+
+If you are processing a large number of molecules, split the molecules into chunks and
+process the chunks separately. You should use a different bad stem for each split. If you
+have [LillyMol](https://github.com/IanAWatson/LillyMol) installed, that might look like
+```
+iwsplit -suffix smi -n 500000 big.smi
+dopattern.sh -parallel 8 -stem iwsplit%.smi 'Lilly_Medchem_Rules.rb -B BAD% iwsplit%.smi > okmedchem%.smi'
+```
+But beware that the Lilly Medchem Rules script runs across 4 cores, so if you have a 24 core
+machine, do **not** try using `-parallel 24`, since each of those 24 tasks will
+attempt to use their own 4 cores. Use `-parallel 6` to be safe.
+If inside Lilly, use the `-cluster` option to send the tasks to the cluster.
 
 ## Adjusting Defaults
 
