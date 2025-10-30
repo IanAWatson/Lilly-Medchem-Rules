@@ -172,5 +172,5 @@ And if a demerit rule you wish to skip is expressed as a query file,
 you can also remove it from [demerits](queries/demerits).
 
 # More Info
-Further information is in the file (documentation)[documentation.md].
+Further information is in the file [documentation](documentation.md).
 

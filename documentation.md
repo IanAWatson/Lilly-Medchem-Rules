@@ -23,7 +23,7 @@ hierarchy and run the rules.
 The normal invocation will be of the form
 
 ```
-ruby Lilly_Medchem_Rules.rb input.smi > okmedchem.smi
+Lilly_Medchem_Rules.sh input.smi > okmedchem.smi
 ```
 
 The molecules from input.smi will be scanned, and those that pass the rules
