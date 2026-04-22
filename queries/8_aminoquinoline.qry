@@ -6,5 +6,5 @@
     (A I nrings 2)
     (A I aromatic_ring_count 2)
   )
-  (A C smarts "[nD2H0]1c2c(-[ND2H])cccc2ccc1")
+  (A C smarts "[nD2H0]1c2c(-[ND2H]-[G0])cccc2ccc1")
 )
