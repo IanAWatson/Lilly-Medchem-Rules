@@ -8,7 +8,7 @@ J. Med. Chem. 2012, 55, 9763--9772 as ACS Author choice, i.e. open
 access at [doi 10.1021/jm301008n](https://doi.org/10.1021/jm301008n).
 
 
-To quote the abstract, "[This approach] describes a set of 275 rules,
+To quote the abstract, "[This approach] describes a set of ~300 rules,
 developed over an 18-year period, used to identify compounds that may
 interfere with biological assays, allowing their removal from
 screening sets. Reasons for rejection include reactivity (e.g., acyl
@@ -55,10 +55,12 @@ have at least 1 carbon atom, and at least one either Oxygen or Nitrogen atom.
 After downloading the software, multiple options are offered to
 install the program.  These include a compilation with `make` e.g.,
 in Cygwin or Linux Ubuntu, or as docker file and are documented in
-respective `.md` files.  In addition to C++, Ruby is needed to
-run the driver script.
+respective `.md` files. In addition to the C++ executables a driver
+script Lilly_Medchem_Rules.{rb,py} is used to orahestrate the underlying
+executables. The Python version is new but seems to work well.
 
 `ruby Lilly_Medchem_Rules.rb input.smi > okmedchem.smi`
+`python Lilly_Medchem_Rules.py input.smi > okmedchem.smi`
 
 In file `okmedchem.smi` contains the molecules that have passed -
 including those whose summed demerits are below the threshold.
@@ -89,6 +91,11 @@ much later than the of screening the program targets.
 ## Python
 See [iwatobipen](https://iwatobipen.wordpress.com/2023/12/17/useful-package-for-filtering-molecules-of-python-rdkit-python-memo/) for
 a discussion of a nice looking python implemention of this ruleset.
+
+## Updates
+These rules are **not** immutable. If you disagree with any particular
+rule, or how it is implemented, or if you have another structural motif
+you believe should be added please raise an issue.
 
 ## Performance
 Performance is reasonable. Using all defaults, Chembl version 33 (2.23M molecules) can be processed

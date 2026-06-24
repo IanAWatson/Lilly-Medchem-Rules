@@ -24,3 +24,12 @@ the tool have worked out something that works in their context.
 
 Your feedback continues to be both encouraged and most welcome, either via GitHub or to
 ianiwatson@gmail.com.
+
+Version 2.1, Jun 2026
+Python driver script.
+
+Fixes to queries and addition of -tabular output option for simple
+```
+smiles id demerit
+```
+output.

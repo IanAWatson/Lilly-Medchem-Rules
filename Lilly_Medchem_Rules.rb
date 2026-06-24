@@ -36,6 +36,7 @@ def usage (rc)
   $stderr << " -q <dir>         directory for queries\n" if $expert
   $stderr << " -okiso           allow isotopic atoms to pass through\n";
   $stderr << " -label           place isotopic labels on the matched atoms for rejected molecules (bad1.smi and bad2.smi)\n" if $expert
+  $stderr << " -tabular         tabular output 'smiles id demerit' with non demerited molecules written as 0\n"
   $stderr << " -symm <bonds>    discard symmetric molecules where two symmetric atoms > <bonds> apart\n" if $expert
   $stderr << " -nophosphorus    reject all phosphorus containing molecules\n"
   $stderr << " -noapdm          do not append demerit reasons\n"
@@ -45,7 +46,7 @@ def usage (rc)
   exit(rc)
 end
 
-cl = IWCmdline.new("-v-noapdm-i=s-expert-b=fraction-B=s-q=dir-log=s-tp=close-iwd=close-bindir=dir-smarts=s-rej=s-c=ipos-Cs=ipos-Ch=ipos-C=ipos-okiso-odm=s-edm=sfile-relaxed-nodemerit-S=s-dcf=sfile-nobadfiles-symm=ipos-nophosphorus-label")
+cl = IWCmdline.new("-v-noapdm-i=s-expert-b=fraction-B=s-q=dir-log=s-tp=close-iwd=close-bindir=dir-smarts=s-rej=s-c=ipos-Cs=ipos-Ch=ipos-C=ipos-okiso-odm=s-edm=sfile-relaxed-nodemerit-S=s-dcf=sfile-nobadfiles-symm=ipos-nophosphorus-label-tabular")
 
 if cl.unrecognised_options_encountered()
   $stderr << "Unrecognised options encountered\n"
@@ -154,6 +155,10 @@ if cl.option_present('relaxed')
   $default_soft_upper_atom_count_cutoff = 26
   $default_hard_upper_atom_count_cutoff = 50
   extra_iwdemerit_options << " -f 160"
+end
+
+if cl.option_present('tabular')
+  extra_iwdemerit_options << " -W tabular"
 end
 
 if cl.option_present('nodemerit')

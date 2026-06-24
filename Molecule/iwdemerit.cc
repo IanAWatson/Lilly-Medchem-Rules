@@ -91,6 +91,11 @@ static int demerit_numeric_value_index = 0;
 
 static int make_implicit_hydrogens_explicit = 0;
 
+// Write all results as
+// smiles id demerit
+// where `demerit` will be '0' for non demerited molecules.
+static int tabular_output = 0;
+
 /*
   Penalty for symmetric molecules.
   If the bond separation between any pair of symmetric atoms is
@@ -378,8 +383,9 @@ do_append_demerit_text_to_name(Molecule & m,
       new_name << " (1 matches to 'D" << demerits[i]->demerit() << ' ' << demerits[i]->reason() << "')";
     }
   }
-  else
-  {
+  else if (tabular_output) {
+    new_name << ' ' << score;
+  } else {
     new_name << " : D(" << score << ") ";
     for (int i = 0; i < n; ++i)
     {
@@ -419,6 +425,8 @@ iwdemerit (Molecule & m,
 
     if (append_demerit_text_to_name)
       do_append_demerit_text_to_name(m, demerit);
+  } else if (tabular_output) {
+    do_append_demerit_text_to_name(m, demerit);
   }
 
 //cerr << m.name() << " rejected? " << demerit.rejected() << " stream is " << stream_for_non_rejected_molecules.active() << endl;
@@ -1036,8 +1044,12 @@ iwdemerit (int argc, char ** argv)
         if (verbose)
           cerr << "Will write a sorted list of demerits and reasons\n";
       }
-      else if ("help" == w)
-      {
+      else if (w == "tabular") {
+        tabular_output = 1;
+        if (verbose) {
+          cerr << "Will write tabular output 'smiles id demerit' including 0 demerit molecules\n";
+        }
+      } else if ("help" == w) {
         display_dash_W_options(cerr);
       }
       else
